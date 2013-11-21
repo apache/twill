@@ -1,0 +1,211 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.twill.internal;
+
+import org.apache.twill.api.Command;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.RunId;
+import org.apache.twill.api.ServiceController;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.logging.LogHandler;
+import org.apache.twill.common.ServiceListenerAdapter;
+import org.apache.twill.common.Threads;
+import org.apache.twill.internal.state.StateNode;
+import org.apache.twill.internal.zookeeper.InMemoryZKServer;
+import org.apache.twill.zookeeper.NodeData;
+import org.apache.twill.zookeeper.ZKClient;
+import org.apache.twill.zookeeper.ZKClientService;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.AbstractIdleService;
+import com.google.common.util.concurrent.Service;
+import com.google.gson.JsonObject;
+import org.junit.Assert;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ *
+ */
+public class ControllerTest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ControllerTest.class);
+
+  @Test
+  public void testController() throws ExecutionException, InterruptedException, TimeoutException {
+    InMemoryZKServer zkServer = InMemoryZKServer.builder().build();
+    zkServer.startAndWait();
+
+    LOG.info("ZKServer: " + zkServer.getConnectionStr());
+
+    try {
+      RunId runId = RunIds.generate();
+      ZKClientService zkClientService = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
+      zkClientService.startAndWait();
+
+      Service service = createService(zkClientService, runId);
+      service.startAndWait();
+
+      TwillController controller = getController(zkClientService, runId);
+      controller.sendCommand(Command.Builder.of("test").build()).get(2, TimeUnit.SECONDS);
+      controller.stop().get(2, TimeUnit.SECONDS);
+
+      Assert.assertEquals(ServiceController.State.TERMINATED, controller.state());
+
+      final CountDownLatch terminateLatch = new CountDownLatch(1);
+      service.addListener(new ServiceListenerAdapter() {
+        @Override
+        public void terminated(Service.State from) {
+          terminateLatch.countDown();
+        }
+      }, Threads.SAME_THREAD_EXECUTOR);
+
+      Assert.assertTrue(service.state() == Service.State.TERMINATED || terminateLatch.await(2, TimeUnit.SECONDS));
+
+      zkClientService.stopAndWait();
+
+    } finally {
+      zkServer.stopAndWait();
+    }
+  }
+
+  // Test controller created before service starts.
+  @Test
+  public void testControllerBefore() throws InterruptedException {
+    InMemoryZKServer zkServer = InMemoryZKServer.builder().build();
+    zkServer.startAndWait();
+
+    LOG.info("ZKServer: " + zkServer.getConnectionStr());
+    try {
+      RunId runId = RunIds.generate();
+      ZKClientService zkClientService = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
+      zkClientService.startAndWait();
+
+      final CountDownLatch runLatch = new CountDownLatch(1);
+      final CountDownLatch stopLatch = new CountDownLatch(1);
+      TwillController controller = getController(zkClientService, runId);
+      controller.addListener(new ServiceListenerAdapter() {
+        @Override
+        public void running() {
+          runLatch.countDown();
+        }
+
+        @Override
+        public void terminated(Service.State from) {
+          stopLatch.countDown();
+        }
+      }, Threads.SAME_THREAD_EXECUTOR);
+
+      Service service = createService(zkClientService, runId);
+      service.start();
+
+      Assert.assertTrue(runLatch.await(2, TimeUnit.SECONDS));
+      Assert.assertFalse(stopLatch.await(2, TimeUnit.SECONDS));
+
+      service.stop();
+
+      Assert.assertTrue(stopLatch.await(2, TimeUnit.SECONDS));
+
+    } finally {
+      zkServer.stopAndWait();
+    }
+  }
+
+  // Test controller listener receive first state change without state transition from service
+  @Test
+  public void testControllerListener() throws InterruptedException {
+    InMemoryZKServer zkServer = InMemoryZKServer.builder().build();
+    zkServer.startAndWait();
+
+    LOG.info("ZKServer: " + zkServer.getConnectionStr());
+    try {
+      RunId runId = RunIds.generate();
+      ZKClientService zkClientService = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
+      zkClientService.startAndWait();
+
+      Service service = createService(zkClientService, runId);
+      service.startAndWait();
+
+      final CountDownLatch runLatch = new CountDownLatch(1);
+      TwillController controller = getController(zkClientService, runId);
+      controller.addListener(new ServiceListenerAdapter() {
+        @Override
+        public void running() {
+          runLatch.countDown();
+        }
+      }, Threads.SAME_THREAD_EXECUTOR);
+
+      Assert.assertTrue(runLatch.await(2, TimeUnit.SECONDS));
+
+      service.stopAndWait();
+
+      zkClientService.stopAndWait();
+    } finally {
+      zkServer.stopAndWait();
+    }
+  }
+
+  private Service createService(ZKClient zkClient, RunId runId) {
+    return new ZKServiceDecorator(
+      zkClient, runId, Suppliers.ofInstance(new JsonObject()), new AbstractIdleService() {
+
+      @Override
+      protected void startUp() throws Exception {
+        LOG.info("Start");
+      }
+
+      @Override
+      protected void shutDown() throws Exception {
+        LOG.info("Stop");
+      }
+    });
+  }
+
+  private TwillController getController(ZKClient zkClient, RunId runId) {
+    TwillController controller = new AbstractTwillController(runId, zkClient, ImmutableList.<LogHandler>of()) {
+
+      @Override
+      public void kill() {
+        // No-op
+      }
+
+      @Override
+      protected void instanceNodeUpdated(NodeData nodeData) {
+        // No-op
+      }
+
+      @Override
+      protected void stateNodeUpdated(StateNode stateNode) {
+        // No-op
+      }
+
+      @Override
+      public ResourceReport getResourceReport() {
+        return null;
+      }
+    };
+    controller.startAndWait();
+    return controller;
+  }
+}
