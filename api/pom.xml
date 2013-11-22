@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.apache.twill</groupId>
         <artifactId>twill-parent</artifactId>
-        <version>1.3.0-SNAPSHOT</version>
+        <version>0.1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>twill-api</artifactId>
