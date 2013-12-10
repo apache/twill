@@ -29,6 +29,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -53,6 +55,12 @@ import java.util.zip.CheckedOutputStream;
  * This class builds jar files based on class dependencies.
  */
 public final class ApplicationBundler {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ApplicationBundler.class);
+  
+  public static final String SUBDIR_CLASSES = "classes/";
+  public static final String SUBDIR_LIB = "lib/";
+  public static final String SUBDIR_RESOURCES = "resources/";
 
   private final List<String> excludePackages;
   private final List<String> includePackages;
@@ -117,6 +125,7 @@ public final class ApplicationBundler {
    * @throws IOException
    */
   public void createBundle(Location target, Iterable<Class<?>> classes, Iterable<URI> resources) throws IOException {
+    LOG.debug("start creating bundle {}. building a temporary file locally at first", target.getName());
     // Write the jar to local tmp file first
     File tmpJar = File.createTempFile(target.getName(), ".tmp");
     try {
@@ -133,15 +142,23 @@ public final class ApplicationBundler {
       } finally {
         jarOut.close();
       }
+      LOG.debug("copying temporary bundle to destination {} ({} bytes)", target.toURI(), tmpJar.length());
       // Copy the tmp jar into destination.
-      OutputStream os = new BufferedOutputStream(target.getOutputStream());
+      OutputStream os = null; 
       try {
+        os = new BufferedOutputStream(target.getOutputStream());
         Files.copy(tmpJar, os);
+      } catch (IOException e) {
+        throw new IOException("failed to copy bundle from " + tmpJar.toURI() + " to " + target.toURI(), e);
       } finally {
-        os.close();
+        if (os != null) {
+          os.close();
+        }
       }
+      LOG.debug("finished creating bundle at {}", target.toURI());
     } finally {
       tmpJar.delete();
+      LOG.debug("cleaned up local temporary for bundle {}", tmpJar.toURI());
     }
   }
 
@@ -191,20 +208,20 @@ public final class ApplicationBundler {
   private void putEntry(String className, URL classUrl, URL classPathUrl, Set<String> entries, JarOutputStream jarOut) {
     String classPath = classPathUrl.getFile();
     if (classPath.endsWith(".jar")) {
-      saveDirEntry("lib/", entries, jarOut);
-      saveEntry("lib/" + classPath.substring(classPath.lastIndexOf('/') + 1), classPathUrl, entries, jarOut, false);
+      saveDirEntry(SUBDIR_LIB, entries, jarOut);
+      saveEntry(SUBDIR_LIB + classPath.substring(classPath.lastIndexOf('/') + 1), classPathUrl, entries, jarOut, false);
     } else {
       // Class file, put it under the classes directory
-      saveDirEntry("classes/", entries, jarOut);
+      saveDirEntry(SUBDIR_CLASSES, entries, jarOut);
       if ("file".equals(classPathUrl.getProtocol())) {
         // Copy every files under the classPath
         try {
-          copyDir(new File(classPathUrl.toURI()), "classes/", entries, jarOut);
+          copyDir(new File(classPathUrl.toURI()), SUBDIR_CLASSES, entries, jarOut);
         } catch (Exception e) {
           throw Throwables.propagate(e);
         }
       } else {
-        String entry = "classes/" + className.replace('.', '/') + ".class";
+        String entry = SUBDIR_CLASSES + className.replace('.', '/') + ".class";
         saveDirEntry(entry.substring(0, entry.lastIndexOf('/') + 1), entries, jarOut);
         saveEntry(entry, classUrl, entries, jarOut, true);
       }
@@ -241,6 +258,7 @@ public final class ApplicationBundler {
    * Saves a class entry to the jar output.
    */
   private void saveEntry(String entry, URL url, Set<String> entries, JarOutputStream jarOut, boolean compress) {
+    LOG.debug("adding bundle entry " + entry);
     if (!entries.add(entry)) {
       return;
     }
@@ -281,6 +299,7 @@ public final class ApplicationBundler {
    */
   private void copyDir(File baseDir, String entryPrefix,
                        Set<String> entries, JarOutputStream jarOut) throws IOException {
+    LOG.debug("adding whole dir {} to bundle at '{}'", baseDir, entryPrefix);
     URI baseUri = baseDir.toURI();
     Queue<File> queue = Lists.newLinkedList();
     Collections.addAll(queue, baseDir.listFiles());
@@ -291,7 +310,11 @@ public final class ApplicationBundler {
       if (entries.add(entry)) {
         jarOut.putNextEntry(new JarEntry(entry));
         if (file.isFile()) {
-          Files.copy(file, jarOut);
+          try {
+            Files.copy(file, jarOut);
+          } catch (IOException e) {
+            throw new IOException("failure copying from " + file.getAbsoluteFile() + " to JAR file entry " + entry, e);
+          }
         }
         jarOut.closeEntry();
       }
@@ -309,15 +332,15 @@ public final class ApplicationBundler {
     if ("file".equals(resource.getScheme())) {
       File file = new File(resource);
       if (file.isDirectory()) {
-        saveDirEntry("resources/", entries, jarOut);
-        copyDir(file, "resources/", entries, jarOut);
+        saveDirEntry(SUBDIR_RESOURCES, entries, jarOut);
+        copyDir(file, SUBDIR_RESOURCES, entries, jarOut);
         return;
       }
     }
 
     URL url = resource.toURL();
     String path = url.getFile();
-    String prefix = path.endsWith(".jar") ? "lib/" : "resources/";
+    String prefix = path.endsWith(".jar") ? SUBDIR_LIB : SUBDIR_RESOURCES;
     path = prefix + path.substring(path.lastIndexOf('/') + 1);
 
     saveDirEntry(prefix, entries, jarOut);
