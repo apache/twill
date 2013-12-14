@@ -161,6 +161,14 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
     this.jvmOptions = options;
   }
 
+  /**
+   * Returns any extra JVM options that have been set.
+   * @see #setJVMOptions(String)
+   */
+  public String getJVMOptions() {
+    return jvmOptions;
+  }
+
   @Override
   public Cancellable scheduleSecureStoreUpdate(final SecureStoreUpdater updater,
                                                long initialDelay, long delay, TimeUnit unit) {

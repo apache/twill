@@ -62,8 +62,11 @@ public class LocalFileTestRun {
                                         Charsets.UTF_8);
 
     TwillRunner runner = YarnTestSuite.getTwillRunner();
+    String prevJVMOptions = "";
     if (runner instanceof YarnTwillRunnerService) {
-      ((YarnTwillRunnerService) runner).setJVMOptions("-verbose:gc -Xloggc:gc.log -XX:+PrintGCDetails");
+      YarnTwillRunnerService yarnRunner = (YarnTwillRunnerService) runner;
+      prevJVMOptions = yarnRunner.getJVMOptions() != null ? yarnRunner.getJVMOptions() : "";
+      yarnRunner.setJVMOptions(prevJVMOptions + " -verbose:gc -Xloggc:gc.log -XX:+PrintGCDetails");
     }
 
     TwillController controller = runner.prepare(new LocalFileApplication())
@@ -73,7 +76,7 @@ public class LocalFileTestRun {
       .start();
 
     if (runner instanceof YarnTwillRunnerService) {
-      ((YarnTwillRunnerService) runner).setJVMOptions("");
+      ((YarnTwillRunnerService) runner).setJVMOptions(prevJVMOptions);
     }
 
     Iterable<Discoverable> discoverables = controller.discoverService("local");

@@ -109,8 +109,11 @@ public class YarnTestSuite {
    * Creates an unstarted instance of {@link org.apache.twill.api.TwillRunnerService}.
    */
   public static final TwillRunnerService createTwillRunnerService() throws IOException {
-    return new YarnTwillRunnerService(config, zkServer.getConnectionStr() + "/twill",
-                                      new LocalLocationFactory(tmpFolder.newFolder()));
+    YarnTwillRunnerService runner = new YarnTwillRunnerService(config, zkServer.getConnectionStr() + "/twill",
+                                                               new LocalLocationFactory(tmpFolder.newFolder()));
+    // disable tests stealing focus
+    runner.setJVMOptions("-Djava.awt.headless=true");
+    return runner;
   }
 
   public static final <T> boolean waitForSize(Iterable<T> iterable, int count, int limit) throws InterruptedException {
