@@ -17,21 +17,6 @@
  */
 package org.apache.twill.yarn;
 
-import org.apache.twill.api.ResourceSpecification;
-import org.apache.twill.api.TwillController;
-import org.apache.twill.api.TwillRunner;
-import org.apache.twill.api.TwillRunnerService;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
-import org.apache.twill.common.Threads;
-import org.apache.twill.discovery.Discoverable;
-import com.google.common.base.Charsets;
-import com.google.common.io.LineReader;
-import org.junit.Assert;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -43,18 +28,35 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.LineReader;
+
+import org.junit.Assert;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.twill.api.ResourceSpecification;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.TwillRunnerService;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.common.ServiceListenerAdapter;
+import org.apache.twill.common.Threads;
+import org.apache.twill.discovery.Discoverable;
+
 /**
  * Using echo server to test various behavior of YarnTwillService.
- * This test is executed by {@link YarnTestSuite}.
+ * This test is executed by {@link YarnTestUtils}.
  */
-public class EchoServerTestRun {
+public final class EchoServerTestRun extends BaseYarnTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(EchoServerTestRun.class);
 
   @Test
   public void testEchoServer() throws InterruptedException, ExecutionException, IOException,
     URISyntaxException, TimeoutException {
-    TwillRunner runner = YarnTestSuite.getTwillRunner();
+    TwillRunner runner = YarnTestUtils.getTwillRunner();
 
     TwillController controller = runner.prepare(new EchoServer(),
                                                 ResourceSpecification.Builder.with()
@@ -78,7 +80,7 @@ public class EchoServerTestRun {
     Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
 
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestSuite.waitForSize(echoServices, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 60));
 
     for (Discoverable discoverable : echoServices) {
       String msg = "Hello: " + discoverable.getSocketAddress();
@@ -98,36 +100,36 @@ public class EchoServerTestRun {
 
     // Increase number of instances
     controller.changeInstances("EchoServer", 3);
-    Assert.assertTrue(YarnTestSuite.waitForSize(echoServices, 3, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 60));
 
     echoServices = controller.discoverService("echo2");
 
     // Decrease number of instances
     controller.changeInstances("EchoServer", 1);
-    Assert.assertTrue(YarnTestSuite.waitForSize(echoServices, 1, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 1, 60));
 
     // Increase number of instances again
     controller.changeInstances("EchoServer", 2);
-    Assert.assertTrue(YarnTestSuite.waitForSize(echoServices, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 60));
 
     // Make sure still only one app is running
     Iterable<TwillRunner.LiveInfo> apps = runner.lookupLive();
-    Assert.assertTrue(YarnTestSuite.waitForSize(apps, 1, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(apps, 1, 60));
 
     // Creates a new runner service to check it can regain control over running app.
-    TwillRunnerService runnerService = YarnTestSuite.createTwillRunnerService();
+    TwillRunnerService runnerService = YarnTestUtils.createTwillRunnerService(tmpFolder.newFolder());
     runnerService.startAndWait();
 
     try {
       Iterable <TwillController> controllers = runnerService.lookup("EchoServer");
-      Assert.assertTrue(YarnTestSuite.waitForSize(controllers, 1, 60));
+      Assert.assertTrue(YarnTestUtils.waitForSize(controllers, 1, 60));
 
       for (TwillController c : controllers) {
         LOG.info("Stopping application: " + c.getRunId());
         c.stop().get(30, TimeUnit.SECONDS);
       }
 
-      Assert.assertTrue(YarnTestSuite.waitForSize(apps, 0, 60));
+      Assert.assertTrue(YarnTestUtils.waitForSize(apps, 0, 60));
     } finally {
       runnerService.stopAndWait();
     }

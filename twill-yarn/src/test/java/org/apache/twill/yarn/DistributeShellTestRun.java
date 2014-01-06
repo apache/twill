@@ -17,29 +17,31 @@
  */
 package org.apache.twill.yarn;
 
+import java.io.PrintWriter;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.Assert;
+import org.junit.Ignore;
+import org.junit.Test;
+
+import com.google.common.util.concurrent.Service;
+
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
-import com.google.common.util.concurrent.Service;
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
-import java.io.PrintWriter;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This test is executed by {@link YarnTestSuite}.
  */
-public class DistributeShellTestRun {
+public final class DistributeShellTestRun extends BaseYarnTest {
 
   @Ignore
   @Test
   public void testDistributedShell() throws InterruptedException {
-    TwillRunner twillRunner = YarnTestSuite.getTwillRunner();
+    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
 
     TwillController controller = twillRunner.prepare(new DistributedShell("pwd", "ls -al"))
                                             .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))

@@ -17,24 +17,6 @@
  */
 package org.apache.twill.yarn;
 
-import org.apache.twill.api.TwillApplication;
-import org.apache.twill.api.TwillController;
-import org.apache.twill.api.TwillRunner;
-import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.discovery.Discoverable;
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Files;
-import com.google.common.io.LineReader;
-import org.junit.Assert;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -48,20 +30,36 @@ import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
+import org.junit.Test;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
+import com.google.common.io.LineReader;
+
+import org.apache.twill.api.TwillApplication;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.discovery.Discoverable;
+import org.junit.Assert;
+
 /**
  * Test for local file transfer.
  */
-public class LocalFileTestRun {
-
-  @ClassRule
-  public static TemporaryFolder tmpFolder = new TemporaryFolder();
+public final class LocalFileTestRun extends BaseYarnTest {
 
   @Test
   public void testLocalFile() throws Exception {
     String header = Files.readFirstLine(new File(getClass().getClassLoader().getResource("header.txt").toURI()),
                                         Charsets.UTF_8);
 
-    TwillRunner runner = YarnTestSuite.getTwillRunner();
+    TwillRunner runner = YarnTestUtils.getTwillRunner();
     String prevJVMOptions = "";
     if (runner instanceof YarnTwillRunnerService) {
       YarnTwillRunnerService yarnRunner = (YarnTwillRunnerService) runner;
@@ -80,7 +78,7 @@ public class LocalFileTestRun {
     }
 
     Iterable<Discoverable> discoverables = controller.discoverService("local");
-    Assert.assertTrue(YarnTestSuite.waitForSize(discoverables, 1, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 1, 60));
 
     InetSocketAddress socketAddress = discoverables.iterator().next().getSocketAddress();
     Socket socket = new Socket(socketAddress.getAddress(), socketAddress.getPort());
@@ -98,7 +96,7 @@ public class LocalFileTestRun {
 
     controller.stopAndWait();
 
-    Assert.assertTrue(YarnTestSuite.waitForSize(discoverables, 0, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 0, 60));
 
     TimeUnit.SECONDS.sleep(2);
   }

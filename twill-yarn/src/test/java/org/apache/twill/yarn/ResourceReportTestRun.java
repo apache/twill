@@ -17,26 +17,6 @@
  */
 package org.apache.twill.yarn;
 
-import org.apache.twill.api.ResourceReport;
-import org.apache.twill.api.ResourceSpecification;
-import org.apache.twill.api.TwillApplication;
-import org.apache.twill.api.TwillController;
-import org.apache.twill.api.TwillRunResources;
-import org.apache.twill.api.TwillRunner;
-import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
-import org.apache.twill.common.Threads;
-import org.apache.twill.discovery.Discoverable;
-import org.apache.twill.internal.EnvKeys;
-import com.google.common.base.Charsets;
-import com.google.common.collect.Maps;
-import com.google.common.io.LineReader;
-import org.junit.Assert;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -50,11 +30,33 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.google.common.base.Charsets;
+import com.google.common.collect.Maps;
+import com.google.common.io.LineReader;
+
+import org.junit.Assert;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.ResourceSpecification;
+import org.apache.twill.api.TwillApplication;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.common.ServiceListenerAdapter;
+import org.apache.twill.common.Threads;
+import org.apache.twill.discovery.Discoverable;
+import org.apache.twill.internal.EnvKeys;
+
 /**
  * Using echo server to test resource reports.
- * This test is executed by {@link org.apache.twill.yarn.YarnTestSuite}.
+ * This test is executed by {@link org.apache.twill.yarn.YarnTestUtils}.
  */
-public class ResourceReportTestRun {
+public final class ResourceReportTestRun {
 
   private static final Logger LOG = LoggerFactory.getLogger(ResourceReportTestRun.class);
 
@@ -80,7 +82,7 @@ public class ResourceReportTestRun {
   @Test
   public void testRunnablesGetAllowedResourcesInEnv() throws InterruptedException, IOException,
     TimeoutException, ExecutionException {
-    TwillRunner runner = YarnTestSuite.getTwillRunner();
+    TwillRunner runner = YarnTestUtils.getTwillRunner();
 
     ResourceSpecification resourceSpec = ResourceSpecification.Builder.with()
       .setVirtualCores(1)
@@ -104,7 +106,7 @@ public class ResourceReportTestRun {
     Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
 
     Iterable<Discoverable> envEchoServices = controller.discoverService("envecho");
-    Assert.assertTrue(YarnTestSuite.waitForSize(envEchoServices, 1, 30));
+    Assert.assertTrue(YarnTestUtils.waitForSize(envEchoServices, 1, 30));
 
     // TODO: check virtual cores once yarn adds the ability
     Map<String, String> expectedValues = Maps.newHashMap();
@@ -134,7 +136,7 @@ public class ResourceReportTestRun {
   @Test
   public void testResourceReportWithFailingContainers() throws InterruptedException, IOException,
     TimeoutException, ExecutionException {
-    TwillRunner runner = YarnTestSuite.getTwillRunner();
+    TwillRunner runner = YarnTestUtils.getTwillRunner();
 
     ResourceSpecification resourceSpec = ResourceSpecification.Builder.with()
       .setVirtualCores(1)
@@ -158,7 +160,7 @@ public class ResourceReportTestRun {
     Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
 
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestSuite.waitForSize(echoServices, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 60));
     // check that we have 2 runnables.
     ResourceReport report = controller.getResourceReport();
     Assert.assertEquals(2, report.getRunnableResources("BuggyServer").size());
@@ -188,7 +190,7 @@ public class ResourceReportTestRun {
   @Test
   public void testResourceReport() throws InterruptedException, ExecutionException, IOException,
     URISyntaxException, TimeoutException {
-    TwillRunner runner = YarnTestSuite.getTwillRunner();
+    TwillRunner runner = YarnTestUtils.getTwillRunner();
 
     TwillController controller = runner.prepare(new ResourceApplication())
                                         .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
@@ -209,7 +211,7 @@ public class ResourceReportTestRun {
 
     // wait for 3 echo servers to come up
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestSuite.waitForSize(echoServices, 3, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 60));
     ResourceReport report = controller.getResourceReport();
     // make sure resources for echo1 and echo2 are there
     Map<String, Collection<TwillRunResources>> usedResources = report.getResources();
@@ -236,7 +238,7 @@ public class ResourceReportTestRun {
     // Decrease number of instances of echo1 from 2 to 1
     controller.changeInstances("echo1", 1);
     echoServices = controller.discoverService("echo1");
-    Assert.assertTrue(YarnTestSuite.waitForSize(echoServices, 1, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 1, 60));
     report = controller.getResourceReport();
 
     // make sure resources for echo1 and echo2 are there

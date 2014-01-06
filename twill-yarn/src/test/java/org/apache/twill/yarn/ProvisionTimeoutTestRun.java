@@ -17,6 +17,16 @@
  */
 package org.apache.twill.yarn;
 
+import java.io.PrintWriter;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableMap;
+
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.EventHandler;
 import org.apache.twill.api.EventHandlerContext;
@@ -25,27 +35,19 @@ import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
 import org.junit.Test;
 
-import java.io.PrintWriter;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.common.Services;
 
 /**
  *
  */
-public class ProvisionTimeoutTestRun {
+public final class ProvisionTimeoutTestRun extends BaseYarnTest {
 
   @Test
   public void testProvisionTimeout() throws InterruptedException, ExecutionException, TimeoutException {
-    TwillRunner runner = YarnTestSuite.getTwillRunner();
+    TwillRunner runner = YarnTestUtils.getTwillRunner();
 
     TwillController controller = runner.prepare(new TimeoutApplication())
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))

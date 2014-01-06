@@ -17,6 +17,8 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillController;
@@ -24,8 +26,6 @@ import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.Service;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
  * Testing application master will shutdown itself when all tasks are completed.
  * This test is executed by {@link YarnTestSuite}.
  */
-public class TaskCompletedTestRun {
+public final class TaskCompletedTestRun extends BaseYarnTest {
 
   public static final class SleepTask extends AbstractTwillRunnable {
 
@@ -60,7 +60,7 @@ public class TaskCompletedTestRun {
 
   @Test
   public void testTaskCompleted() throws InterruptedException {
-    TwillRunner twillRunner = YarnTestSuite.getTwillRunner();
+    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
     TwillController controller = twillRunner.prepare(new SleepTask(),
                                                 ResourceSpecification.Builder.with()
                                                   .setVirtualCores(1)

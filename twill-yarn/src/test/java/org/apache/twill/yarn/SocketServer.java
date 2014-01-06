@@ -17,13 +17,12 @@
  */
 package org.apache.twill.yarn;
 
-import org.apache.twill.api.AbstractTwillRunnable;
-import org.apache.twill.api.TwillContext;
-import org.apache.twill.api.TwillContext;
-import org.apache.twill.common.Cancellable;
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import org.apache.twill.api.AbstractTwillRunnable;
+import org.apache.twill.api.TwillContext;
+import org.apache.twill.common.Cancellable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

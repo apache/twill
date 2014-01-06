@@ -17,9 +17,9 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillSpecification;
-import com.google.common.collect.ImmutableSet;
 import org.junit.Assert;
 import org.junit.Test;
 

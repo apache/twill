@@ -17,22 +17,21 @@
  */
 package org.apache.twill.yarn;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import java.io.IOException;
+
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.rules.TemporaryFolder;
 
 /**
- * Test suite for all tests with mini yarn cluster.
+ * Base class for all YARN tests.
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-                      EchoServerTestRun.class,
-                      ResourceReportTestRun.class,
-                      TaskCompletedTestRun.class,
-                      DistributeShellTestRun.class,
-                      LocalFileTestRun.class,
-                      FailureRestartTestRun.class,
-                      ProvisionTimeoutTestRun.class
-                    })
-public final class YarnTestSuite {
+public abstract class BaseYarnTest {
+  @ClassRule
+  public static TemporaryFolder tmpFolder = new TemporaryFolder();
 
+  @BeforeClass
+  public static final void init() throws IOException {
+    YarnTestUtils.initOnce(tmpFolder.newFolder());
+  }
 }

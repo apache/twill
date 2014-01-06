@@ -17,18 +17,6 @@
  */
 package org.apache.twill.yarn;
 
-import org.apache.twill.api.Command;
-import org.apache.twill.api.ResourceSpecification;
-import org.apache.twill.api.TwillController;
-import org.apache.twill.api.TwillRunner;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.discovery.Discoverable;
-import com.google.common.base.Charsets;
-import com.google.common.collect.Sets;
-import com.google.common.io.LineReader;
-import org.junit.Assert;
-import org.junit.Test;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -39,14 +27,28 @@ import java.net.Socket;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Assert;
+import org.junit.Test;
+
+import com.google.common.base.Charsets;
+import com.google.common.collect.Sets;
+import com.google.common.io.LineReader;
+
+import org.apache.twill.api.Command;
+import org.apache.twill.api.ResourceSpecification;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.discovery.Discoverable;
+
 /**
  *
  */
-public class FailureRestartTestRun {
+public final class FailureRestartTestRun extends  BaseYarnTest {
 
   @Test
   public void testFailureRestart() throws Exception {
-    TwillRunner runner = YarnTestSuite.getTwillRunner();
+    TwillRunner runner = YarnTestUtils.getTwillRunner();
 
     ResourceSpecification resource = ResourceSpecification.Builder.with()
       .setVirtualCores(1)
@@ -60,7 +62,7 @@ public class FailureRestartTestRun {
       .start();
 
     Iterable<Discoverable> discoverables = controller.discoverService("failure");
-    Assert.assertTrue(YarnTestSuite.waitForSize(discoverables, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 60));
 
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));
@@ -71,7 +73,7 @@ public class FailureRestartTestRun {
     // Do a shot sleep, make sure the runnable is killed.
     TimeUnit.SECONDS.sleep(5);
 
-    Assert.assertTrue(YarnTestSuite.waitForSize(discoverables, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 60));
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));
 
