@@ -281,6 +281,21 @@
                     <deployAtEnd>true</deployAtEnd>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.10</version>
+                <configuration>
+                    <excludes>
+                        <exclude>.git/**/*</exclude>
+                        <exclude>**/*.iml</exclude>
+                        <exclude>target/**/*</exclude>
+                        <exclude>**/README</exclude>
+                        <exclude>src/test/resources/header.txt</exclude>
+                    </excludes>
+                    <ignoreErrors>true</ignoreErrors>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
