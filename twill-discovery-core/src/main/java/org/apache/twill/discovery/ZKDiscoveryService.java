@@ -84,16 +84,16 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  *      DiscoveryService service = new ZKDiscoveryService(zkClient);
  *      service.register(new Discoverable() {
- *        @Override
+ *        &#64;Override
  *        public String getName() {
  *          return 'service-name';
- *        }
+ *        &#125;
  *
- *        @Override
+ *        &#64;Override
  *        public InetSocketAddress getSocketAddress() {
  *          return new InetSocketAddress(hostname, port);
- *        }
- *      });
+ *        &#125;
+ *      &#125;);
  *      ...
  *      ...
  *      Iterable<Discoverable> services = service.discovery("service-name");
@@ -146,10 +146,11 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
    * Registers a {@link Discoverable} in zookeeper.
    * <p>
    *   Registering a {@link Discoverable} will create a node <base>/<service-name>
-   *   in zookeeper as a ephemeral node. If the node already exists (timeout associated with emphemeral, then a runtime
-   *   exception is thrown to make sure that a service with an intent to register is not started without registering.
-   *   When a runtime is thrown, expectation is that the process being started with fail and would be started again
-   *   by the monitoring service.
+   *   in zookeeper as a ephemeral node. If the node already exists (timeout associated with emphemeral node creation), 
+   *   then a runtime exception is thrown to make sure that a service with an intent to register is not started without 
+   *   registering. 
+   *   When a runtime exception is thrown, expectation is that the process being started will fail and would be started 
+   *   again by the monitoring service.
    * </p>
    * @param discoverable Information of the service provider that could be discovered.
    * @return An instance of {@link Cancellable}
