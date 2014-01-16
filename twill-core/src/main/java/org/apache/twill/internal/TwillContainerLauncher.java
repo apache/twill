@@ -17,6 +17,7 @@
  */
 package org.apache.twill.internal;
 
+import com.google.common.util.concurrent.Futures;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
@@ -27,6 +28,8 @@ import org.apache.twill.launcher.TwillLauncher;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
 import com.google.common.util.concurrent.ListenableFuture;
+import org.apache.twill.zookeeper.ZKOperations;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +67,10 @@ public final class TwillContainerLauncher {
   public TwillContainerController start(RunId runId, int instanceId, Class<?> mainClass, String classPath) {
     ProcessLauncher.PrepareLaunchContext.AfterResources afterResources = null;
     ProcessLauncher.PrepareLaunchContext.ResourcesAdder resourcesAdder = null;
+
+    // Clean up zookeeper path in case this is a retry and there are old messages and state there.
+    Futures.getUnchecked(ZKOperations.ignoreError(
+      ZKOperations.recursiveDelete(zkClient, "/" + runId), KeeperException.NoNodeException.class, null));
 
     // Adds all file to be localized to container
     if (!runtimeSpec.getLocalFiles().isEmpty()) {

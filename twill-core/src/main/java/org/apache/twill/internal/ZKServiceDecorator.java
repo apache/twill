@@ -107,20 +107,6 @@ public final class ZKServiceDecorator extends AbstractService {
     }
   }
 
-  /**
-   * Deletes the given ZK path recursively and create the path again.
-   */
-  private ListenableFuture<String> deleteAndCreate(final String path, final byte[] data, final CreateMode mode) {
-    return Futures.transform(ZKOperations.ignoreError(ZKOperations.recursiveDelete(zkClient, path),
-                                                      KeeperException.NoNodeException.class, null),
-                             new AsyncFunction<String, String>() {
-      @Override
-      public ListenableFuture<String> apply(String input) throws Exception {
-        return zkClient.create(path, data, mode);
-      }
-    }, Threads.SAME_THREAD_EXECUTOR);
-  }
-
   @Override
   protected void doStart() {
     callbackExecutor = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("message-callback"));
@@ -131,8 +117,9 @@ public final class ZKServiceDecorator extends AbstractService {
         StateNode stateNode = new StateNode(ServiceController.State.STARTING);
 
         final ListenableFuture<List<String>> createFuture = Futures.allAsList(
-          deleteAndCreate(getZKPath("messages"), null, CreateMode.PERSISTENT),
-          deleteAndCreate(getZKPath("state"), encodeStateNode(stateNode), CreateMode.PERSISTENT)
+          ZKOperations.ignoreError(zkClient.create(getZKPath("messages"), null, CreateMode.PERSISTENT),
+                                   KeeperException.NodeExistsException.class, null),
+          zkClient.create(getZKPath("state"), encodeStateNode(stateNode), CreateMode.PERSISTENT)
         );
 
         createFuture.addListener(new Runnable() {
