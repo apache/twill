@@ -25,12 +25,11 @@ import org.apache.twill.zookeeper.OperationFuture;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClients;
 import org.apache.twill.zookeeper.ZKOperations;
-import com.google.common.base.Charsets;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.hash.Hashing;
@@ -38,14 +37,6 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
@@ -54,16 +45,13 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Type;
 import java.net.InetSocketAddress;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -96,7 +84,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *      &#125;);
  *      ...
  *      ...
- *      Iterable<Discoverable> services = service.discovery("service-name");
+ *      ServiceDiscovered services = service.discovery("service-name");
  *      ...
  *      }
  *    </pre>
@@ -114,7 +102,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   private final Multimap<Discoverable, DiscoveryCancellable> discoverables;
   private final Lock lock;
 
-  private final LoadingCache<String, Iterable<Discoverable>> services;
+  private final LoadingCache<String, ServiceDiscovered> services;
   private final ZKClient zkClient;
   private final ScheduledExecutorService retryExecutor;
 
@@ -193,7 +181,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   }
 
   @Override
-  public Iterable<Discoverable> discover(String service) {
+  public ServiceDiscovered discover(String service) {
     return services.getUnchecked(service);
   }
 
@@ -251,7 +239,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   }
 
   private OperationFuture<String> doRegister(Discoverable discoverable) {
-    byte[] discoverableBytes = encode(discoverable);
+    byte[] discoverableBytes = DiscoverableAdapter.encode(discoverable);
     return zkClient.create(getNodePath(discoverable), discoverableBytes, CreateMode.EPHEMERAL, true);
   }
 
@@ -330,14 +318,11 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   /**
    * Creates a CacheLoader for creating live Iterable for watching instances changes for a given service.
    */
-  private CacheLoader<String, Iterable<Discoverable>> createServiceLoader() {
-    return new CacheLoader<String, Iterable<Discoverable>>() {
+  private CacheLoader<String, ServiceDiscovered> createServiceLoader() {
+    return new CacheLoader<String, ServiceDiscovered>() {
       @Override
-      public Iterable<Discoverable> load(String service) throws Exception {
-        // The atomic reference is to keep the resulting Iterable live. It always contains a
-        // immutable snapshot of the latest detected set of Discoverable.
-        final AtomicReference<Iterable<Discoverable>> iterable =
-              new AtomicReference<Iterable<Discoverable>>(ImmutableList.<Discoverable>of());
+      public ServiceDiscovered load(String service) throws Exception {
+        final DefaultServiceDiscovered serviceDiscovered = new DefaultServiceDiscovered(service);
         final String serviceBase = "/" + service;
 
         // Watch for children changes in /service
@@ -356,57 +341,24 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
             fetchFuture.addListener(new Runnable() {
               @Override
               public void run() {
-                ImmutableList.Builder<Discoverable> builder = ImmutableList.builder();
+                ImmutableSet.Builder<Discoverable> builder = ImmutableSet.builder();
                 for (NodeData nodeData : Futures.getUnchecked(fetchFuture)) {
                   // For successful fetch, decode the content.
                   if (nodeData != null) {
-                    Discoverable discoverable = decode(nodeData.getData());
+                    Discoverable discoverable = DiscoverableAdapter.decode(nodeData.getData());
                     if (discoverable != null) {
                       builder.add(discoverable);
                     }
                   }
                 }
-                iterable.set(builder.build());
+                serviceDiscovered.setDiscoverables(builder.build());
               }
             }, Threads.SAME_THREAD_EXECUTOR);
           }
         });
-
-        return new Iterable<Discoverable>() {
-          @Override
-          public Iterator<Discoverable> iterator() {
-            return iterable.get().iterator();
-          }
-        };
+        return serviceDiscovered;
       }
     };
-  }
-
-  /**
-   * Static helper function for decoding array of bytes into a {@link DiscoverableWrapper} object.
-   * @param bytes representing serialized {@link DiscoverableWrapper}
-   * @return null if bytes are null; else an instance of {@link DiscoverableWrapper}
-   */
-  private static Discoverable decode(byte[] bytes) {
-    if (bytes == null) {
-      return null;
-    }
-    String content = new String(bytes, Charsets.UTF_8);
-    return new GsonBuilder().registerTypeAdapter(Discoverable.class, new DiscoverableCodec())
-      .create()
-      .fromJson(content, Discoverable.class);
-  }
-
-  /**
-   * Static helper function for encoding an instance of {@link DiscoverableWrapper} into array of bytes.
-   * @param discoverable An instance of {@link Discoverable}
-   * @return array of bytes representing an instance of <code>discoverable</code>
-   */
-  private static byte[] encode(Discoverable discoverable) {
-    return new GsonBuilder().registerTypeAdapter(DiscoverableWrapper.class, new DiscoverableCodec())
-      .create()
-      .toJson(discoverable, DiscoverableWrapper.class)
-      .getBytes(Charsets.UTF_8);
   }
 
   /**
@@ -469,43 +421,6 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
       Futures.getUnchecked(ZKOperations.ignoreError(zkClient.delete(path),
                                                     KeeperException.NoNodeException.class, path));
       LOG.debug("Service unregistered: {} {}", discoverable, path);
-    }
-  }
-
-  /**
-   * SerDe for converting a {@link DiscoverableWrapper} into a JSON object
-   * or from a JSON object into {@link DiscoverableWrapper}.
-   */
-  private static final class DiscoverableCodec implements JsonSerializer<Discoverable>, JsonDeserializer<Discoverable> {
-
-    @Override
-    public Discoverable deserialize(JsonElement json, Type typeOfT,
-                                    JsonDeserializationContext context) throws JsonParseException {
-      JsonObject jsonObj = json.getAsJsonObject();
-      final String service = jsonObj.get("service").getAsString();
-      String hostname = jsonObj.get("hostname").getAsString();
-      int port = jsonObj.get("port").getAsInt();
-      final InetSocketAddress address = new InetSocketAddress(hostname, port);
-      return new Discoverable() {
-        @Override
-        public String getName() {
-          return service;
-        }
-
-        @Override
-        public InetSocketAddress getSocketAddress() {
-          return address;
-        }
-      };
-    }
-
-    @Override
-    public JsonElement serialize(Discoverable src, Type typeOfSrc, JsonSerializationContext context) {
-      JsonObject jsonObj = new JsonObject();
-      jsonObj.addProperty("service", src.getName());
-      jsonObj.addProperty("hostname", src.getSocketAddress().getHostName());
-      jsonObj.addProperty("port", src.getSocketAddress().getPort());
-      return jsonObj;
     }
   }
 }

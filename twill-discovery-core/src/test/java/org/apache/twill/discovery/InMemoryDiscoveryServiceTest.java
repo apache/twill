@@ -18,50 +18,18 @@
 
 package org.apache.twill.discovery;
 
-import org.apache.twill.common.Cancellable;
-import com.google.common.collect.Iterables;
-import org.junit.Assert;
-import org.junit.Test;
+import com.google.common.collect.Maps;
 
-import java.net.InetSocketAddress;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 /**
  * Test memory based service discovery service.
  */
-public class InMemoryDiscoveryServiceTest {
-  private Cancellable register(DiscoveryService service, final String name, final String host, final int port) {
-    return service.register(new Discoverable() {
-      @Override
-      public String getName() {
-        return name;
-      }
+public class InMemoryDiscoveryServiceTest extends DiscoveryServiceTestBase {
 
-      @Override
-      public InetSocketAddress getSocketAddress() {
-        return new InetSocketAddress(host, port);
-      }
-    });
-  }
-
-  @Test
-  public void simpleDiscoverable() throws Exception {
+  @Override
+  protected Map.Entry<DiscoveryService, DiscoveryServiceClient> create() {
     DiscoveryService discoveryService = new InMemoryDiscoveryService();
-    DiscoveryServiceClient discoveryServiceClient = (DiscoveryServiceClient) discoveryService;
-
-    // Register one service running on one host:port
-    Cancellable cancellable = register(discoveryService, "foo", "localhost", 8090);
-    Iterable<Discoverable> discoverables = discoveryServiceClient.discover("foo");
-
-    // Discover that registered host:port.
-    Assert.assertTrue(Iterables.size(discoverables) == 1);
-
-    // Remove the service
-    cancellable.cancel();
-
-    // There should be no service.
-    discoverables = discoveryServiceClient.discover("foo");
-    TimeUnit.MILLISECONDS.sleep(100);
-    Assert.assertTrue(Iterables.size(discoverables) == 0);
+    return Maps.immutableEntry(discoveryService, (DiscoveryServiceClient) discoveryService);
   }
 }

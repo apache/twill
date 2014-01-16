@@ -18,11 +18,11 @@
 package org.apache.twill.discovery;
 
 import org.apache.twill.common.Cancellable;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.LinkedHashMultimap;
+import com.google.common.collect.Maps;
+import com.google.common.collect.SetMultimap;
 
-import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -31,43 +31,58 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class InMemoryDiscoveryService implements DiscoveryService, DiscoveryServiceClient {
 
-  private final Multimap<String, Discoverable> services = HashMultimap.create();
+  private final SetMultimap<String, Discoverable> services = LinkedHashMultimap.create();
+  private final Map<String, DefaultServiceDiscovered> serviceDiscoveredMap = Maps.newHashMap();
   private final Lock lock = new ReentrantLock();
 
   @Override
   public Cancellable register(final Discoverable discoverable) {
+    final Discoverable wrapper = new DiscoverableWrapper(discoverable);
+    final String serviceName = wrapper.getName();
+
     lock.lock();
     try {
-      final Discoverable wrapper = new DiscoverableWrapper(discoverable);
-      services.put(wrapper.getName(), wrapper);
-      return new Cancellable() {
-        @Override
-        public void cancel() {
-          lock.lock();
-          try {
-            services.remove(wrapper.getName(), wrapper);
-          } finally {
-            lock.unlock();
-          }
-        }
-      };
+      services.put(serviceName, wrapper);
+
+      DefaultServiceDiscovered serviceDiscovered = serviceDiscoveredMap.get(serviceName);
+      if (serviceDiscovered != null) {
+        serviceDiscovered.setDiscoverables(services.get(serviceName));
+      }
     } finally {
       lock.unlock();
     }
-  }
 
-  @Override
-  public Iterable<Discoverable> discover(final String name) {
-    return new Iterable<Discoverable>() {
+    return new Cancellable() {
       @Override
-      public Iterator<Discoverable> iterator() {
+      public void cancel() {
         lock.lock();
         try {
-          return ImmutableList.copyOf(services.get(name)).iterator();
+          services.remove(serviceName, wrapper);
+
+          DefaultServiceDiscovered serviceDiscovered = serviceDiscoveredMap.get(serviceName);
+          if (serviceDiscovered != null) {
+            serviceDiscovered.setDiscoverables(services.get(serviceName));
+          }
         } finally {
           lock.unlock();
         }
       }
     };
+  }
+
+  @Override
+  public ServiceDiscovered discover(final String name) {
+    lock.lock();
+    try {
+      DefaultServiceDiscovered serviceDiscovered = serviceDiscoveredMap.get(name);
+      if (serviceDiscovered == null) {
+        serviceDiscovered = new DefaultServiceDiscovered(name);
+        serviceDiscovered.setDiscoverables(services.get(name));
+        serviceDiscoveredMap.put(name, serviceDiscovered);
+      }
+      return serviceDiscovered;
+    } finally {
+      lock.unlock();
+    }
   }
 }

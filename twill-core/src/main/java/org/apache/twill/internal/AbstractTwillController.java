@@ -21,8 +21,8 @@ import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
-import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.DiscoveryServiceClient;
+import org.apache.twill.discovery.ServiceDiscovered;
 import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.json.StackTraceElementCodec;
 import org.apache.twill.internal.kafka.client.SimpleKafkaClient;
@@ -97,7 +97,7 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   }
 
   @Override
-  public final Iterable<Discoverable> discoverService(String serviceName) {
+  public final ServiceDiscovered discoverService(String serviceName) {
     return discoveryServiceClient.discover(serviceName);
   }
 

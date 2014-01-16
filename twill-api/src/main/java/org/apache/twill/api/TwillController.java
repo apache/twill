@@ -19,6 +19,7 @@ package org.apache.twill.api;
 
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.discovery.Discoverable;
+import org.apache.twill.discovery.ServiceDiscovered;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
@@ -35,10 +36,9 @@ public interface TwillController extends ServiceController {
   /**
    * Discovers the set of {@link Discoverable} endpoints that provides service for the given service name.
    * @param serviceName Name of the service to discovery.
-   * @return An {@link Iterable} that gives set of latest {@link Discoverable} every time when
-   *         {@link Iterable#iterator()}} is invoked.
+   * @return A {@link org.apache.twill.discovery.ServiceDiscovered} object representing the result.
    */
-  Iterable<Discoverable> discoverService(String serviceName);
+  ServiceDiscovered discoverService(String serviceName);
 
 
   /**
