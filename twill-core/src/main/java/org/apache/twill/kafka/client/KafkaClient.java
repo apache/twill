@@ -17,34 +17,22 @@
  */
 package org.apache.twill.kafka.client;
 
-import org.apache.twill.internal.kafka.client.Compression;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Service;
-
-import java.util.Iterator;
-
 /**
- * This interface provides methods for interacting with kafka broker. It also
- * extends from {@link Service} for lifecycle management. The {@link #start()} method
- * must be called prior to other methods in this class. When instance of this class
- * is not needed, call {@link #stop()}} to release any resources that it holds.
+ * Represents a kafka client that can publish/subscribe to a Kafka server cluster.
  */
-public interface KafkaClient extends Service {
-
-  PreparePublish preparePublish(String topic, Compression compression);
-
-  Iterator<FetchedMessage> consume(String topic, int partition, long offset, int maxSize);
+public interface KafkaClient {
 
   /**
-   * Fetches offset from the given topic and partition.
-   * @param topic Topic to fetch from.
-   * @param partition Partition to fetch from.
-   * @param time The first offset of every segment file for a given partition with a modified time less than time.
-   *             {@code -1} for latest offset, {@code -2} for earliest offset.
-   * @param maxOffsets Maximum number of offsets to fetch.
-   * @return A Future that carry the result as an array of offsets in descending order.
-   *         The size of the result array would not be larger than maxOffsets. If there is any error during the fetch,
-   *         the exception will be carried in the exception.
+   * Creates a {@link KafkaPublisher} that is ready for publish.
+   * @param ack Type of ack that the publisher would use for all it's publish.
+   * @param compression The compression type for messages published through the returned publisher.
+   * @return A {@link KafkaPublisher}.
    */
-  ListenableFuture<long[]> getOffset(String topic, int partition, long time, int maxOffsets);
+  KafkaPublisher getPublisher(KafkaPublisher.Ack ack, Compression compression);
+
+  /**
+   * Creates a {@link KafkaConsumer} for consuming messages.
+   * @return A {@link KafkaConsumer}.
+   */
+  KafkaConsumer getConsumer();
 }

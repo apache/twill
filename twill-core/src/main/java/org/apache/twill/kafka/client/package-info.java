@@ -16,6 +16,6 @@
  * limitations under the License.
  */
 /**
- * This package provides a pure java Kafka client interface.
+ * This package provides Kafka client interfaces.
  */
 package org.apache.twill.kafka.client;

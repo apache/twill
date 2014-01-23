@@ -20,17 +20,16 @@ package org.apache.twill.kafka.client;
 import java.nio.ByteBuffer;
 
 /**
- * Represents a message fetched from kafka broker.
+ *
  */
 public interface FetchedMessage {
 
-  /**
-   * Returns the message offset.
-   */
-  long getOffset();
+  TopicPartition getTopicPartition();
+
+  ByteBuffer getPayload();
 
   /**
-   * Returns the message payload.
+   * Returns the offset for the next message to be read.
    */
-  ByteBuffer getBuffer();
+  long getNextOffset();
 }

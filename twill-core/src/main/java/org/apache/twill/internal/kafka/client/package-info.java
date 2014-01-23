@@ -16,6 +16,6 @@
  * limitations under the License.
  */
 /**
- * This package provides pure java kafka client implementation.
+ * This package provides Kafka client implementation.
  */
 package org.apache.twill.internal.kafka.client;

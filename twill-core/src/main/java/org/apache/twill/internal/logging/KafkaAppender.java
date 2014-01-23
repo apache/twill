@@ -17,16 +17,6 @@
  */
 package org.apache.twill.internal.logging;
 
-import org.apache.twill.common.Services;
-import org.apache.twill.common.Threads;
-import org.apache.twill.internal.kafka.client.Compression;
-import org.apache.twill.internal.kafka.client.SimpleKafkaClient;
-import org.apache.twill.kafka.client.KafkaClient;
-import org.apache.twill.kafka.client.PreparePublish;
-import org.apache.twill.zookeeper.RetryStrategies;
-import org.apache.twill.zookeeper.ZKClientService;
-import org.apache.twill.zookeeper.ZKClientServices;
-import org.apache.twill.zookeeper.ZKClients;
 import ch.qos.logback.classic.pattern.ClassOfCallerConverter;
 import ch.qos.logback.classic.pattern.FileOfCallerConverter;
 import ch.qos.logback.classic.pattern.LineOfCallerConverter;
@@ -36,7 +26,6 @@ import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import ch.qos.logback.core.AppenderBase;
 import com.google.common.base.Charsets;
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
@@ -44,6 +33,16 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.stream.JsonWriter;
+import org.apache.twill.common.Services;
+import org.apache.twill.common.Threads;
+import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
+import org.apache.twill.kafka.client.Compression;
+import org.apache.twill.kafka.client.KafkaClientService;
+import org.apache.twill.kafka.client.KafkaPublisher;
+import org.apache.twill.zookeeper.RetryStrategies;
+import org.apache.twill.zookeeper.ZKClientService;
+import org.apache.twill.zookeeper.ZKClientServices;
+import org.apache.twill.zookeeper.ZKClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +64,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaAppender.class);
 
   private final LogEventConverter eventConverter;
-  private final AtomicReference<PreparePublish> publisher;
+  private final AtomicReference<KafkaPublisher.Preparer> publisher;
   private final Runnable flushTask;
   /**
    * Rough count of how many entries are being buffered. It's just approximate, not exact.
@@ -73,7 +72,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   private final AtomicInteger bufferedSize;
 
   private ZKClientService zkClientService;
-  private KafkaClient kafkaClient;
+  private KafkaClientService kafkaClient;
   private String zkConnectStr;
   private String hostname;
   private String topic;
@@ -84,7 +83,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
 
   public KafkaAppender() {
     eventConverter = new LogEventConverter();
-    publisher = new AtomicReference<PreparePublish>();
+    publisher = new AtomicReference<KafkaPublisher.Preparer>();
     flushTask = createFlushTask();
     bufferedSize = new AtomicInteger();
     buffer = new ConcurrentLinkedQueue<String>();
@@ -141,12 +140,14 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
         ZKClients.retryOnFailure(ZKClientService.Builder.of(zkConnectStr).build(),
                                  RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
 
-    kafkaClient = new SimpleKafkaClient(zkClientService);
+    kafkaClient = new ZKKafkaClientService(zkClientService);
     Futures.addCallback(Services.chainStart(zkClientService, kafkaClient), new FutureCallback<Object>() {
       @Override
       public void onSuccess(Object result) {
         LOG.info("Kafka client started: " + zkConnectStr);
-        publisher.set(kafkaClient.preparePublish(topic, Compression.SNAPPY));
+        KafkaPublisher.Preparer preparer = kafkaClient.getPublisher(KafkaPublisher.Ack.LEADER_RECEIVED,
+                                                                    Compression.SNAPPY).prepare(topic);
+        publisher.set(preparer);
         scheduler.scheduleWithFixedDelay(flushTask, 0, flushPeriod, TimeUnit.MILLISECONDS);
       }
 
@@ -186,7 +187,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
 
   private ListenableFuture<Integer> publishLogs() {
     // If the publisher is not available, simply returns a completed future.
-    PreparePublish publisher = KafkaAppender.this.publisher.get();
+    KafkaPublisher.Preparer publisher = KafkaAppender.this.publisher.get();
     if (publisher == null) {
       return Futures.immediateFuture(0);
     }
@@ -202,13 +203,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
     }
 
     bufferedSize.set(0);
-    final int finalCount = count;
-    return Futures.transform(publisher.publish(), new Function<Object, Integer>() {
-      @Override
-      public Integer apply(Object input) {
-        return finalCount;
-      }
-    });
+    return publisher.send();
   }
 
   /**

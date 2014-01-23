@@ -17,24 +17,16 @@
  */
 package org.apache.twill.kafka.client;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Futures;
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Services;
 import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
-import org.apache.twill.internal.kafka.client.Compression;
-import org.apache.twill.internal.kafka.client.SimpleKafkaClient;
+import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
 import org.apache.twill.internal.utils.Networks;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.zookeeper.ZKClientService;
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Files;
-import com.google.common.util.concurrent.Futures;
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveException;
-import org.apache.commons.compress.archivers.ArchiveInputStream;
-import org.apache.commons.compress.archivers.ArchiveStreamFactory;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -44,11 +36,10 @@ import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -64,7 +55,7 @@ public class KafkaTest {
   private static InMemoryZKServer zkServer;
   private static EmbeddedKafkaServer kafkaServer;
   private static ZKClientService zkClientService;
-  private static KafkaClient kafkaClient;
+  private static KafkaClientService kafkaClient;
 
   @BeforeClass
   public static void init() throws Exception {
@@ -72,12 +63,12 @@ public class KafkaTest {
     zkServer.startAndWait();
 
     // Extract the kafka.tgz and start the kafka server
-    kafkaServer = new EmbeddedKafkaServer(extractKafka(), generateKafkaConfig(zkServer.getConnectionStr()));
+    kafkaServer = new EmbeddedKafkaServer(generateKafkaConfig(zkServer.getConnectionStr()));
     kafkaServer.startAndWait();
 
     zkClientService = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
 
-    kafkaClient = new SimpleKafkaClient(zkClientService);
+    kafkaClient = new ZKKafkaClientService(zkClientService);
     Services.chainStart(zkClientService, kafkaClient).get();
   }
 
@@ -102,46 +93,27 @@ public class KafkaTest {
     t2.join();
     t3.start();
 
-    Iterator<FetchedMessage> consumer = kafkaClient.consume(topic, 0, 0, 1048576);
-    int count = 0;
-    long startTime = System.nanoTime();
-    while (count < 30 && consumer.hasNext() && secondsPassed(startTime, TimeUnit.NANOSECONDS) < 5) {
-      LOG.info(Charsets.UTF_8.decode(consumer.next().getBuffer()).toString());
-      count++;
-    }
+    final CountDownLatch latch = new CountDownLatch(30);
+    final CountDownLatch stopLatch = new CountDownLatch(1);
+    Cancellable cancel = kafkaClient.getConsumer().prepare().add(topic, 0, 0).consume(new KafkaConsumer
+      .MessageCallback() {
+      @Override
+      public void onReceived(Iterator<FetchedMessage> messages) {
+        while (messages.hasNext()) {
+          LOG.info(Charsets.UTF_8.decode(messages.next().getPayload()).toString());
+          latch.countDown();
+        }
+      }
 
-    Assert.assertEquals(30, count);
-  }
+      @Override
+      public void finished() {
+        stopLatch.countDown();
+      }
+    });
 
-  @Test (timeout = 10000)
-  public void testOffset() throws Exception {
-    String topic = "testOffset";
-
-    // Initial earliest offset should be 0.
-    long[] offsets = kafkaClient.getOffset(topic, 0, -2, 10).get();
-    Assert.assertArrayEquals(new long[]{0L}, offsets);
-
-    // Publish some messages
-    Thread publishThread = createPublishThread(kafkaClient, topic, Compression.NONE, "Testing", 2000);
-    publishThread.start();
-    publishThread.join();
-
-    // Fetch earliest offset, should still be 0.
-    offsets = kafkaClient.getOffset(topic, 0, -2, 10).get();
-    Assert.assertArrayEquals(new long[]{0L}, offsets);
-
-    // Fetch latest offset
-    offsets = kafkaClient.getOffset(topic, 0, -1, 10).get();
-    Iterator<FetchedMessage> consumer = kafkaClient.consume(topic, 0, offsets[0], 1048576);
-
-    // Publish one more message, the consumer should see the new message being published.
-    publishThread = createPublishThread(kafkaClient, topic, Compression.NONE, "Testing", 1, 3000);
-    publishThread.start();
-    publishThread.join();
-
-    // Should see the last message being published.
-    Assert.assertTrue(consumer.hasNext());
-    Assert.assertEquals("3000 Testing", Charsets.UTF_8.decode(consumer.next().getBuffer()).toString());
+    Assert.assertTrue(latch.await(5, TimeUnit.SECONDS));
+    cancel.cancel();
+    Assert.assertTrue(stopLatch.await(1, TimeUnit.SECONDS));
   }
 
   private Thread createPublishThread(final KafkaClient kafkaClient, final String topic,
@@ -153,11 +125,12 @@ public class KafkaTest {
                                      final String message, final int count, final int base) {
     return new Thread() {
       public void run() {
-        PreparePublish preparePublish = kafkaClient.preparePublish(topic, compression);
+        KafkaPublisher publisher = kafkaClient.getPublisher(KafkaPublisher.Ack.ALL_RECEIVED, compression);
+        KafkaPublisher.Preparer preparer = publisher.prepare(topic);
         for (int i = 0; i < count; i++) {
-          preparePublish.add(((base + i) + " " + message).getBytes(Charsets.UTF_8), 0);
+          preparer.add(Charsets.UTF_8.encode((base + i) + " " + message), 0);
         }
-        Futures.getUnchecked(preparePublish.publish());
+        Futures.getUnchecked(preparer.send());
       }
     };
   }
@@ -167,30 +140,6 @@ public class KafkaTest {
                                     TimeUnit.NANOSECONDS);
   }
 
-  private static File extractKafka() throws IOException, ArchiveException, CompressorException {
-    File kafkaExtract = TMP_FOLDER.newFolder();
-    InputStream kakfaResource = KafkaTest.class.getClassLoader().getResourceAsStream("kafka-0.7.2.tgz");
-    ArchiveInputStream archiveInput = new ArchiveStreamFactory()
-      .createArchiveInputStream(ArchiveStreamFactory.TAR,
-                                new CompressorStreamFactory()
-                                  .createCompressorInputStream(CompressorStreamFactory.GZIP, kakfaResource));
-
-    try {
-      ArchiveEntry entry = archiveInput.getNextEntry();
-      while (entry != null) {
-        File file = new File(kafkaExtract, entry.getName());
-        if (entry.isDirectory()) {
-          file.mkdirs();
-        } else {
-          ByteStreams.copy(archiveInput, Files.newOutputStreamSupplier(file));
-        }
-        entry = archiveInput.getNextEntry();
-      }
-    } finally {
-      archiveInput.close();
-    }
-    return kafkaExtract;
-  }
 
   private static Properties generateKafkaConfig(String zkConnectStr) throws IOException {
     int port = Networks.getRandomPort();
@@ -198,20 +147,20 @@ public class KafkaTest {
 
     Properties prop = new Properties();
     prop.setProperty("log.dir", TMP_FOLDER.newFolder().getAbsolutePath());
-    prop.setProperty("zk.connect", zkConnectStr);
-    prop.setProperty("num.threads", "8");
     prop.setProperty("port", Integer.toString(port));
-    prop.setProperty("log.flush.interval", "1000");
-    prop.setProperty("max.socket.request.bytes", "104857600");
-    prop.setProperty("log.cleanup.interval.mins", "1");
-    prop.setProperty("log.default.flush.scheduler.interval.ms", "1000");
-    prop.setProperty("zk.connectiontimeout.ms", "1000000");
-    prop.setProperty("socket.receive.buffer", "1048576");
-    prop.setProperty("enable.zookeeper", "true");
-    prop.setProperty("log.retention.hours", "24");
-    prop.setProperty("brokerid", "0");
-    prop.setProperty("socket.send.buffer", "1048576");
+    prop.setProperty("broker.id", "1");
+    prop.setProperty("socket.send.buffer.bytes", "1048576");
+    prop.setProperty("socket.receive.buffer.bytes", "1048576");
+    prop.setProperty("socket.request.max.bytes", "104857600");
     prop.setProperty("num.partitions", "1");
+    prop.setProperty("log.retention.hours", "1");
+    prop.setProperty("log.flush.interval.messages", "10000");
+    prop.setProperty("log.flush.interval.ms", "1000");
+    prop.setProperty("log.segment.bytes", "536870912");
+    prop.setProperty("zookeeper.connect", zkConnectStr);
+    prop.setProperty("zookeeper.connection.timeout.ms", "1000000");
+    prop.setProperty("default.replication.factor", "1");
+
     // Use a really small file size to force some flush to happen
     prop.setProperty("log.file.size", "1024");
     prop.setProperty("log.default.flush.interval.ms", "1000");

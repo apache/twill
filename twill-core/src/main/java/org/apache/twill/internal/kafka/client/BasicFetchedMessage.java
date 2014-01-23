@@ -18,29 +18,43 @@
 package org.apache.twill.internal.kafka.client;
 
 import org.apache.twill.kafka.client.FetchedMessage;
+import org.apache.twill.kafka.client.TopicPartition;
 
 import java.nio.ByteBuffer;
 
 /**
- *
+ * An implementation of FetchedMessage that provides setters as well.
  */
 final class BasicFetchedMessage implements FetchedMessage {
 
-  private final long offset;
-  private final ByteBuffer buffer;
+  private final TopicPartition topicPartition;
+  private ByteBuffer payload;
+  private long nextOffset;
 
-  BasicFetchedMessage(long offset, ByteBuffer buffer) {
-    this.offset = offset;
-    this.buffer = buffer;
+  BasicFetchedMessage(TopicPartition topicPartition) {
+    this.topicPartition = topicPartition;
+  }
+
+  void setPayload(ByteBuffer payload) {
+    this.payload = payload;
+  }
+
+  void setNextOffset(long nextOffset) {
+    this.nextOffset = nextOffset;
   }
 
   @Override
-  public long getOffset() {
-    return offset;
+  public TopicPartition getTopicPartition() {
+    return topicPartition;
   }
 
   @Override
-  public ByteBuffer getBuffer() {
-    return buffer;
+  public ByteBuffer getPayload() {
+    return payload;
+  }
+
+  @Override
+  public long getNextOffset() {
+    return nextOffset;
   }
 }

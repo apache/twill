@@ -243,7 +243,6 @@ final class YarnTwillPreparer implements TwillPreparer {
           saveSpecification(twillSpec, runnableLocalFiles, localFiles);
           saveLogback(localFiles);
           saveLauncher(localFiles);
-          saveKafka(localFiles);
           saveVmOptions(vmOpts, localFiles);
           saveArguments(new Arguments(arguments, runnableArgs), localFiles);
           saveLocalFiles(localFiles, ImmutableSet.of(Constants.Files.TWILL_SPEC,
@@ -496,15 +495,6 @@ final class YarnTwillPreparer implements TwillPreparer {
     LOG.debug("Done {}", Constants.Files.LAUNCHER_JAR);
 
     localFiles.put(Constants.Files.LAUNCHER_JAR, createLocalFile(Constants.Files.LAUNCHER_JAR, location));
-  }
-
-  private void saveKafka(Map<String, LocalFile> localFiles) throws IOException {
-    LOG.debug("Copy {}", Constants.Files.KAFKA);
-    Location location = copyFromURL(getClass().getClassLoader().getResource(KAFKA_ARCHIVE),
-                                    createTempLocation(Constants.Files.KAFKA));
-    LOG.debug("Done {}", Constants.Files.KAFKA);
-
-    localFiles.put(Constants.Files.KAFKA, createLocalFile(Constants.Files.KAFKA, location, true));
   }
 
   private void saveVmOptions(String opts, Map<String, LocalFile> localFiles) throws IOException {
