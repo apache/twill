@@ -1,0 +1,61 @@
+This file contains the PGP keys of various developers.
+
+Users: pgp < KEYS
+       gpg --import KEYS
+Developers: 
+        pgp -kxa <your name> and append it to this file.
+        (pgpk -ll <your name> && pgpk -xa <your name>) >> this file.
+        (gpg --list-sigs <your name>
+             && gpg --armor --export <your name>) >> this file.
+
+Type bits/keyID     Date       User ID
+pub  4096R/2167BDB4 2014-01-27 Terence Yim (CODE SIGNING KEY) <chtyim@apache.org>
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: SKS 1.1.4
+Comment: Hostname: pgp.mit.edu
+
+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
+HRgYfJQv18t0mA==
+=lr4q
+-----END PGP PUBLIC KEY BLOCK-----
