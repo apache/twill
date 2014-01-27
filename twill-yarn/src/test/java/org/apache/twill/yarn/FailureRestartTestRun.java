@@ -17,6 +17,18 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.base.Charsets;
+import com.google.common.collect.Sets;
+import com.google.common.io.LineReader;
+import org.apache.twill.api.Command;
+import org.apache.twill.api.ResourceSpecification;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.discovery.Discoverable;
+import org.junit.Assert;
+import org.junit.Test;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -25,26 +37,11 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import org.junit.Assert;
-import org.junit.Test;
-
-import com.google.common.base.Charsets;
-import com.google.common.collect.Sets;
-import com.google.common.io.LineReader;
-
-import org.apache.twill.api.Command;
-import org.apache.twill.api.ResourceSpecification;
-import org.apache.twill.api.TwillController;
-import org.apache.twill.api.TwillRunner;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.discovery.Discoverable;
 
 /**
  *
  */
-public final class FailureRestartTestRun extends  BaseYarnTest {
+public final class FailureRestartTestRun extends BaseYarnTest {
 
   @Test
   public void testFailureRestart() throws Exception {
@@ -70,10 +67,12 @@ public final class FailureRestartTestRun extends  BaseYarnTest {
     // Kill server with instanceId = 0
     controller.sendCommand(FailureRunnable.class.getSimpleName(), Command.Builder.of("kill0").build());
 
-    // Do a shot sleep, make sure the runnable is killed.
-    TimeUnit.SECONDS.sleep(5);
+    // Make sure the runnable is killed.
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 1, 60));
 
+    // Wait for the restart
     Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 60));
+
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));
 

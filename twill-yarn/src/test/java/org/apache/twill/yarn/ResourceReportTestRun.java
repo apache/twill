@@ -17,6 +17,26 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.base.Charsets;
+import com.google.common.collect.Maps;
+import com.google.common.io.LineReader;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.ResourceSpecification;
+import org.apache.twill.api.TwillApplication;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.common.ServiceListenerAdapter;
+import org.apache.twill.common.Threads;
+import org.apache.twill.discovery.Discoverable;
+import org.apache.twill.internal.EnvKeys;
+import org.junit.Assert;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -30,33 +50,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.Maps;
-import com.google.common.io.LineReader;
-
-import org.junit.Assert;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.twill.api.ResourceReport;
-import org.apache.twill.api.ResourceSpecification;
-import org.apache.twill.api.TwillApplication;
-import org.apache.twill.api.TwillController;
-import org.apache.twill.api.TwillRunResources;
-import org.apache.twill.api.TwillRunner;
-import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
-import org.apache.twill.common.Threads;
-import org.apache.twill.discovery.Discoverable;
-import org.apache.twill.internal.EnvKeys;
-
 /**
  * Using echo server to test resource reports.
  * This test is executed by {@link org.apache.twill.yarn.YarnTestUtils}.
  */
-public final class ResourceReportTestRun {
+public final class ResourceReportTestRun extends BaseYarnTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(ResourceReportTestRun.class);
 
@@ -177,10 +175,18 @@ public final class ResourceReportTestRun {
     }
 
     // takes some time for app master to find out the container completed...
-    TimeUnit.SECONDS.sleep(5);
-    // check that we have 1 runnable, not 2.
-    report = controller.getResourceReport();
-    Assert.assertEquals(1, report.getRunnableResources("BuggyServer").size());
+    int count = 0;
+    while (count < 20) {
+      report = controller.getResourceReport();
+      // check that we have 1 runnable, not 2.
+      if (report.getRunnableResources("BuggyServer").size() == 1) {
+        break;
+      }
+      LOG.info("Wait for BuggyServer to have 1 instance left. Trial {}.", count);
+      count++;
+      TimeUnit.SECONDS.sleep(1);
+    }
+    Assert.assertTrue("Still has 2 contains running after 20 seconds", count < 20);
 
     controller.stop().get(30, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
