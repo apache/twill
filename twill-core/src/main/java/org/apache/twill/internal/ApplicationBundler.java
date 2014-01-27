@@ -17,8 +17,6 @@
  */
 package org.apache.twill.internal;
 
-import org.apache.twill.filesystem.Location;
-import org.apache.twill.internal.utils.Dependencies;
 import com.google.common.base.Function;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
@@ -29,6 +27,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
+import org.apache.twill.filesystem.Location;
+import org.apache.twill.internal.utils.Dependencies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -258,10 +258,10 @@ public final class ApplicationBundler {
    * Saves a class entry to the jar output.
    */
   private void saveEntry(String entry, URL url, Set<String> entries, JarOutputStream jarOut, boolean compress) {
-    LOG.debug("adding bundle entry " + entry);
     if (!entries.add(entry)) {
       return;
     }
+    LOG.trace("adding bundle entry " + entry);
     try {
       JarEntry jarEntry = new JarEntry(entry);
       InputStream is = url.openStream();
@@ -299,7 +299,7 @@ public final class ApplicationBundler {
    */
   private void copyDir(File baseDir, String entryPrefix,
                        Set<String> entries, JarOutputStream jarOut) throws IOException {
-    LOG.debug("adding whole dir {} to bundle at '{}'", baseDir, entryPrefix);
+    LOG.trace("adding whole dir {} to bundle at '{}'", baseDir, entryPrefix);
     URI baseUri = baseDir.toURI();
     Queue<File> queue = Lists.newLinkedList();
     Collections.addAll(queue, baseDir.listFiles());
