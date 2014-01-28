@@ -427,6 +427,18 @@
                                     </sources>
                                 </configuration>
                             </execution>
+                            <execution>
+                                <id>add-source-2.0</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/main/hadoop20</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
                         </executions>
                     </plugin>
                 </plugins>
@@ -456,6 +468,18 @@
                                 <configuration>
                                     <sources>
                                         <source>src/main/hadoop21</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>add-source-2.0</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/main/hadoop20</source>
                                     </sources>
                                 </configuration>
                             </execution>
