@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This interface is for adapting ContainerLaunchContext in different Hadoop version
+ * This interface is for adapting ContainerLaunchContext in different Hadoop version.
  */
 public interface YarnLaunchContext {
 

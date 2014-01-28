@@ -17,10 +17,10 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.api.ResourceReport;
-import org.apache.twill.api.TwillRunResources;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.TwillRunResources;
 
 import java.io.Reader;
 import java.io.Writer;

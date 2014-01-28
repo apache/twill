@@ -17,16 +17,16 @@
  */
 package org.apache.twill.internal.appmaster;
 
+import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.util.Records;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.yarn.AbstractYarnProcessLauncher;
 import org.apache.twill.internal.yarn.YarnLaunchContext;
 import org.apache.twill.internal.yarn.YarnUtils;
-import com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.util.Records;
 
 import java.util.Map;
 

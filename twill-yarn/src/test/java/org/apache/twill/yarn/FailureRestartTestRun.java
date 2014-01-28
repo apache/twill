@@ -102,6 +102,9 @@ public final class FailureRestartTestRun extends BaseYarnTest {
   }
 
 
+  /**
+   * A SocketServer that fails upon receiving a kill command.
+   */
   public static final class FailureRunnable extends SocketServer {
 
     private volatile boolean killed;

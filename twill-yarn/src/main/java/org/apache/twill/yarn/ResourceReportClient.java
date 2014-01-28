@@ -17,10 +17,10 @@
  */
 package org.apache.twill.yarn;
 
-import org.apache.twill.api.ResourceReport;
-import org.apache.twill.internal.json.ResourceReportAdapter;
 import com.google.common.base.Charsets;
 import com.google.common.io.Closeables;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.internal.json.ResourceReportAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

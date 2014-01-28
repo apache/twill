@@ -17,10 +17,10 @@
  */
 package org.apache.twill.api;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.ServiceDiscovered;
-import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * For controlling a running application.

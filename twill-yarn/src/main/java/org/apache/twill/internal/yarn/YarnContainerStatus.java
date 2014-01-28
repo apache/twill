@@ -20,7 +20,7 @@ package org.apache.twill.internal.yarn;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 
 /**
- * This interface is for adapting differences in ContainerStatus between Hadoop 2.0 and 2.1
+ * This interface is for adapting differences in ContainerStatus between Hadoop 2.0 and 2.1.
  */
 public interface YarnContainerStatus {
 

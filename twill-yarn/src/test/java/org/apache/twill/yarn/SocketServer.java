@@ -128,5 +128,5 @@ public abstract class SocketServer extends AbstractTwillRunnable {
     }
   }
 
-  abstract public void handleRequest(BufferedReader reader, PrintWriter writer) throws IOException;
+  public abstract void handleRequest(BufferedReader reader, PrintWriter writer) throws IOException;
 }

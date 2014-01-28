@@ -17,9 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.api.ResourceReport;
-import org.apache.twill.api.TwillRunResources;
-import org.apache.twill.internal.DefaultResourceReport;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
@@ -28,6 +25,9 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.google.gson.reflect.TypeToken;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.internal.DefaultResourceReport;
 
 import java.lang.reflect.Type;
 import java.util.Collection;
@@ -45,9 +45,9 @@ public final class ResourceReportCodec implements JsonSerializer<ResourceReport>
 
     json.addProperty("appMasterId", src.getApplicationId());
     json.add("appMasterResources", context.serialize(
-      src.getAppMasterResources(), new TypeToken<TwillRunResources>(){}.getType()));
+      src.getAppMasterResources(), new TypeToken<TwillRunResources>() { }.getType()));
     json.add("runnableResources", context.serialize(
-      src.getResources(), new TypeToken<Map<String, Collection<TwillRunResources>>>(){}.getType()));
+      src.getResources(), new TypeToken<Map<String, Collection<TwillRunResources>>>() { }.getType()));
 
     return json;
   }
@@ -60,7 +60,7 @@ public final class ResourceReportCodec implements JsonSerializer<ResourceReport>
     TwillRunResources masterResources = context.deserialize(
       jsonObj.get("appMasterResources"), TwillRunResources.class);
     Map<String, Collection<TwillRunResources>> resources = context.deserialize(
-      jsonObj.get("runnableResources"), new TypeToken<Map<String, Collection<TwillRunResources>>>(){}.getType());
+      jsonObj.get("runnableResources"), new TypeToken<Map<String, Collection<TwillRunResources>>>() { }.getType());
 
     return new DefaultResourceReport(appMasterId, masterResources, resources);
   }

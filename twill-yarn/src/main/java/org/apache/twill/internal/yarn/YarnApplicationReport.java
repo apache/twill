@@ -36,7 +36,7 @@ public interface YarnApplicationReport {
 
   /**
    * Get the <code>ApplicationAttemptId</code> of the current
-   * attempt of the application
+   * attempt of the application.
    * @return <code>ApplicationAttemptId</code> of the attempt
    */
   ApplicationAttemptId getCurrentApplicationAttemptId();
@@ -119,7 +119,7 @@ public interface YarnApplicationReport {
   FinalApplicationStatus getFinalApplicationStatus();
 
   /**
-   * Retrieve the structure containing the job resources for this application
+   * Retrieve the structure containing the job resources for this application.
    * @return the job resources structure for this application
    */
   ApplicationResourceUsageReport getApplicationResourceUsageReport();

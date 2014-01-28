@@ -17,8 +17,8 @@
  */
 package org.apache.twill.yarn;
 
-import org.apache.twill.api.SecureStore;
 import org.apache.hadoop.security.Credentials;
+import org.apache.twill.api.SecureStore;
 
 /**
  * A {@link SecureStore} for hadoop credentials.

@@ -18,10 +18,13 @@
 package org.apache.twill.internal;
 
 /**
- *
+ * Defines keys and default values constants being used for configuration.
  */
 public final class Configs {
 
+  /**
+   * Defines keys being used in configuration.
+   */
   public static final class Keys {
     /**
      * Size in MB of reserved memory for Java process (non-heap memory).
@@ -32,6 +35,9 @@ public final class Configs {
     }
   }
 
+  /**
+   * Defines default configuration values.
+   */
   public static final class Defaults {
     // By default have 200MB reserved for Java process.
     public static final int JAVA_RESERVED_MEMORY_MB = 200;

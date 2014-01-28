@@ -32,7 +32,7 @@ import java.util.List;
 public final class AllocationResponses {
 
   /**
-   * A hack for CDH 4.4.0, as the AllocateResponse class is being rewritten and diverted from YARN 2.0
+   * A hack for CDH 4.4.0, as the AllocateResponse class is being rewritten and diverted from YARN 2.0.
    */
   private static final boolean IS_CDH_4_4;
 
@@ -89,12 +89,12 @@ public final class AllocationResponses {
 
     @Override
     public List<Container> getAllocatedContainers() {
-      return call("getAllocatedContainers", new TypeToken<List<Container>>() {});
+      return call("getAllocatedContainers", new TypeToken<List<Container>>() { });
     }
 
     @Override
     public List<ContainerStatus> getCompletedContainersStatuses() {
-      return call("getCompletedContainersStatuses", new TypeToken<List<ContainerStatus>>() {});
+      return call("getCompletedContainersStatuses", new TypeToken<List<ContainerStatus>>() { });
     }
 
     private <T> T call(String methodName, TypeToken<T> resultType) {

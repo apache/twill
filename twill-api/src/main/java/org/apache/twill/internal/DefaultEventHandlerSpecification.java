@@ -17,11 +17,8 @@
  */
 package org.apache.twill.internal;
 
-import org.apache.twill.api.EventHandlerSpecification;
-import org.apache.twill.api.EventHandler;
-import org.apache.twill.api.EventHandlerSpecification;
-import org.apache.twill.api.EventHandlerSpecification;
 import com.google.common.collect.ImmutableMap;
+import org.apache.twill.api.EventHandler;
 import org.apache.twill.api.EventHandlerSpecification;
 
 import java.util.Map;

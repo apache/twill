@@ -17,9 +17,9 @@
  */
 package org.apache.twill.discovery;
 
-import org.apache.twill.common.Cancellable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import org.apache.twill.common.Cancellable;
 
 import java.util.Iterator;
 import java.util.List;

@@ -17,8 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.api.TwillRunnableSpecification;
-import org.apache.twill.internal.DefaultTwillRunnableSpecification;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
@@ -27,12 +25,14 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.TwillRunnableSpecification;
+import org.apache.twill.internal.DefaultTwillRunnableSpecification;
 
 import java.lang.reflect.Type;
 import java.util.Map;
 
 /**
- *
+ * Gson codec for {@link TwillRunnableSpecification}.
  */
 final class TwillRunnableSpecificationCodec implements JsonSerializer<TwillRunnableSpecification>,
                                                        JsonDeserializer<TwillRunnableSpecification> {
@@ -43,7 +43,7 @@ final class TwillRunnableSpecificationCodec implements JsonSerializer<TwillRunna
 
     json.addProperty("classname", src.getClassName());
     json.addProperty("name", src.getName());
-    json.add("arguments", context.serialize(src.getConfigs(), new TypeToken<Map<String, String>>(){}.getType()));
+    json.add("arguments", context.serialize(src.getConfigs(), new TypeToken<Map<String, String>>() { }.getType()));
 
     return json;
   }
@@ -56,7 +56,7 @@ final class TwillRunnableSpecificationCodec implements JsonSerializer<TwillRunna
     String className = jsonObj.get("classname").getAsString();
     String name = jsonObj.get("name").getAsString();
     Map<String, String> arguments = context.deserialize(jsonObj.get("arguments"),
-                                                        new TypeToken<Map<String, String>>(){}.getType());
+                                                        new TypeToken<Map<String, String>>() { }.getType());
 
     return new DefaultTwillRunnableSpecification(className, name, arguments);
   }

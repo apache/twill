@@ -17,11 +17,11 @@
  */
 package org.apache.twill.filesystem;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import javax.annotation.Nullable;
 
 /**
  * This interface defines the location and operations of a resource on the filesystem.

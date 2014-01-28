@@ -18,6 +18,7 @@
 package org.apache.twill.internal;
 
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
@@ -27,7 +28,6 @@ import org.apache.twill.internal.state.StateNode;
 import org.apache.twill.launcher.TwillLauncher;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
-import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.twill.zookeeper.ZKOperations;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;

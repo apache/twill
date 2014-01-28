@@ -17,10 +17,10 @@
  */
 package org.apache.twill.internal.appmaster;
 
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
 import org.apache.twill.internal.yarn.YarnLaunchContext;
-import org.apache.hadoop.yarn.api.records.Resource;
 
 /**
  * Interface for submitting a new application to run.

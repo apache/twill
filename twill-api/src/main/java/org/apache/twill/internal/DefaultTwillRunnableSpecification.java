@@ -17,8 +17,8 @@
  */
 package org.apache.twill.internal;
 
-import org.apache.twill.api.TwillRunnableSpecification;
 import com.google.common.collect.ImmutableMap;
+import org.apache.twill.api.TwillRunnableSpecification;
 
 import java.util.Map;
 

@@ -17,15 +17,17 @@
  */
 package org.apache.twill.internal.zookeeper;
 
-import org.apache.twill.zookeeper.OperationFuture;
 import com.google.common.util.concurrent.AbstractFuture;
+import org.apache.twill.zookeeper.OperationFuture;
 
-import javax.annotation.Nullable;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 
 /**
  * An implementation for {@link OperationFuture} that allows setting result directly.
  * Also, all listener callback will be fired from the given executor.
+ *
+ * @param <V> The result type returned by this Future's {@link #get()} method.
  */
 public final class SettableOperationFuture<V> extends AbstractFuture<V> implements OperationFuture<V> {
 

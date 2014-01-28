@@ -17,11 +17,11 @@
  */
 package org.apache.twill.yarn;
 
-import java.io.IOException;
-
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.rules.TemporaryFolder;
+
+import java.io.IOException;
 
 /**
  * Base class for all YARN tests.

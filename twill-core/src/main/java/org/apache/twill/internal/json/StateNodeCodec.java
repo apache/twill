@@ -17,8 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.api.ServiceController;
-import org.apache.twill.internal.state.StateNode;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
@@ -26,11 +24,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.ServiceController;
+import org.apache.twill.internal.state.StateNode;
 
 import java.lang.reflect.Type;
 
 /**
- *
+ * Gson codec for {@link StateNode}.
  */
 public final class StateNodeCodec implements JsonSerializer<StateNode>, JsonDeserializer<StateNode> {
 
@@ -42,7 +42,8 @@ public final class StateNodeCodec implements JsonSerializer<StateNode>, JsonDese
     String errorMessage = jsonObj.has("errorMessage") ? jsonObj.get("errorMessage").getAsString() : null;
 
     return new StateNode(state, errorMessage,
-                         context.<StackTraceElement[]>deserialize(jsonObj.get("stackTraces"), StackTraceElement[].class));
+                         context.<StackTraceElement[]>deserialize(jsonObj.get("stackTraces"),
+                                                                  StackTraceElement[].class));
   }
 
   @Override

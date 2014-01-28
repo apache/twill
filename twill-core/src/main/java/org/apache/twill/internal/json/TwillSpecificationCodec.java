@@ -17,11 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.api.EventHandlerSpecification;
-import org.apache.twill.api.RuntimeSpecification;
-import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.internal.DefaultEventHandlerSpecification;
-import org.apache.twill.internal.DefaultTwillSpecification;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
@@ -30,6 +25,11 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.EventHandlerSpecification;
+import org.apache.twill.api.RuntimeSpecification;
+import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.internal.DefaultEventHandlerSpecification;
+import org.apache.twill.internal.DefaultTwillSpecification;
 
 import java.lang.reflect.Type;
 import java.util.List;
@@ -47,9 +47,9 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
     JsonObject json = new JsonObject();
     json.addProperty("name", src.getName());
     json.add("runnables", context.serialize(src.getRunnables(),
-                                            new TypeToken<Map<String, RuntimeSpecification>>(){}.getType()));
+                                            new TypeToken<Map<String, RuntimeSpecification>>() { }.getType()));
     json.add("orders", context.serialize(src.getOrders(),
-                                         new TypeToken<List<TwillSpecification.Order>>(){}.getType()));
+                                         new TypeToken<List<TwillSpecification.Order>>() { }.getType()));
     EventHandlerSpecification eventHandler = src.getEventHandler();
     if (eventHandler != null) {
       json.add("handler", context.serialize(eventHandler, EventHandlerSpecification.class));
@@ -65,9 +65,9 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
 
     String name = jsonObj.get("name").getAsString();
     Map<String, RuntimeSpecification> runnables = context.deserialize(
-      jsonObj.get("runnables"), new TypeToken<Map<String, RuntimeSpecification>>(){}.getType());
+      jsonObj.get("runnables"), new TypeToken<Map<String, RuntimeSpecification>>() { }.getType());
     List<TwillSpecification.Order> orders = context.deserialize(
-      jsonObj.get("orders"), new TypeToken<List<TwillSpecification.Order>>(){}.getType());
+      jsonObj.get("orders"), new TypeToken<List<TwillSpecification.Order>>() { }.getType());
 
     JsonElement handler = jsonObj.get("handler");
     EventHandlerSpecification eventHandler = null;
@@ -84,7 +84,7 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
     @Override
     public JsonElement serialize(TwillSpecification.Order src, Type typeOfSrc, JsonSerializationContext context) {
       JsonObject json = new JsonObject();
-      json.add("names", context.serialize(src.getNames(), new TypeToken<Set<String>>(){}.getType()));
+      json.add("names", context.serialize(src.getNames(), new TypeToken<Set<String>>() { }.getType()));
       json.addProperty("type", src.getType().name());
       return json;
     }
@@ -94,7 +94,7 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
                                                 JsonDeserializationContext context) throws JsonParseException {
       JsonObject jsonObj = json.getAsJsonObject();
 
-      Set<String> names = context.deserialize(jsonObj.get("names"), new TypeToken<Set<String>>(){}.getType());
+      Set<String> names = context.deserialize(jsonObj.get("names"), new TypeToken<Set<String>>() { }.getType());
       TwillSpecification.Order.Type type = TwillSpecification.Order.Type.valueOf(jsonObj.get("type").getAsString());
 
       return new DefaultTwillSpecification.DefaultOrder(names, type);
@@ -108,7 +108,7 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
     public JsonElement serialize(EventHandlerSpecification src, Type typeOfSrc, JsonSerializationContext context) {
       JsonObject json = new JsonObject();
       json.addProperty("classname", src.getClassName());
-      json.add("configs", context.serialize(src.getConfigs(), new TypeToken<Map<String, String>>(){}.getType()));
+      json.add("configs", context.serialize(src.getConfigs(), new TypeToken<Map<String, String>>() { }.getType()));
       return json;
     }
 

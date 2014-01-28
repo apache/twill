@@ -17,11 +17,11 @@
  */
 package org.apache.twill.internal.yarn;
 
+import com.google.common.util.concurrent.Service;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
-import com.google.common.util.concurrent.Service;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 /**
  * Interface for launching Yarn application from client.

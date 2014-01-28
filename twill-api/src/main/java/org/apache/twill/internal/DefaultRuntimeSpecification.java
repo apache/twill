@@ -17,11 +17,11 @@
  */
 package org.apache.twill.internal;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillRunnableSpecification;
-import com.google.common.collect.ImmutableList;
 
 import java.util.Collection;
 

@@ -47,7 +47,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * A abstract base class for {@link org.apache.twill.api.TwillController} implementation that uses Zookeeper to controller a
+ * A abstract base class for {@link TwillController} implementation that uses Zookeeper to controller a
  * running twill application.
  */
 public abstract class AbstractTwillController extends AbstractZKServiceController implements TwillController {

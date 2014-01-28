@@ -17,10 +17,10 @@
  */
 package org.apache.twill.discovery;
 
-import org.apache.twill.common.Cancellable;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
+import org.apache.twill.common.Cancellable;
 
 import java.util.Map;
 import java.util.concurrent.locks.Lock;

@@ -17,9 +17,9 @@
  */
 package org.apache.twill.internal;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.twill.api.ServiceController;
 import org.apache.twill.internal.state.Message;
-import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * A {@link ServiceController} that allows sending a message directly. Internal use only.

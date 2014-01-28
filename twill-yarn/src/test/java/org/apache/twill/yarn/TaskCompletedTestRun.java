@@ -40,6 +40,9 @@ import java.util.concurrent.TimeUnit;
  */
 public final class TaskCompletedTestRun extends BaseYarnTest {
 
+  /**
+   * A {@link AbstractTwillRunnable} that sleeps randomly and finish.
+   */
   public static final class SleepTask extends AbstractTwillRunnable {
 
     @Override

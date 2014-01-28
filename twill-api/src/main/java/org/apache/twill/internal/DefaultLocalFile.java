@@ -19,8 +19,8 @@ package org.apache.twill.internal;
 
 import org.apache.twill.api.LocalFile;
 
-import javax.annotation.Nullable;
 import java.net.URI;
+import javax.annotation.Nullable;
 
 /**
  * A straightforward implementation of {@link LocalFile}.

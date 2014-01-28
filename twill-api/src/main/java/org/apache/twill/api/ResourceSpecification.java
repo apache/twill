@@ -20,7 +20,8 @@ package org.apache.twill.api;
 import org.apache.twill.internal.DefaultResourceSpecification;
 
 /**
- * This interface provides specifications for resource requirements including set and get methods for number of cores, amount of memory, and number of instances.
+ * This interface provides specifications for resource requirements including set and get methods
+ * for number of cores, amount of memory, and number of instances.
  */
 public interface ResourceSpecification {
 

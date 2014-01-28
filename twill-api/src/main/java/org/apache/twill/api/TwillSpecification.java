@@ -17,24 +17,24 @@
  */
 package org.apache.twill.api;
 
-import org.apache.twill.internal.DefaultLocalFile;
-import org.apache.twill.internal.DefaultRuntimeSpecification;
-import org.apache.twill.internal.DefaultTwillRunnableSpecification;
-import org.apache.twill.internal.DefaultTwillSpecification;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.twill.internal.DefaultLocalFile;
+import org.apache.twill.internal.DefaultRuntimeSpecification;
+import org.apache.twill.internal.DefaultTwillRunnableSpecification;
+import org.apache.twill.internal.DefaultTwillSpecification;
 
-import javax.annotation.Nullable;
 import java.io.File;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 /**
  * Represents specification of a {@link TwillApplication}.

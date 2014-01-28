@@ -17,8 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.api.LocalFile;
-import org.apache.twill.internal.DefaultLocalFile;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
@@ -26,6 +24,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.LocalFile;
+import org.apache.twill.internal.DefaultLocalFile;
 
 import java.lang.reflect.Type;
 import java.net.URI;

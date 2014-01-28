@@ -17,8 +17,8 @@
  */
 package org.apache.twill.internal.zookeeper;
 
-import org.apache.twill.zookeeper.NodeData;
 import com.google.common.base.Objects;
+import org.apache.twill.zookeeper.NodeData;
 import org.apache.zookeeper.data.Stat;
 
 import java.util.Arrays;

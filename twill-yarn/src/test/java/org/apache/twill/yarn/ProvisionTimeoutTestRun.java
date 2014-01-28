@@ -17,16 +17,8 @@
  */
 package org.apache.twill.yarn;
 
-import java.io.PrintWriter;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
-
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.EventHandler;
 import org.apache.twill.api.EventHandlerContext;
@@ -35,10 +27,16 @@ import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
-import org.junit.Test;
-
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.Services;
+import org.junit.Test;
+
+import java.io.PrintWriter;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  *
@@ -63,6 +61,9 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
     }
   }
 
+  /**
+   * The handler for testing timeout handling.
+   */
   public static final class Handler extends EventHandler {
 
     private boolean abort;
@@ -87,6 +88,9 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
     }
   }
 
+  /**
+   * Testing application for timeout.
+   */
   public static final class TimeoutApplication implements TwillApplication {
 
     @Override

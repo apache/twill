@@ -31,7 +31,7 @@ public final class Constants {
 
   public static final long PROVISION_TIMEOUT = 30000;
 
-  /** Memory size of AM */
+  /** Memory size of AM. */
   public static final int APP_MASTER_MEMORY_MB = 512;
 
   public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;

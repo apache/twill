@@ -17,6 +17,8 @@
  */
 package org.apache.twill.internal.appmaster;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.Maps;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.ProcessController;
@@ -24,8 +26,6 @@ import org.apache.twill.internal.yarn.AbstractYarnProcessLauncher;
 import org.apache.twill.internal.yarn.YarnContainerInfo;
 import org.apache.twill.internal.yarn.YarnLaunchContext;
 import org.apache.twill.internal.yarn.YarnNMClient;
-import com.google.common.base.Objects;
-import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

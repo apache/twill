@@ -17,13 +17,13 @@
  */
 package org.apache.twill.internal.yarn;
 
-import org.apache.twill.internal.ProcessLauncher;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
+import org.apache.twill.internal.ProcessLauncher;
 
 import java.net.InetSocketAddress;
 import java.net.URL;

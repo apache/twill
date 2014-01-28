@@ -17,11 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.api.LocalFile;
-import org.apache.twill.api.ResourceSpecification;
-import org.apache.twill.api.RuntimeSpecification;
-import org.apache.twill.api.TwillRunnableSpecification;
-import org.apache.twill.internal.DefaultRuntimeSpecification;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
@@ -30,12 +25,17 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.LocalFile;
+import org.apache.twill.api.ResourceSpecification;
+import org.apache.twill.api.RuntimeSpecification;
+import org.apache.twill.api.TwillRunnableSpecification;
+import org.apache.twill.internal.DefaultRuntimeSpecification;
 
 import java.lang.reflect.Type;
 import java.util.Collection;
 
 /**
- *
+ * Gson codec for {@link RuntimeSpecification}.
  */
 final class RuntimeSpecificationCodec implements JsonSerializer<RuntimeSpecification>,
                                                  JsonDeserializer<RuntimeSpecification> {
@@ -46,7 +46,7 @@ final class RuntimeSpecificationCodec implements JsonSerializer<RuntimeSpecifica
     json.addProperty("name", src.getName());
     json.add("runnable", context.serialize(src.getRunnableSpecification(), TwillRunnableSpecification.class));
     json.add("resources", context.serialize(src.getResourceSpecification(), ResourceSpecification.class));
-    json.add("files", context.serialize(src.getLocalFiles(), new TypeToken<Collection<LocalFile>>(){}.getType()));
+    json.add("files", context.serialize(src.getLocalFiles(), new TypeToken<Collection<LocalFile>>() { }.getType()));
 
     return json;
   }
@@ -62,7 +62,7 @@ final class RuntimeSpecificationCodec implements JsonSerializer<RuntimeSpecifica
     ResourceSpecification resources = context.deserialize(jsonObj.get("resources"),
                                                           ResourceSpecification.class);
     Collection<LocalFile> files = context.deserialize(jsonObj.get("files"),
-                                                      new TypeToken<Collection<LocalFile>>(){}.getType());
+                                                      new TypeToken<Collection<LocalFile>>() { }.getType());
 
     return new DefaultRuntimeSpecification(name, runnable, resources, files);
   }

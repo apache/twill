@@ -17,11 +17,11 @@
  */
 package org.apache.twill.internal;
 
-import org.apache.twill.api.ResourceReport;
-import org.apache.twill.api.TwillRunResources;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.TwillRunResources;
 
 import java.util.Collection;
 import java.util.Map;

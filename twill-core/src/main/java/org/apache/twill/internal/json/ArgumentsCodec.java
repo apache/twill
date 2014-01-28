@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import org.apache.twill.internal.Arguments;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.io.InputSupplier;
 import com.google.common.io.OutputSupplier;
@@ -31,6 +30,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.internal.Arguments;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -41,7 +41,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- *
+ * Gson codec for {@link Arguments}.
  */
 public final class ArgumentsCodec implements JsonSerializer<Arguments>, JsonDeserializer<Arguments> {
 
@@ -81,9 +81,9 @@ public final class ArgumentsCodec implements JsonSerializer<Arguments>, JsonDese
   public Arguments deserialize(JsonElement json, Type typeOfT,
                               JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
-    List<String> arguments = context.deserialize(jsonObj.get("arguments"), new TypeToken<List<String>>() {}.getType());
+    List<String> arguments = context.deserialize(jsonObj.get("arguments"), new TypeToken<List<String>>() { }.getType());
     Map<String, Collection<String>> args = context.deserialize(jsonObj.get("runnableArguments"),
-                                                               new TypeToken<Map<String, Collection<String>>>(){
+                                                               new TypeToken<Map<String, Collection<String>>>() {
                                                                }.getType());
 
     ImmutableMultimap.Builder<String, String> builder = ImmutableMultimap.builder();

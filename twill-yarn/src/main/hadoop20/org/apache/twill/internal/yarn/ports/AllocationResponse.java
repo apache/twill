@@ -24,7 +24,7 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import java.util.List;
 
 /**
- * This interface is to abstract the differences in Vanilla Hadoop YARN 2.0 and CDH 4.4
+ * This interface is to abstract the differences in Vanilla Hadoop YARN 2.0 and CDH 4.4.
  */
 public interface AllocationResponse {
 

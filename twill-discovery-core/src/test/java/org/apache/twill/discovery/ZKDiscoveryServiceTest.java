@@ -17,6 +17,8 @@
  */
 package org.apache.twill.discovery;
 
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.Futures;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Services;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
@@ -25,8 +27,6 @@ import org.apache.twill.zookeeper.RetryStrategies;
 import org.apache.twill.zookeeper.ZKClientService;
 import org.apache.twill.zookeeper.ZKClientServices;
 import org.apache.twill.zookeeper.ZKClients;
-import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.Futures;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;

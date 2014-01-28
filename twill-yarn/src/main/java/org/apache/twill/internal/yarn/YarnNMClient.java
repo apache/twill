@@ -20,7 +20,7 @@ package org.apache.twill.internal.yarn;
 import org.apache.twill.common.Cancellable;
 
 /**
- * Abstraction for dealing with API differences in different hadoop yarn version
+ * Abstraction for dealing with API differences in different hadoop yarn version.
  */
 public interface YarnNMClient {
 

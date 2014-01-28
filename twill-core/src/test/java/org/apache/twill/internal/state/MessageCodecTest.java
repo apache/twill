@@ -17,8 +17,8 @@
  */
 package org.apache.twill.internal.state;
 
-import org.apache.twill.api.Command;
 import com.google.common.collect.ImmutableMap;
+import org.apache.twill.api.Command;
 import org.junit.Assert;
 import org.junit.Test;
 

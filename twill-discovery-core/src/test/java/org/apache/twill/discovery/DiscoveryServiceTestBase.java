@@ -17,12 +17,12 @@
  */
 package org.apache.twill.discovery;
 
-import org.apache.twill.common.Cancellable;
-import org.apache.twill.common.Threads;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import org.apache.twill.common.Cancellable;
+import org.apache.twill.common.Threads;
 import org.junit.Assert;
 import org.junit.Test;
 

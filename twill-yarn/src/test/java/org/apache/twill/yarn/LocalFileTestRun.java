@@ -17,6 +17,22 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
+import com.google.common.io.LineReader;
+import org.apache.twill.api.TwillApplication;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.discovery.Discoverable;
+import org.junit.Assert;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -29,25 +45,6 @@ import java.net.Socket;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
-
-import org.junit.Test;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Files;
-import com.google.common.io.LineReader;
-
-import org.apache.twill.api.TwillApplication;
-import org.apache.twill.api.TwillController;
-import org.apache.twill.api.TwillRunner;
-import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.discovery.Discoverable;
-import org.junit.Assert;
 
 /**
  * Test for local file transfer.
@@ -101,6 +98,9 @@ public final class LocalFileTestRun extends BaseYarnTest {
     TimeUnit.SECONDS.sleep(2);
   }
 
+  /**
+   * Application for testing local file transfer.
+   */
   public static final class LocalFileApplication implements TwillApplication {
 
     private final File headerFile;
@@ -130,6 +130,9 @@ public final class LocalFileTestRun extends BaseYarnTest {
     }
   }
 
+  /**
+   * SocketServer for testing local file transfer.
+   */
   public static final class LocalFileSocketServer extends SocketServer {
 
     private static final Logger LOG = LoggerFactory.getLogger(LocalFileSocketServer.class);

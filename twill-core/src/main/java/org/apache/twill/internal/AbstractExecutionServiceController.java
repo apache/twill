@@ -17,13 +17,13 @@
  */
 package org.apache.twill.internal;
 
-import org.apache.twill.api.RunId;
-import org.apache.twill.api.ServiceController;
-import org.apache.twill.common.Threads;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
+import org.apache.twill.api.RunId;
+import org.apache.twill.api.ServiceController;
+import org.apache.twill.common.Threads;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -31,7 +31,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- *
+ * An abstract base class for implementing {@link ServiceController} that deal with Service state transition and
+ * listener callback.
  */
 public abstract class AbstractExecutionServiceController implements ServiceController {
 
@@ -120,7 +121,7 @@ public abstract class AbstractExecutionServiceController implements ServiceContr
   }
 
   /**
-   * Inner class for dispatching listener call back to a list of listeners
+   * Inner class for dispatching listener call back to a list of listeners.
    */
   private static final class ListenerExecutors implements Listener {
 

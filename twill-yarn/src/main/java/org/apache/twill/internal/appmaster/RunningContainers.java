@@ -17,19 +17,6 @@
  */
 package org.apache.twill.internal.appmaster;
 
-import org.apache.twill.api.ResourceReport;
-import org.apache.twill.api.RunId;
-import org.apache.twill.api.ServiceController;
-import org.apache.twill.api.TwillRunResources;
-import org.apache.twill.internal.ContainerInfo;
-import org.apache.twill.internal.DefaultResourceReport;
-import org.apache.twill.internal.DefaultTwillRunResources;
-import org.apache.twill.internal.RunIds;
-import org.apache.twill.internal.TwillContainerController;
-import org.apache.twill.internal.TwillContainerLauncher;
-import org.apache.twill.internal.container.TwillContainerMain;
-import org.apache.twill.internal.state.Message;
-import org.apache.twill.internal.yarn.YarnContainerStatus;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashBasedTable;
@@ -43,6 +30,19 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.RunId;
+import org.apache.twill.api.ServiceController;
+import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.internal.ContainerInfo;
+import org.apache.twill.internal.DefaultResourceReport;
+import org.apache.twill.internal.DefaultTwillRunResources;
+import org.apache.twill.internal.RunIds;
+import org.apache.twill.internal.TwillContainerController;
+import org.apache.twill.internal.TwillContainerLauncher;
+import org.apache.twill.internal.container.TwillContainerMain;
+import org.apache.twill.internal.state.Message;
+import org.apache.twill.internal.yarn.YarnContainerStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -334,7 +334,7 @@ final class RunningContainers {
   }
 
   /**
-   * Sends a command through the given {@link org.apache.twill.internal.TwillContainerController} of a runnable. Decrements the count
+   * Sends a command through the given {@link TwillContainerController} of a runnable. Decrements the count
    * when the sending of command completed. Triggers completion when count reaches zero.
    */
   private void sendMessage(final String runnableName, final Message message,

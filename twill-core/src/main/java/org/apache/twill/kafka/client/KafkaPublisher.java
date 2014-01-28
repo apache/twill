@@ -38,7 +38,7 @@ public interface KafkaPublisher {
      *                ByteBuffer would be {@code 0}.
      * @param partitionKey Key for computing the partition Id to publish to. The {@link Object#hashCode()} method
      *                     will be invoke to compute the id.
-     * @return
+     * @return This {@link Preparer} instance.
      */
     Preparer add(ByteBuffer message, Object partitionKey);
 

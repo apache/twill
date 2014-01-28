@@ -566,7 +566,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
       Reader reader = Files.newReader(new File(Constants.Files.LOCALIZE_FILES), Charsets.UTF_8);
       try {
         return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
-                                .create().fromJson(reader, new TypeToken<List<LocalFile>>() {}.getType());
+                                .create().fromJson(reader, new TypeToken<List<LocalFile>>() { }.getType());
       } finally {
         reader.close();
       }

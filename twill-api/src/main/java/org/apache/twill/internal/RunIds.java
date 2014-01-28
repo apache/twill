@@ -17,8 +17,8 @@
  */
 package org.apache.twill.internal;
 
-import org.apache.twill.api.RunId;
 import com.google.common.base.Preconditions;
+import org.apache.twill.api.RunId;
 
 import java.util.UUID;
 
@@ -65,7 +65,7 @@ public final class RunIds {
       if (other == null || !(other instanceof RunId)) {
         return false;
       }
-      return id.equals(((RunId)other).getId());
+      return id.equals(((RunId) other).getId());
     }
 
     @Override

@@ -17,8 +17,8 @@
  */
 package org.apache.twill.internal.state;
 
-import org.apache.twill.api.ServiceController;
 import com.google.common.util.concurrent.Service;
+import org.apache.twill.api.ServiceController;
 
 /**
  *

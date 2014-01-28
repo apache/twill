@@ -21,7 +21,6 @@ import com.google.common.util.concurrent.AbstractIdleService;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
 
-import java.io.File;
 import java.util.Properties;
 
 /**

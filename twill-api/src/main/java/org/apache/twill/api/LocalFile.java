@@ -17,8 +17,8 @@
  */
 package org.apache.twill.api;
 
-import javax.annotation.Nullable;
 import java.net.URI;
+import javax.annotation.Nullable;
 
 /**
  * This interface represents a local file that will be available for the container running a {@link TwillRunnable}.

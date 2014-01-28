@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal.state;
 
-import org.apache.twill.api.Command;
 import com.google.common.base.Charsets;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
@@ -29,16 +28,17 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.Command;
 
 import java.lang.reflect.Type;
 import java.util.Map;
 
 /**
- *
+ * Gson codec for {@link Message}.
  */
 public final class MessageCodec {
 
-  private static final Type OPTIONS_TYPE = new TypeToken<Map<String, String>>() {}.getType();
+  private static final Type OPTIONS_TYPE = new TypeToken<Map<String, String>>() { }.getType();
   private static final Gson GSON = new GsonBuilder()
                                         .registerTypeAdapter(Message.class, new MessageAdapter())
                                         .registerTypeAdapter(Command.class, new CommandAdapter())

@@ -17,11 +17,11 @@
  */
 package org.apache.twill.zookeeper;
 
-import org.apache.twill.internal.zookeeper.DefaultZKClientService;
 import com.google.common.base.Supplier;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.Service;
+import org.apache.twill.internal.zookeeper.DefaultZKClientService;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;

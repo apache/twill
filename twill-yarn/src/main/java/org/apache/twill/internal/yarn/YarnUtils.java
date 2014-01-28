@@ -17,10 +17,6 @@
  */
 package org.apache.twill.internal.yarn;
 
-import org.apache.twill.api.LocalFile;
-import org.apache.twill.filesystem.ForwardingLocationFactory;
-import org.apache.twill.filesystem.HDFSLocationFactory;
-import org.apache.twill.filesystem.LocationFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -41,6 +37,10 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
+import org.apache.twill.api.LocalFile;
+import org.apache.twill.filesystem.ForwardingLocationFactory;
+import org.apache.twill.filesystem.HDFSLocationFactory;
+import org.apache.twill.filesystem.LocationFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,7 +220,7 @@ public class YarnUtils {
   }
 
   /**
-   * Helper method to create adapter class for bridging between Hadoop 2.0 and 2.1
+   * Helper method to create adapter class for bridging between Hadoop 2.0 and 2.1.
    */
   private static <T> T createAdapter(Class<T> clz) {
     String className = clz.getPackage().getName();

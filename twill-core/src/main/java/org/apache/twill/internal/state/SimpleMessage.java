@@ -17,8 +17,8 @@
  */
 package org.apache.twill.internal.state;
 
-import org.apache.twill.api.Command;
 import com.google.common.base.Objects;
+import org.apache.twill.api.Command;
 
 /**
  *

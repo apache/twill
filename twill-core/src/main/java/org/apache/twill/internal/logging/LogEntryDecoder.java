@@ -17,13 +17,13 @@
  */
 package org.apache.twill.internal.logging;
 
-import org.apache.twill.api.logging.LogEntry;
-import org.apache.twill.internal.json.JsonUtils;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import org.apache.twill.api.logging.LogEntry;
+import org.apache.twill.internal.json.JsonUtils;
 
 import java.lang.reflect.Type;
 
