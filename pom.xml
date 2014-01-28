@@ -29,7 +29,7 @@
 
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-parent</artifactId>
-    <version>0.1.0-incubating-SNAPSHOT</version>
+    <version>0.1.0-incubating</version>
     <packaging>pom</packaging>
     <name>Apache Twill</name>
     <url>http://twill.incubator.apache.org</url>
