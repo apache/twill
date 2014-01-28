@@ -1,31 +1,5 @@
-This product includes software developed by The Apache Software
-Foundation (http://www.apache.org/).
+Apache Twill
+Copyright [2013-2014] The Apache Software Foundation
 
-In addition, this product includes software developed by:
-
-Guava (https://code.google.com/p/guava-libraries) is a Google Core Libraries.
-Licensed under the Apache License 2.0.
-
-Netty (http://netty.io) is a an asynchronous event-driven network application framework.
-Licensed under the Apache License 2.0.
-
-Findbugs (https://code.google.com/p/findbugs) is a defect detection tool for Java.
-Licensed under the GNU Lesser GPL
-
-Gson (https://code.google.com/p/google-gson) is a Java library for converting Java Objects into JSON.
-Licensed under the Apache License 2.0.
-
-Snappy-java (https://code.google.com/p/snappy-java) is a Java library for compression.
-Licensed under the Apache License 2.0.
-
-SLF4J (http://www.slf4j.org/) is a logging library for Java.
-Licensed under the MIT License.
-
-Logback (http://logback.qos.ch) is a logging library for Java.
-Dual licensed under EPL/LGPL. We use it under LGPL.
-
-ASM (http://asm.ow2.org) is a bytecode manipulation library for Java.
-Licensed under the BSD License.
-
-JUnit (http://www.junit.org/) included under the Common Public License v1.0. See
-the full text here: http://junit.sourceforge.net/cpl-v10.html
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
