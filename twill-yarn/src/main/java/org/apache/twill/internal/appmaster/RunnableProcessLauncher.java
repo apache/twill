@@ -68,7 +68,8 @@ public final class RunnableProcessLauncher extends AbstractYarnProcessLauncher<Y
 
     launchContext.setEnvironment(env);
 
-    LOG.info("Launching in container {}, {}", containerInfo.getId(), launchContext.getCommands());
+    LOG.info("Launching in container {} at {}, {}",
+             containerInfo.getId(), containerInfo.getHost(), launchContext.getCommands());
     final Cancellable cancellable = nmClient.start(containerInfo, launchContext);
     launched = true;
 
