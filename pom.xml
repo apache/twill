@@ -244,6 +244,20 @@
                         </execution>
                     </executions>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.rat</groupId>
+                    <artifactId>apache-rat-plugin</artifactId>
+                    <version>0.10</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>.git/**/*</exclude>
+                            <exclude>**/*.iml</exclude>
+                            <exclude>target/**/*</exclude>
+                            <exclude>**/README</exclude>
+                            <exclude>src/test/resources/header.txt</exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -314,21 +328,6 @@
                     <deployAtEnd>true</deployAtEnd>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.apache.rat</groupId>
-                <artifactId>apache-rat-plugin</artifactId>
-                <version>0.10</version>
-                <configuration>
-                    <excludes>
-                        <exclude>.git/**/*</exclude>
-                        <exclude>**/*.iml</exclude>
-                        <exclude>target/**/*</exclude>
-                        <exclude>**/README</exclude>
-                        <exclude>src/test/resources/header.txt</exclude>
-                    </excludes>
-                    <ignoreErrors>true</ignoreErrors>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
 
@@ -347,6 +346,18 @@
                                 <format>tar.gz</format>
                             </formats>
                         </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.rat</groupId>
+                        <artifactId>apache-rat-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
