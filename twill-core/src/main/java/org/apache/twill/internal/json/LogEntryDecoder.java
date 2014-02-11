@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.internal.logging;
+package org.apache.twill.internal.json;
 
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
@@ -23,14 +23,16 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import org.apache.twill.api.logging.LogEntry;
-import org.apache.twill.internal.json.JsonUtils;
+import org.apache.twill.api.logging.LogThrowable;
 
 import java.lang.reflect.Type;
 
 /**
- * A {@link com.google.gson.Gson} decoder for {@link LogEntry}.
+ * A Gson decoder for {@link LogEntry}.
  */
 public final class LogEntryDecoder implements JsonDeserializer<LogEntry> {
+
+  private static final StackTraceElement[] EMPTY_STACK_TRACES = new StackTraceElement[0];
 
   @Override
   public LogEntry deserialize(JsonElement json, Type typeOfT,
@@ -43,22 +45,14 @@ public final class LogEntryDecoder implements JsonDeserializer<LogEntry> {
     final String name = JsonUtils.getAsString(jsonObj, "name");
     final String host = JsonUtils.getAsString(jsonObj, "host");
     final long timestamp = JsonUtils.getAsLong(jsonObj, "timestamp", 0);
-    LogEntry.Level l;
-    try {
-      l = LogEntry.Level.valueOf(JsonUtils.getAsString(jsonObj, "level"));
-    } catch (Exception e) {
-      l = LogEntry.Level.FATAL;
-    }
-    final LogEntry.Level logLevel = l;
+    final LogEntry.Level logLevel = LogEntry.Level.valueOf(JsonUtils.getAsString(jsonObj, "level"));
     final String className = JsonUtils.getAsString(jsonObj, "className");
     final String method = JsonUtils.getAsString(jsonObj, "method");
     final String file = JsonUtils.getAsString(jsonObj, "file");
     final String line = JsonUtils.getAsString(jsonObj, "line");
     final String thread = JsonUtils.getAsString(jsonObj, "thread");
     final String message = JsonUtils.getAsString(jsonObj, "message");
-
-    final StackTraceElement[] stackTraces = context.deserialize(jsonObj.get("stackTraces").getAsJsonArray(),
-                                                                StackTraceElement[].class);
+    final LogThrowable logThrowable = context.deserialize(jsonObj.get("throwable"), LogThrowable.class);
 
     return new LogEntry() {
       @Override
@@ -116,8 +110,14 @@ public final class LogEntryDecoder implements JsonDeserializer<LogEntry> {
       }
 
       @Override
+      public LogThrowable getThrowable() {
+        return logThrowable;
+      }
+
+      @Override
       public StackTraceElement[] getStackTraces() {
-        return stackTraces;
+        LogThrowable throwable = getThrowable();
+        return (throwable == null) ? EMPTY_STACK_TRACES : throwable.getStackTraces();
       }
     };
   }

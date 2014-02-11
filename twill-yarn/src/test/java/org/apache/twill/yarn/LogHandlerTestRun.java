@@ -22,11 +22,15 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
+import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.common.Services;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +42,8 @@ public class LogHandlerTestRun extends BaseYarnTest {
 
   @Test
   public void testLogHandler() throws ExecutionException, InterruptedException {
-    final CountDownLatch latch = new CountDownLatch(2);
+    final CountDownLatch latch = new CountDownLatch(3);
+    final Queue<LogThrowable> throwables = new ConcurrentLinkedQueue<LogThrowable>();
 
     LogHandler logHandler = new LogHandler() {
       @Override
@@ -47,6 +52,9 @@ public class LogHandlerTestRun extends BaseYarnTest {
         if (logEntry.getMessage().startsWith("Starting runnable " + LogRunnable.class.getSimpleName())) {
           latch.countDown();
         } else if (logEntry.getMessage().equals("Running")) {
+          latch.countDown();
+        } else if (logEntry.getMessage().equals("Got exception") && logEntry.getThrowable() != null) {
+          throwables.add(logEntry.getThrowable());
           latch.countDown();
         }
       }
@@ -59,6 +67,18 @@ public class LogHandlerTestRun extends BaseYarnTest {
 
     Services.getCompletionFuture(controller).get();
     latch.await(1, TimeUnit.SECONDS);
+
+    // Verify the log throwable
+    Assert.assertEquals(1, throwables.size());
+
+    LogThrowable t = throwables.poll();
+    Assert.assertEquals(RuntimeException.class.getName(), t.getClassName());
+    Assert.assertNotNull(t.getCause());
+    Assert.assertEquals(4, t.getStackTraces().length);
+
+    t = t.getCause();
+    Assert.assertEquals(Exception.class.getName(), t.getClassName());
+    Assert.assertEquals("Exception", t.getMessage());
   }
 
   /**
@@ -72,6 +92,16 @@ public class LogHandlerTestRun extends BaseYarnTest {
     @Override
     public void run() {
       LOG.info("Running");
+      try {
+        // Just throw some exception and log it
+        try {
+          throw new Exception("Exception");
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      } catch (Throwable t) {
+        LOG.error("Got exception", t);
+      }
     }
 
     @Override

@@ -17,27 +17,25 @@
  */
 package org.apache.twill.internal.logging;
 
-import ch.qos.logback.classic.pattern.ClassOfCallerConverter;
-import ch.qos.logback.classic.pattern.FileOfCallerConverter;
-import ch.qos.logback.classic.pattern.LineOfCallerConverter;
-import ch.qos.logback.classic.pattern.MethodOfCallerConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.classic.spi.IThrowableProxy;
-import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import ch.qos.logback.core.AppenderBase;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
-import com.google.gson.stream.JsonWriter;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.common.Services;
 import org.apache.twill.common.Threads;
+import org.apache.twill.internal.json.ILoggingEventSerializer;
+import org.apache.twill.internal.json.LogThrowableCodec;
+import org.apache.twill.internal.json.StackTraceElementCodec;
 import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
 import org.apache.twill.kafka.client.Compression;
 import org.apache.twill.kafka.client.KafkaClientService;
@@ -49,8 +47,6 @@ import org.apache.twill.zookeeper.ZKClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
@@ -71,7 +67,6 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
 
   private static final Logger LOG = LoggerFactory.getLogger(KafkaAppender.class);
 
-  private final LogEventConverter eventConverter;
   private final AtomicReference<KafkaPublisher.Preparer> publisher;
   private final Runnable flushTask;
   /**
@@ -79,6 +74,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
    */
   private final AtomicInteger bufferedSize;
 
+  private LogEventConverter eventConverter;
   private ZKClientService zkClientService;
   private KafkaClientService kafkaClient;
   private String zkConnectStr;
@@ -90,7 +86,6 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   private ScheduledExecutorService scheduler;
 
   public KafkaAppender() {
-    eventConverter = new LogEventConverter();
     publisher = new AtomicReference<KafkaPublisher.Preparer>();
     flushTask = createFlushTask();
     bufferedSize = new AtomicInteger();
@@ -141,6 +136,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   public void start() {
     Preconditions.checkNotNull(zkConnectStr);
 
+    eventConverter = new LogEventConverter(hostname);
     scheduler = Executors.newSingleThreadScheduledExecutor(Threads.createDaemonThreadFactory("kafka-logger"));
 
     zkClientService = ZKClientServices.delegate(
@@ -286,65 +282,20 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   /**
    * Helper class to convert {@link ILoggingEvent} into json string.
    */
-  private final class LogEventConverter {
+  private static final class LogEventConverter {
 
-    private final ClassOfCallerConverter classNameConverter = new ClassOfCallerConverter();
-    private final MethodOfCallerConverter methodConverter = new MethodOfCallerConverter();
-    private final FileOfCallerConverter fileConverter = new FileOfCallerConverter();
-    private final LineOfCallerConverter lineConverter = new LineOfCallerConverter();
+    private final Gson gson;
 
-    private String convert(ILoggingEvent event) {
-      StringWriter result = new StringWriter();
-      JsonWriter writer = new JsonWriter(result);
-
-      try {
-        try {
-          writer.beginObject();
-          writer.name("name").value(event.getLoggerName());
-          writer.name("host").value(hostname);
-          writer.name("timestamp").value(Long.toString(event.getTimeStamp()));
-          writer.name("level").value(event.getLevel().toString());
-          writer.name("className").value(classNameConverter.convert(event));
-          writer.name("method").value(methodConverter.convert(event));
-          writer.name("file").value(fileConverter.convert(event));
-          writer.name("line").value(lineConverter.convert(event));
-          writer.name("thread").value(event.getThreadName());
-          writer.name("message").value(event.getFormattedMessage());
-          writer.name("stackTraces");
-          encodeStackTraces(event.getThrowableProxy(), writer);
-
-          writer.endObject();
-        } finally {
-          writer.close();
-        }
-      } catch (IOException e) {
-        throw Throwables.propagate(e);
-      }
-
-      return result.toString();
+    private LogEventConverter(String hostname) {
+      gson = new GsonBuilder()
+        .registerTypeAdapter(StackTraceElement.class, new StackTraceElementCodec())
+        .registerTypeAdapter(LogThrowable.class, new LogThrowableCodec())
+        .registerTypeAdapter(ILoggingEvent.class, new ILoggingEventSerializer(hostname))
+        .create();
     }
 
-    private void encodeStackTraces(IThrowableProxy throwable, JsonWriter writer) throws IOException {
-      writer.beginArray();
-      try {
-        if (throwable == null) {
-          return;
-        }
-
-        for (StackTraceElementProxy stackTrace : throwable.getStackTraceElementProxyArray()) {
-          writer.beginObject();
-
-          StackTraceElement element = stackTrace.getStackTraceElement();
-          writer.name("className").value(element.getClassName());
-          writer.name("method").value(element.getMethodName());
-          writer.name("file").value(element.getFileName());
-          writer.name("line").value(element.getLineNumber());
-
-          writer.endObject();
-        }
-      } finally {
-        writer.endArray();
-      }
+    private String convert(ILoggingEvent event) {
+      return gson.toJson(event, ILoggingEvent.class);
     }
   }
 }

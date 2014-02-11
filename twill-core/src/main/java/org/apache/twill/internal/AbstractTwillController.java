@@ -26,13 +26,15 @@ import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
+import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.apache.twill.discovery.ServiceDiscovered;
 import org.apache.twill.discovery.ZKDiscoveryService;
+import org.apache.twill.internal.json.LogEntryDecoder;
+import org.apache.twill.internal.json.LogThrowableCodec;
 import org.apache.twill.internal.json.StackTraceElementCodec;
 import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
-import org.apache.twill.internal.logging.LogEntryDecoder;
 import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.kafka.client.FetchedMessage;
 import org.apache.twill.kafka.client.KafkaClientService;
@@ -109,7 +111,9 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
 
   private static final class LogMessageCallback implements KafkaConsumer.MessageCallback {
 
-    private static final Gson GSON = new GsonBuilder().registerTypeAdapter(LogEntry.class, new LogEntryDecoder())
+    private static final Gson GSON = new GsonBuilder()
+      .registerTypeAdapter(LogEntry.class, new LogEntryDecoder())
+      .registerTypeAdapter(LogThrowable.class, new LogThrowableCodec())
       .registerTypeAdapter(StackTraceElement.class, new StackTraceElementCodec())
       .create();
 

@@ -69,14 +69,27 @@ public final class PrinterLogHandler implements LogHandler {
                      logEntry.getMessage());
     formatter.flush();
 
-    StackTraceElement[] stackTraces = logEntry.getStackTraces();
-    if (stackTraces != null) {
-      for (StackTraceElement stackTrace : stackTraces) {
-        writer.append("\tat ").append(stackTrace.toString());
-        writer.println();
+    // Prints the throwable and stack trace.
+    LogThrowable throwable = logEntry.getThrowable();
+    while (throwable != null) {
+      writer.append(throwable.getClassName()).append(": ").append(throwable.getMessage());
+      writer.println();
+
+      StackTraceElement[] stackTraces = throwable.getStackTraces();
+      if (stackTraces != null) {
+        for (StackTraceElement stackTrace : stackTraces) {
+          writer.append("\tat ").append(stackTrace.toString());
+          writer.println();
+        }
       }
-      writer.flush();
+
+      throwable = throwable.getCause();
+      if (throwable != null) {
+        writer.append("Caused by: ");
+      }
     }
+
+    writer.flush();
   }
 
   private String timestampToUTC(long timestamp) {
