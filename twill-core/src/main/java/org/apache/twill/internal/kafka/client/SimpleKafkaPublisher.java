@@ -90,11 +90,15 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
 
     @Override
     public ListenableFuture<Integer> send() {
-      int size = messages.size();
-      producer.send(messages);
-
-      messages.clear();
-      return Futures.immediateFuture(size);
+      try {
+        int size = messages.size();
+        producer.send(messages);
+        return Futures.immediateFuture(size);
+      } catch (Exception e) {
+        return Futures.immediateFailedFuture(e);
+      } finally {
+        messages.clear();
+      }
     }
   }
 

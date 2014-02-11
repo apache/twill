@@ -33,7 +33,7 @@ public final class JsonUtils {
    */
   public static String getAsString(JsonObject json, String property) {
     JsonElement jsonElement = json.get(property);
-    if (jsonElement.isJsonNull()) {
+    if (jsonElement == null || jsonElement.isJsonNull()) {
       return null;
     }
     if (jsonElement.isJsonPrimitive()) {

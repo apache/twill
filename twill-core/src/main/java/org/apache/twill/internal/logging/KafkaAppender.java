@@ -27,11 +27,14 @@ import ch.qos.logback.classic.spi.StackTraceElementProxy;
 import ch.qos.logback.core.AppenderBase;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Service;
 import com.google.gson.stream.JsonWriter;
 import org.apache.twill.common.Services;
 import org.apache.twill.common.Threads;
@@ -48,11 +51,16 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -141,22 +149,24 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
                                  RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
 
     kafkaClient = new ZKKafkaClientService(zkClientService);
-    Futures.addCallback(Services.chainStart(zkClientService, kafkaClient), new FutureCallback<Object>() {
+    Futures.addCallback(Services.chainStart(zkClientService, kafkaClient),
+                        new FutureCallback<List<ListenableFuture<Service.State>>>() {
       @Override
-      public void onSuccess(Object result) {
+      public void onSuccess(List<ListenableFuture<Service.State>> result) {
+        for (ListenableFuture<Service.State> future : result) {
+          Preconditions.checkState(Futures.getUnchecked(future) == Service.State.RUNNING,
+                                   "Service is not running.");
+        }
         LOG.info("Kafka client started: " + zkConnectStr);
-        KafkaPublisher.Preparer preparer = kafkaClient.getPublisher(KafkaPublisher.Ack.LEADER_RECEIVED,
-                                                                    Compression.SNAPPY).prepare(topic);
-        publisher.set(preparer);
         scheduler.scheduleWithFixedDelay(flushTask, 0, flushPeriod, TimeUnit.MILLISECONDS);
       }
 
       @Override
       public void onFailure(Throwable t) {
         // Fail to talk to kafka. Other than logging, what can be done?
-        LOG.error("Failed to start kafka client.", t);
+        LOG.error("Failed to start kafka appender.", t);
       }
-    });
+    }, Threads.SAME_THREAD_EXECUTOR);
 
     super.start();
   }
@@ -170,7 +180,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
 
   public void forceFlush() {
     try {
-      publishLogs().get(2, TimeUnit.SECONDS);
+      publishLogs(2, TimeUnit.SECONDS);
     } catch (Exception e) {
       LOG.error("Failed to publish last batch of log.", e);
     }
@@ -185,24 +195,71 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
     }
   }
 
-  private ListenableFuture<Integer> publishLogs() {
-    // If the publisher is not available, simply returns a completed future.
+  /**
+   * Publishes buffered logs to Kafka, within the given timeout.
+   *
+   * @return Number of logs published.
+   * @throws TimeoutException If timeout reached before publish completed.
+   */
+  private int publishLogs(long timeout, TimeUnit timeoutUnit) throws TimeoutException {
+    List<ByteBuffer> logs = Lists.newArrayListWithExpectedSize(bufferedSize.get());
+
+    for (String json : Iterables.consumingIterable(buffer)) {
+      logs.add(Charsets.UTF_8.encode(json));
+    }
+
+    long backOffTime = timeoutUnit.toNanos(timeout) / 10;
+    if (backOffTime <= 0) {
+      backOffTime = 1;
+    }
+
+    try {
+      Stopwatch stopwatch = new Stopwatch();
+      stopwatch.start();
+      long publishTimeout = timeout;
+
+      do {
+        try {
+          int published = doPublishLogs(logs).get(publishTimeout, timeoutUnit);
+          bufferedSize.addAndGet(-published);
+          return published;
+        } catch (ExecutionException e) {
+          LOG.error("Failed to publish logs to Kafka.", e);
+          TimeUnit.NANOSECONDS.sleep(backOffTime);
+          publishTimeout -= stopwatch.elapsedTime(timeoutUnit);
+          stopwatch.reset();
+          stopwatch.start();
+        }
+      } while (publishTimeout > 0);
+    } catch (InterruptedException e) {
+      LOG.warn("Logs publish to Kafka interrupted.", e);
+    }
+    return 0;
+  }
+
+  private ListenableFuture<Integer> doPublishLogs(Collection <ByteBuffer> logs) {
+    // Nothing to publish, simply returns a completed future.
+    if (logs.isEmpty()) {
+      return Futures.immediateFuture(0);
+    }
+
+    // If the publisher is not available, tries to create one.
     KafkaPublisher.Preparer publisher = KafkaAppender.this.publisher.get();
     if (publisher == null) {
-      return Futures.immediateFuture(0);
+      try {
+        KafkaPublisher.Preparer preparer = kafkaClient.getPublisher(KafkaPublisher.Ack.LEADER_RECEIVED,
+                                                                    Compression.SNAPPY).prepare(topic);
+        KafkaAppender.this.publisher.compareAndSet(null, preparer);
+        publisher = KafkaAppender.this.publisher.get();
+      } catch (Exception e) {
+        return Futures.immediateFailedFuture(e);
+      }
     }
 
-    int count = 0;
-    for (String json : Iterables.consumingIterable(buffer)) {
-      publisher.add(Charsets.UTF_8.encode(json), 0);
-      count++;
-    }
-    // Nothing to publish, simply returns a completed future.
-    if (count == 0) {
-      return Futures.immediateFuture(0);
+    for (ByteBuffer buffer : logs) {
+      publisher.add(buffer, 0);
     }
 
-    bufferedSize.set(0);
     return publisher.send();
   }
 
@@ -214,19 +271,14 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
     return new Runnable() {
       @Override
       public void run() {
-        Futures.addCallback(publishLogs(), new FutureCallback<Integer>() {
-          @Override
-          public void onSuccess(Integer result) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Log entries published, size=" + result);
-            }
+        try {
+          int published = publishLogs(2L, TimeUnit.SECONDS);
+          if (LOG.isDebugEnabled()) {
+            LOG.info("Published {} log messages to Kafka.", published);
           }
-
-          @Override
-          public void onFailure(Throwable t) {
-            LOG.error("Failed to push logs to kafka. Log entries dropped.", t);
-          }
-        });
+        } catch (Exception e) {
+          LOG.error("Failed to push logs to Kafka. Log entries dropped.", e);
+        }
       }
     };
   }

@@ -31,7 +31,8 @@ import org.junit.runners.Suite;
                       DistributeShellTestRun.class,
                       LocalFileTestRun.class,
                       FailureRestartTestRun.class,
-                      ProvisionTimeoutTestRun.class
+                      ProvisionTimeoutTestRun.class,
+                      LogHandlerTestRun.class
                     })
 public final class YarnTestSuite {
 
