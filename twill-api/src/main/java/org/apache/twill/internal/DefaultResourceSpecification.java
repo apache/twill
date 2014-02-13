@@ -28,13 +28,21 @@ public final class DefaultResourceSpecification implements ResourceSpecification
   private final int instances;
   private final int uplink;
   private final int downlink;
+  private final String[] hosts;
+  private final String[] racks;
 
   public DefaultResourceSpecification(int virtualCores, int memorySize, int instances, int uplink, int downlink) {
+    this(virtualCores, memorySize, instances, uplink, downlink, new String[0], new String[0]);
+  }
+
+  public DefaultResourceSpecification(int virtualCores, int memorySize, int instances, int uplink, int downlink, String[] hosts, String[] racks) {
     this.virtualCores = virtualCores;
     this.memorySize = memorySize;
     this.instances = instances;
     this.uplink = uplink;
     this.downlink = downlink;
+    this.hosts = hosts;
+    this.racks = racks;
   }
 
   @Deprecated
@@ -56,6 +64,16 @@ public final class DefaultResourceSpecification implements ResourceSpecification
   @Override
   public int getInstances() {
     return instances;
+  }
+
+  @Override
+  public String[] getHosts() {
+    return hosts.clone();
+  }
+
+  @Override
+  public String[] getRacks() {
+    return racks.clone();
   }
 
   @Override

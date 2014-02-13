@@ -27,10 +27,9 @@ import org.apache.twill.internal.ProcessLauncher;
 
 import java.net.InetSocketAddress;
 import java.net.URL;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+
+import static org.apache.commons.lang.ArrayUtils.isEmpty;
 
 /**
  * This interface provides abstraction for AM to interacts with YARN to abstract out YARN version specific
@@ -54,12 +53,12 @@ public interface YarnAMClient extends Service {
       this.count = count;
     }
 
-    public ContainerRequestBuilder addHosts(String firstHost, String...moreHosts) {
-      return add(hosts, firstHost, moreHosts);
+    public ContainerRequestBuilder addHosts(String...newHosts) {
+      return add(hosts, newHosts);
     }
 
-    public ContainerRequestBuilder addRacks(String firstRack, String...moreRacks) {
-      return add(racks, firstRack, moreRacks);
+    public ContainerRequestBuilder addRacks(String...newRacks) {
+      return add(racks, newRacks);
     }
 
     public ContainerRequestBuilder setPriority(int prio) {
@@ -72,9 +71,9 @@ public interface YarnAMClient extends Service {
      */
     public abstract String apply();
 
-    private <T> ContainerRequestBuilder add(Collection<T> collection, T first, T... more) {
-      collection.add(first);
-      Collections.addAll(collection, more);
+    private <T> ContainerRequestBuilder add(Collection<T> collection, T... more) {
+      if (!isEmpty(more))
+        Collections.addAll(collection, more);
       return this;
     }
   }

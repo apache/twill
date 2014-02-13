@@ -507,7 +507,10 @@ public final class ApplicationMasterService extends AbstractTwillService {
       if (newContainers > 0) {
         // TODO: Allow user to set priority?
         LOG.info("Request {} container with capability {}", newContainers, capability);
-        String requestId = amClient.addContainerRequest(capability, newContainers).setPriority(0).apply();
+        String requestId = amClient.addContainerRequest(capability, newContainers)
+                .addHosts(runtimeSpec.getResourceSpecification().getHosts())
+                .addRacks(runtimeSpec.getResourceSpecification().getRacks())
+                .setPriority(0).apply();
         provisioning.add(new ProvisionRequest(runtimeSpec, requestId, newContainers));
       }
     }

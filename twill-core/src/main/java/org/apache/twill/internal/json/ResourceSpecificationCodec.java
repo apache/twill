@@ -17,13 +17,7 @@
  */
 package org.apache.twill.internal.json;
 
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
+import com.google.gson.*;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.internal.DefaultResourceSpecification;
 
@@ -38,13 +32,13 @@ final class ResourceSpecificationCodec implements JsonSerializer<ResourceSpecifi
   @Override
   public JsonElement serialize(ResourceSpecification src, Type typeOfSrc, JsonSerializationContext context) {
     JsonObject json = new JsonObject();
-
     json.addProperty("cores", src.getVirtualCores());
     json.addProperty("memorySize", src.getMemorySize());
     json.addProperty("instances", src.getInstances());
     json.addProperty("uplink", src.getUplink());
     json.addProperty("downlink", src.getDownlink());
-
+    json.add("hosts", context.serialize(src.getHosts()));
+    json.add("racks", context.serialize(src.getRacks()));
     return json;
   }
 
@@ -52,10 +46,17 @@ final class ResourceSpecificationCodec implements JsonSerializer<ResourceSpecifi
   public ResourceSpecification deserialize(JsonElement json, Type typeOfT,
                                            JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
+    final String[] hosts = context.deserialize(jsonObj.getAsJsonArray("hosts"), String[].class);
+    final String[] racks = context.deserialize(jsonObj.getAsJsonArray("racks"), String[].class);
     return new DefaultResourceSpecification(jsonObj.get("cores").getAsInt(),
                                             jsonObj.get("memorySize").getAsInt(),
                                             jsonObj.get("instances").getAsInt(),
                                             jsonObj.get("uplink").getAsInt(),
-                                            jsonObj.get("downlink").getAsInt());
+                                            jsonObj.get("downlink").getAsInt(),
+                                            hosts,
+                                            racks);
+
+
   }
+
 }

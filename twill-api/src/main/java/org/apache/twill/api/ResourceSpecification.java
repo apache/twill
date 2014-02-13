@@ -79,6 +79,20 @@ public interface ResourceSpecification {
   int getInstances();
 
   /**
+   * Returns the execution hosts, expects Fully Qualified Domain Names host + domain
+   * This is a suggestion for the scheduler depending on cluster load it may ignore it
+   * @return An array containing the hosts where the containers should run
+   */
+  String[] getHosts();
+
+  /**
+   * Returns the execution racks
+   * This is a suggestion for the scheduler depending on cluster load it may ignore it
+   * @return An array containing the racks where the containers should run
+   */
+  String[] getRacks();
+
+  /**
    * Builder for creating {@link ResourceSpecification}.
    */
   static final class Builder {
@@ -88,9 +102,29 @@ public interface ResourceSpecification {
     private int uplink = -1;
     private int downlink = -1;
     private int instances = 1;
+    private String[] hosts = new String[0];
+    private String[] racks = new String[0];
 
     public static CoreSetter with() {
       return new Builder().new CoreSetter();
+    }
+
+    public final class HostsSetter extends Build {
+      public RackSetter setHosts(String... hosts) {
+        if (hosts != null) {
+          Builder.this.hosts = hosts.clone();
+        }
+        return new RackSetter();
+      }
+    }
+
+    public final class RackSetter extends Build {
+      public AfterRacks setRacks(String... racks) {
+        if (racks != null) {
+          Builder.this.racks = racks.clone();
+        }
+        return new AfterRacks();
+      }
     }
 
     public final class CoreSetter {
@@ -114,13 +148,13 @@ public interface ResourceSpecification {
     }
 
     public final class AfterMemory extends Build {
-      public AfterInstances setInstances(int instances) {
+      public HostsSetter setInstances(int instances) {
         Builder.this.instances = instances;
-        return new AfterInstances();
+        return new HostsSetter();
       }
     }
 
-    public final class AfterInstances extends Build {
+    public final class AfterRacks extends Build {
       public AfterUplink setUplink(int uplink, SizeUnit unit) {
         Builder.this.uplink = uplink * unit.multiplier;
         return new AfterUplink();
@@ -128,23 +162,18 @@ public interface ResourceSpecification {
     }
 
     public final class AfterUplink extends Build {
-      public AfterDownlink setDownlink(int downlink, SizeUnit unit) {
+      public Done setDownlink(int downlink, SizeUnit unit) {
         Builder.this.downlink = downlink * unit.multiplier;
-        return new AfterDownlink();
+        return new Done();
       }
     }
 
-    public final class AfterDownlink extends Build {
-
-      @Override
-      public ResourceSpecification build() {
-        return super.build();
-      }
+    public final class Done extends Build {
     }
 
     public abstract class Build {
       public ResourceSpecification build() {
-        return new DefaultResourceSpecification(cores, memory, instances, uplink, downlink);
+        return new DefaultResourceSpecification(cores, memory, instances, uplink, downlink, hosts, racks);
       }
     }
 

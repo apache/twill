@@ -61,6 +61,8 @@ public final class EchoServerTestRun extends BaseYarnTest {
                                                          .setVirtualCores(1)
                                                          .setMemory(1, ResourceSpecification.SizeUnit.GIGA)
                                                          .setInstances(2)
+                                                         .setHosts("someHost1.domain.no","someHost2.domain.no") /*demo only ignored in this test*/
+                                                         .setRacks("someRack1") /* demo only ignored in this test*/
                                                          .build())
                                         .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                         .withApplicationArguments("echo")
