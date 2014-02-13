@@ -93,9 +93,12 @@ public final class Hadoop20YarnAMClient extends AbstractIdleService implements Y
 
     amrmClient.start();
 
+    String url = String.format("%s:%d",
+                               trackerUrl.getHost(),
+                               trackerUrl.getPort() == -1 ? trackerUrl.getDefaultPort() : trackerUrl.getPort());
     RegisterApplicationMasterResponse response = amrmClient.registerApplicationMaster(trackerAddr.getHostName(),
                                                                                       trackerAddr.getPort(),
-                                                                                      trackerUrl.toString());
+                                                                                      url);
     maxCapability = response.getMaximumResourceCapability();
     minCapability = response.getMinimumResourceCapability();
   }

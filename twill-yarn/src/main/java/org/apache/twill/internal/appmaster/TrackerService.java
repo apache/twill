@@ -145,8 +145,7 @@ public final class TrackerService extends AbstractIdleService {
 
     Channel channel = bootstrap.bind(new InetSocketAddress(host, 0));
     bindAddress = (InetSocketAddress) channel.getLocalAddress();
-    url = URI.create(String.format("http://%s:%d", host, bindAddress.getPort()))
-             .resolve(TrackerService.PATH).toURL();
+    url = URI.create(String.format("http://%s:%d", host, bindAddress.getPort())).toURL();
     channelGroup.add(channel);
   }
 
