@@ -73,16 +73,25 @@ public abstract class ServiceMain {
     // Listener for state changes of the service
     ListenableFuture<Service.State> completion = Services.getCompletionFuture(service);
 
-    // Starts the service
-    LOG.info("Starting service {}.", serviceName);
-    Futures.getUnchecked(Services.chainStart(zkClientService, service));
-    LOG.info("Service {} started.", serviceName);
     try {
-      completion.get();
-      LOG.info("Service {} completed.", serviceName);
-    } catch (Throwable t) {
-      LOG.warn("Exception thrown from service {}.", serviceName, t);
-      throw Throwables.propagate(t);
+      try {
+        // Starts the service
+        LOG.info("Starting service {}.", serviceName);
+        Futures.allAsList(Services.chainStart(zkClientService, service).get()).get();
+        LOG.info("Service {} started.", serviceName);
+      } catch (Throwable t) {
+        LOG.error("Exception when starting service {}.", serviceName, t);
+        // Exit with the init fail exit code.
+        System.exit(ContainerExitCodes.INIT_FAILED);
+      }
+
+      try {
+        completion.get();
+        LOG.info("Service {} completed.", serviceName);
+      } catch (Throwable t) {
+        LOG.error("Exception thrown from service {}.", serviceName, t);
+        throw Throwables.propagate(t);
+      }
     } finally {
       ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
       if (loggerFactory instanceof LoggerContext) {

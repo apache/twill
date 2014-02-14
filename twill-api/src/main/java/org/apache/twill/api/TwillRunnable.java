@@ -30,7 +30,9 @@ public interface TwillRunnable extends Runnable {
   TwillRunnableSpecification configure();
 
   /**
-   * Called when the container process starts. Executed in container machine.
+   * Called when the container process starts. Executed in container machine. If any exception is thrown from this
+   * method, this runnable won't get retry.
+   *
    * @param context Contains information about the runtime context.
    */
   void initialize(TwillContext context);

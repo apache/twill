@@ -34,6 +34,7 @@ import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.ServiceController;
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.internal.ContainerExitCodes;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.DefaultResourceReport;
 import org.apache.twill.internal.DefaultTwillRunResources;
@@ -309,10 +310,13 @@ final class RunningContainers {
         LOG.warn("More than one controller found for container {}", containerId);
       }
 
-      if (exitStatus != 0) {
-        LOG.warn("Container {} exited abnormally with state {}, exit code {}. Re-request the container.",
+      if (exitStatus != ContainerExitCodes.SUCCESS) {
+        LOG.warn("Container {} exited abnormally with state {}, exit code {}.",
                  containerId, state, exitStatus);
-        restartRunnables.add(lookup.keySet().iterator().next());
+        if (shouldRetry(exitStatus)) {
+          LOG.info("Re-request the container {} for exit code {}.", containerId, exitStatus);
+          restartRunnables.add(lookup.keySet().iterator().next());
+        }
       } else {
         LOG.info("Container {} exited normally with state {}", containerId, state);
       }
@@ -331,6 +335,12 @@ final class RunningContainers {
     } finally {
       containerLock.unlock();
     }
+  }
+
+  private boolean shouldRetry(int exitCode) {
+    return exitCode != ContainerExitCodes.SUCCESS
+      && exitCode != ContainerExitCodes.DISKS_FAILED
+      && exitCode != ContainerExitCodes.INIT_FAILED;
   }
 
   /**
