@@ -19,6 +19,7 @@ package org.apache.twill.internal.yarn;
 
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Service;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -27,9 +28,10 @@ import org.apache.twill.internal.ProcessLauncher;
 
 import java.net.InetSocketAddress;
 import java.net.URL;
-import java.util.*;
-
-import static org.apache.commons.lang.ArrayUtils.isEmpty;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 /**
  * This interface provides abstraction for AM to interacts with YARN to abstract out YARN version specific
@@ -72,8 +74,9 @@ public interface YarnAMClient extends Service {
     public abstract String apply();
 
     private <T> ContainerRequestBuilder add(Collection<T> collection, T... more) {
-      if (!isEmpty(more))
+      if (!ArrayUtils.isEmpty(more)){
         Collections.addAll(collection, more);
+      }
       return this;
     }
   }

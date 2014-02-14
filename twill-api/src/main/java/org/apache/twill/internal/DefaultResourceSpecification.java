@@ -35,7 +35,9 @@ public final class DefaultResourceSpecification implements ResourceSpecification
     this(virtualCores, memorySize, instances, uplink, downlink, new String[0], new String[0]);
   }
 
-  public DefaultResourceSpecification(int virtualCores, int memorySize, int instances, int uplink, int downlink, String[] hosts, String[] racks) {
+  public DefaultResourceSpecification(int virtualCores, int memorySize, int instances,
+                                      int uplink, int downlink,
+                                      String[] hosts, String[] racks) {
     this.virtualCores = virtualCores;
     this.memorySize = memorySize;
     this.instances = instances;

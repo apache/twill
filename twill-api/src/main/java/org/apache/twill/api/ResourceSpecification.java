@@ -79,14 +79,14 @@ public interface ResourceSpecification {
   int getInstances();
 
   /**
-   * Returns the execution hosts, expects Fully Qualified Domain Names host + domain
+   * Returns the execution hosts, expects Fully Qualified Domain Names host + domain.
    * This is a suggestion for the scheduler depending on cluster load it may ignore it
    * @return An array containing the hosts where the containers should run
    */
   String[] getHosts();
 
   /**
-   * Returns the execution racks
+   * Returns the execution racks.
    * This is a suggestion for the scheduler depending on cluster load it may ignore it
    * @return An array containing the racks where the containers should run
    */
