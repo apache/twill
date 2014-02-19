@@ -55,11 +55,11 @@ public interface YarnAMClient extends Service {
       this.count = count;
     }
 
-    public ContainerRequestBuilder addHosts(String...newHosts) {
+    public ContainerRequestBuilder addHosts(Collection<String> newHosts) {
       return add(hosts, newHosts);
     }
 
-    public ContainerRequestBuilder addRacks(String...newRacks) {
+    public ContainerRequestBuilder addRacks(Collection<String> newRacks) {
       return add(racks, newRacks);
     }
 
@@ -73,9 +73,9 @@ public interface YarnAMClient extends Service {
      */
     public abstract String apply();
 
-    private <T> ContainerRequestBuilder add(Collection<T> collection, T... more) {
-      if (!ArrayUtils.isEmpty(more)){
-        Collections.addAll(collection, more);
+    private <T> ContainerRequestBuilder add(Collection<T> collection, Collection<T> more) {
+      if (more != null){
+        collection.addAll(more);
       }
       return this;
     }

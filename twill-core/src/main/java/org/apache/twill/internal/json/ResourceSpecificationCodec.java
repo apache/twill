@@ -28,6 +28,7 @@ import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.internal.DefaultResourceSpecification;
 
 import java.lang.reflect.Type;
+import java.util.List;
 
 /**
  *
@@ -52,8 +53,8 @@ final class ResourceSpecificationCodec implements JsonSerializer<ResourceSpecifi
   public ResourceSpecification deserialize(JsonElement json, Type typeOfT,
                                            JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
-    final String[] hosts = context.deserialize(jsonObj.getAsJsonArray("hosts"), String[].class);
-    final String[] racks = context.deserialize(jsonObj.getAsJsonArray("racks"), String[].class);
+    final List<String> hosts = context.deserialize(jsonObj.getAsJsonArray("hosts"), List.class);
+    final List<String> racks = context.deserialize(jsonObj.getAsJsonArray("racks"), List.class);
     return new DefaultResourceSpecification(jsonObj.get("cores").getAsInt(),
                                             jsonObj.get("memorySize").getAsInt(),
                                             jsonObj.get("instances").getAsInt(),
@@ -61,8 +62,6 @@ final class ResourceSpecificationCodec implements JsonSerializer<ResourceSpecifi
                                             jsonObj.get("downlink").getAsInt(),
                                             hosts,
                                             racks);
-
-
   }
 
 }

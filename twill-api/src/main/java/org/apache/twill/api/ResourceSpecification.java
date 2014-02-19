@@ -19,6 +19,11 @@ package org.apache.twill.api;
 
 import org.apache.twill.internal.DefaultResourceSpecification;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+
 /**
  * This interface provides specifications for resource requirements including set and get methods
  * for number of cores, amount of memory, and number of instances.
@@ -83,14 +88,14 @@ public interface ResourceSpecification {
    * This is a suggestion for the scheduler depending on cluster load it may ignore it
    * @return An array containing the hosts where the containers should run
    */
-  String[] getHosts();
+  List<String> getHosts();
 
   /**
    * Returns the execution racks.
    * This is a suggestion for the scheduler depending on cluster load it may ignore it
    * @return An array containing the racks where the containers should run
    */
-  String[] getRacks();
+  List<String> getRacks();
 
   /**
    * Builder for creating {@link ResourceSpecification}.
@@ -102,29 +107,11 @@ public interface ResourceSpecification {
     private int uplink = -1;
     private int downlink = -1;
     private int instances = 1;
-    private String[] hosts = new String[0];
-    private String[] racks = new String[0];
+    private List<String> hosts = new LinkedList<String>();
+    private List<String> racks = new LinkedList<String>();
 
     public static CoreSetter with() {
       return new Builder().new CoreSetter();
-    }
-
-    public final class HostsSetter extends Build {
-      public RackSetter setHosts(String... hosts) {
-        if (hosts != null) {
-          Builder.this.hosts = hosts.clone();
-        }
-        return new RackSetter();
-      }
-    }
-
-    public final class RackSetter extends Build {
-      public AfterRacks setRacks(String... racks) {
-        if (racks != null) {
-          Builder.this.racks = racks.clone();
-        }
-        return new AfterRacks();
-      }
     }
 
     public final class CoreSetter {
@@ -148,13 +135,13 @@ public interface ResourceSpecification {
     }
 
     public final class AfterMemory extends Build {
-      public HostsSetter setInstances(int instances) {
+      public AfterInstances setInstances(int instances) {
         Builder.this.instances = instances;
-        return new HostsSetter();
+        return new AfterInstances();
       }
     }
 
-    public final class AfterRacks extends Build {
+    public final class AfterInstances extends Build {
       public AfterUplink setUplink(int uplink, SizeUnit unit) {
         Builder.this.uplink = uplink * unit.multiplier;
         return new AfterUplink();
@@ -162,9 +149,41 @@ public interface ResourceSpecification {
     }
 
     public final class AfterUplink extends Build {
-      public Done setDownlink(int downlink, SizeUnit unit) {
+      public AfterDownlink setDownlink(int downlink, SizeUnit unit) {
         Builder.this.downlink = downlink * unit.multiplier;
+        return new AfterDownlink();
+      }
+    }
+
+    public final class AfterHosts extends Build {
+      public Done setRacks(String... racks) {
+        if (racks != null) {
+          Builder.this.racks = Arrays.asList(racks);
+        }
         return new Done();
+      }
+
+      public Done setRacks(Collection<String> racks){
+        if (racks != null){
+          Builder.this.racks.addAll(racks);
+        }
+        return new Done();
+      }
+    }
+
+    public final class AfterDownlink extends Build {
+      public AfterHosts setHosts(String... hosts) {
+        if (hosts != null) {
+          Builder.this.hosts = Arrays.asList(hosts);
+        }
+        return new AfterHosts();
+      }
+
+      public AfterHosts setHosts(Collection<String> hosts){
+        if (hosts != null){
+          Builder.this.hosts.addAll(hosts);
+        }
+        return new AfterHosts();
       }
     }
 

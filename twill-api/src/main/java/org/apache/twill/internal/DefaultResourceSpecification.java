@@ -19,6 +19,9 @@ package org.apache.twill.internal;
 
 import org.apache.twill.api.ResourceSpecification;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Straightforward implementation of {@link org.apache.twill.api.ResourceSpecification}.
  */
@@ -28,16 +31,17 @@ public final class DefaultResourceSpecification implements ResourceSpecification
   private final int instances;
   private final int uplink;
   private final int downlink;
-  private final String[] hosts;
-  private final String[] racks;
+  private final List<String> hosts;
+  private final List<String> racks;
 
   public DefaultResourceSpecification(int virtualCores, int memorySize, int instances, int uplink, int downlink) {
-    this(virtualCores, memorySize, instances, uplink, downlink, new String[0], new String[0]);
+    this(virtualCores, memorySize, instances, uplink, downlink,
+            Collections.<String>emptyList(), Collections.<String>emptyList());
   }
 
   public DefaultResourceSpecification(int virtualCores, int memorySize, int instances,
                                       int uplink, int downlink,
-                                      String[] hosts, String[] racks) {
+                                      List<String> hosts, List<String> racks) {
     this.virtualCores = virtualCores;
     this.memorySize = memorySize;
     this.instances = instances;
@@ -69,13 +73,13 @@ public final class DefaultResourceSpecification implements ResourceSpecification
   }
 
   @Override
-  public String[] getHosts() {
-    return hosts.clone();
+  public List<String> getHosts() {
+    return Collections.unmodifiableList(this.hosts);
   }
 
   @Override
-  public String[] getRacks() {
-    return racks.clone();
+  public List<String> getRacks() {
+    return Collections.unmodifiableList(this.racks);
   }
 
   @Override
