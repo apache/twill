@@ -17,6 +17,7 @@
  */
 package org.apache.twill.api;
 
+import com.google.common.collect.Iterables;
 import org.apache.twill.internal.DefaultResourceSpecification;
 
 import java.util.Arrays;
@@ -163,9 +164,9 @@ public interface ResourceSpecification {
         return new Done();
       }
 
-      public Done setRacks(Collection<String> racks){
+      public Done setRacks(Iterable<String> racks){
         if (racks != null){
-          Builder.this.racks.addAll(racks);
+          Iterables.addAll(Builder.this.racks, racks);
         }
         return new Done();
       }
@@ -179,9 +180,9 @@ public interface ResourceSpecification {
         return new AfterHosts();
       }
 
-      public AfterHosts setHosts(Collection<String> hosts){
+      public AfterHosts setHosts(Iterable<String> hosts){
         if (hosts != null){
-          Builder.this.hosts.addAll(hosts);
+          Iterables.addAll(Builder.this.hosts, hosts);
         }
         return new AfterHosts();
       }
