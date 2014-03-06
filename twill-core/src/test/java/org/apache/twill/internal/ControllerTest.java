@@ -35,6 +35,7 @@ import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClientService;
+import org.apache.zookeeper.KeeperException;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -193,6 +194,14 @@ public class ControllerTest {
       @Override
       protected void instanceNodeUpdated(NodeData nodeData) {
         // No-op
+      }
+
+      @Override
+      protected void instanceNodeFailed(Throwable cause) {
+        // Shutdown if the instance node goes away
+        if (cause instanceof KeeperException.NoNodeException) {
+          forceShutDown();
+        }
       }
 
       @Override

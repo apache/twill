@@ -110,6 +110,7 @@ public final class ZKServiceDecorator extends AbstractService {
   @Override
   protected void doStart() {
     callbackExecutor = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("message-callback"));
+    // Create the live node, if succeeded, start the decorated service, otherwise fail out.
     Futures.addCallback(createLiveNode(), new FutureCallback<String>() {
       @Override
       public void onSuccess(String result) {
@@ -140,6 +141,33 @@ public final class ZKServiceDecorator extends AbstractService {
       @Override
       public void onFailure(Throwable t) {
         notifyFailed(t);
+      }
+    });
+
+    // Watch for session expiration, recreate the live node if reconnected after expiration.
+    zkClient.addConnectionWatcher(new Watcher() {
+      private boolean expired = false;
+
+      @Override
+      public void process(WatchedEvent event) {
+        if (event.getState() == Event.KeeperState.Expired) {
+          LOG.warn("ZK Session expired for service {} with runId {}.", decoratedService, id.getId());
+          expired = true;
+        } else if (event.getState() == Event.KeeperState.SyncConnected && expired) {
+          LOG.info("Reconnected after expiration for service {} with runId {}", decoratedService, id.getId());
+          expired = false;
+          Futures.addCallback(createLiveNode(), new FutureCallback<String>() {
+            @Override
+            public void onSuccess(String result) {
+              // All good, no-op
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+              notifyFailed(t);
+            }
+          }, Threads.SAME_THREAD_EXECUTOR);
+        }
       }
     });
   }

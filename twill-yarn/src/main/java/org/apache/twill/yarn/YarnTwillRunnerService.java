@@ -245,7 +245,7 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
       public YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
                                         Callable<ProcessController<YarnApplicationReport>> startUp) {
         ZKClient zkClient = ZKClients.namespace(zkClientService, "/" + appName);
-        YarnTwillController controller = listenController(new YarnTwillController(runId, zkClient,
+        YarnTwillController controller = listenController(new YarnTwillController(appName, runId, zkClient,
                                                                                   logHandlers, startUp));
         synchronized (YarnTwillRunnerService.this) {
           Preconditions.checkArgument(!controllers.contains(appName, runId),
@@ -468,7 +468,7 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
           if (!controllers.contains(appName, runId)) {
             ZKClient zkClient = ZKClients.namespace(zkClientService, "/" + appName);
             YarnTwillController controller = listenController(
-              new YarnTwillController(runId, zkClient,
+              new YarnTwillController(appName, runId, zkClient,
                                       Callables.returning(yarnAppClient.createProcessController(appId))));
             controllers.put(appName, runId, controller);
             controller.start();

@@ -163,6 +163,11 @@ public final class TwillContainerLauncher {
     }
 
     @Override
+    protected void instanceNodeFailed(Throwable cause) {
+      // No-op
+    }
+
+    @Override
     protected void stateNodeUpdated(StateNode stateNode) {
       // No-op
     }

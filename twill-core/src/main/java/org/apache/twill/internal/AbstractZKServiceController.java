@@ -53,7 +53,7 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractZKServiceController.class);
 
-  private final ZKClient zkClient;
+  protected final ZKClient zkClient;
   private final InstanceNodeDataCallback instanceNodeDataCallback;
   private final StateNodeDataCallback stateNodeDataCallback;
   private final List<ListenableFuture<?>> messageFutures;
@@ -79,6 +79,8 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
 
   @Override
   protected final void startUp() {
+    doStartUp();
+
     // Watch for instance node existence.
     actOnExists(getInstancePath(), new Runnable() {
       @Override
@@ -94,8 +96,6 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
         watchStateNode();
       }
     });
-
-    doStartUp();
   }
 
   @Override
@@ -165,6 +165,12 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
   protected abstract void instanceNodeUpdated(NodeData nodeData);
 
   /**
+   * Called when failed to fetch from live instance node.
+   * @param cause The cause of failure of {@code null} if cause is unknown.
+   */
+  protected abstract void instanceNodeFailed(Throwable cause);
+
+  /**
    * Called when an update on the state node is detected.
    * @param stateNode The update state node data or {@code null} if there is an error when fetching the node data.
    */
@@ -185,6 +191,9 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
     Futures.addCallback(zkClient.exists(path, new Watcher() {
       @Override
       public void process(WatchedEvent event) {
+        if (!shouldProcessZKEvent()) {
+          return;
+        }
         // When node is created, call the action.
         // Other event type would be handled by the action.
         if (event.getType() == Event.EventType.NodeCreated && nodeExists.compareAndSet(false, true)) {
@@ -207,13 +216,14 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
     }, Threads.SAME_THREAD_EXECUTOR);
   }
 
-  private void watchInstanceNode() {
+  protected final void watchInstanceNode() {
+    if (!shouldProcessZKEvent()) {
+      return;
+    }
     Futures.addCallback(zkClient.getData(getInstancePath(), new Watcher() {
       @Override
       public void process(WatchedEvent event) {
-        State state = state();
-        if (state != State.NEW && state != State.STARTING && state != State.RUNNING) {
-          // Ignore ZK node events when it is in stopping sequence.
+        if (!shouldProcessZKEvent()) {
           return;
         }
         switch (event.getType()) {
@@ -221,8 +231,7 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
             watchInstanceNode();
             break;
           case NodeDeleted:
-            // When the ephemeral node goes away, treat the remote service stopped.
-            forceShutDown();
+            instanceNodeFailed(KeeperException.create(KeeperException.Code.NONODE, getInstancePath()));
             break;
           default:
             LOG.info("Ignore ZK event for instance node: {}", event);
@@ -232,12 +241,13 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
   }
 
   private void watchStateNode() {
+    if (!shouldProcessZKEvent()) {
+      return;
+    }
     Futures.addCallback(zkClient.getData(getZKPath("state"), new Watcher() {
       @Override
       public void process(WatchedEvent event) {
-        State state = state();
-        if (state != State.NEW && state != State.STARTING && state != State.RUNNING) {
-          // Ignore ZK node events when it is in stopping sequence.
+        if (!shouldProcessZKEvent()) {
           return;
         }
         switch (event.getType()) {
@@ -245,10 +255,18 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
             watchStateNode();
             break;
           default:
-            LOG.info("Ignore ZK event for state node: {}", event);
+            LOG.debug("Ignore ZK event for state node: {}", event);
         }
       }
     }), stateNodeDataCallback, Threads.SAME_THREAD_EXECUTOR);
+  }
+
+  /**
+   * Returns true if ZK events needs to be processed.
+   */
+  private boolean shouldProcessZKEvent() {
+    State state = state();
+    return (state == State.NEW || state == State.STARTING || state == State.RUNNING);
   }
 
   /**
@@ -261,7 +279,7 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
   /**
    * Returns the zookeeper node path for the ephemeral instance node for this runId.
    */
-  private String getInstancePath() {
+  protected final String getInstancePath() {
     return String.format("/instances/%s", getRunId().getId());
   }
 
@@ -273,17 +291,16 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
 
     @Override
     public void onSuccess(NodeData result) {
-      instanceNodeUpdated(result);
+      if (shouldProcessZKEvent()) {
+        instanceNodeUpdated(result);
+      }
     }
 
     @Override
     public void onFailure(Throwable t) {
       LOG.error("Failed in fetching instance node data.", t);
-      if (t instanceof KeeperException && ((KeeperException) t).code() == KeeperException.Code.NONODE) {
-        // If the node is gone, treat the remote service stopped.
-        forceShutDown();
-      } else {
-        instanceNodeUpdated(null);
+      if (shouldProcessZKEvent()) {
+        instanceNodeFailed(t);
       }
     }
   }
@@ -292,23 +309,27 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
 
     @Override
     public void onSuccess(NodeData result) {
-      byte[] data = result.getData();
-      if (data == null) {
-        stateNodeUpdated(null);
-        return;
-      }
-      StateNode stateNode = new GsonBuilder().registerTypeAdapter(StateNode.class, new StateNodeCodec())
-        .registerTypeAdapter(StackTraceElement.class, new StackTraceElementCodec())
-        .create()
-        .fromJson(new String(data, Charsets.UTF_8), StateNode.class);
+      if (shouldProcessZKEvent()) {
+        byte[] data = result.getData();
+        if (data == null) {
+          stateNodeUpdated(null);
+          return;
+        }
+        StateNode stateNode = new GsonBuilder().registerTypeAdapter(StateNode.class, new StateNodeCodec())
+          .registerTypeAdapter(StackTraceElement.class, new StackTraceElementCodec())
+          .create()
+          .fromJson(new String(data, Charsets.UTF_8), StateNode.class);
 
-      stateNodeUpdated(stateNode);
+        stateNodeUpdated(stateNode);
+      }
     }
 
     @Override
     public void onFailure(Throwable t) {
-      LOG.error("Failed in fetching state node data.", t);
-      stateNodeUpdated(null);
+      if (shouldProcessZKEvent()) {
+        LOG.error("Failed in fetching state node data.", t);
+        stateNodeUpdated(null);
+      }
     }
   }
 }

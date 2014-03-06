@@ -110,6 +110,10 @@ public final class YarnTestUtils {
     return runnerService;
   }
 
+  public static final InMemoryZKServer getZkServer() {
+    return zkServer;
+  }
+
   /**
    * Creates an unstarted instance of {@link org.apache.twill.api.TwillRunnerService}.
    */
