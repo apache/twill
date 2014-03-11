@@ -23,10 +23,10 @@ package org.apache.twill.discovery;
 public interface DiscoveryServiceClient {
 
   /**
-   * Retrieves a list of {@link Discoverable} for the a service with the given name.
+   * Discover service with the given name.
    *
    * @param name Name of the service
-   * @return A {@link org.apache.twill.discovery.ServiceDiscovered} object representing the result.
+   * @return A {@link ServiceDiscovered} object representing the result.
    */
   ServiceDiscovered discover(String name);
 }

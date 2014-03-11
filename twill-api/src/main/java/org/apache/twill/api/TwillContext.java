@@ -17,12 +17,15 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.discovery.DiscoveryServiceClient;
+import org.apache.twill.discovery.ServiceDiscovered;
+
 import java.net.InetAddress;
 
 /**
  * Represents the runtime context of a {@link TwillRunnable}.
  */
-public interface TwillContext extends ServiceAnnouncer {
+public interface TwillContext extends ServiceAnnouncer, DiscoveryServiceClient {
 
   /**
    * Returns the {@link RunId} of this running instance of {@link TwillRunnable}.
@@ -73,4 +76,13 @@ public interface TwillContext extends ServiceAnnouncer {
    * Returns the amount of memory in MB the runnable is allowed to use.
    */
   int getMaxMemoryMB();
+
+  /**
+   * Discover service with the given name that is announced within the same {@link TwillApplication}.
+   *
+   * @param name Name of the service
+   * @return A {@link ServiceDiscovered} object representing the result.
+   */
+  @Override
+  ServiceDiscovered discover(String name);
 }

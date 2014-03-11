@@ -33,7 +33,8 @@ import org.junit.runners.Suite;
                       FailureRestartTestRun.class,
                       ProvisionTimeoutTestRun.class,
                       LogHandlerTestRun.class,
-                      SessionExpireTestRun.class
+                      SessionExpireTestRun.class,
+                      ServiceDiscoveryTest.class
                     })
 public final class YarnTestSuite {
 

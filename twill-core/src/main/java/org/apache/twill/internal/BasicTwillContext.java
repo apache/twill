@@ -23,6 +23,8 @@ import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.DiscoveryService;
+import org.apache.twill.discovery.DiscoveryServiceClient;
+import org.apache.twill.discovery.ServiceDiscovered;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -40,12 +42,14 @@ public final class BasicTwillContext implements TwillContext {
   private final TwillRunnableSpecification spec;
   private final int instanceId;
   private final DiscoveryService discoveryService;
+  private final DiscoveryServiceClient discoveryServiceClient;
   private final int allowedMemoryMB;
   private final int virtualCores;
   private volatile int instanceCount;
 
   public BasicTwillContext(RunId runId, RunId appRunId, InetAddress host, String[] args, String[] appArgs,
-                           TwillRunnableSpecification spec, int instanceId, DiscoveryService discoveryService,
+                           TwillRunnableSpecification spec, int instanceId,
+                           DiscoveryService discoveryService, DiscoveryServiceClient discoveryServiceClient,
                            int instanceCount, int allowedMemoryMB, int virtualCores) {
     this.runId = runId;
     this.appRunId = appRunId;
@@ -55,6 +59,7 @@ public final class BasicTwillContext implements TwillContext {
     this.spec = spec;
     this.instanceId = instanceId;
     this.discoveryService = discoveryService;
+    this.discoveryServiceClient = discoveryServiceClient;
     this.instanceCount = instanceCount;
     this.allowedMemoryMB = allowedMemoryMB;
     this.virtualCores = virtualCores;
@@ -127,5 +132,10 @@ public final class BasicTwillContext implements TwillContext {
         return new InetSocketAddress(getHost(), port);
       }
     });
+  }
+
+  @Override
+  public ServiceDiscovered discover(String name) {
+    return discoveryServiceClient.discover(name);
   }
 }

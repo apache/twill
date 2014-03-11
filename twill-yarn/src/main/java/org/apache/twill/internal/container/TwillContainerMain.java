@@ -31,7 +31,6 @@ import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.discovery.DiscoveryService;
 import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.Arguments;
 import org.apache.twill.internal.BasicTwillContext;
@@ -86,7 +85,7 @@ public final class TwillContainerMain extends ServiceMain {
         ZKClients.retryOnFailure(ZKClientService.Builder.of(zkConnectStr).build(),
                                  RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
 
-    DiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
+    ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
     TwillSpecification twillSpec = loadTwillSpec(twillSpecFile);
     renameLocalFiles(twillSpec.getRunnables().get(runnableName));
@@ -98,7 +97,7 @@ public final class TwillContainerMain extends ServiceMain {
       runId, appRunId, containerInfo.getHost(),
       arguments.getRunnableArguments().get(runnableName).toArray(new String[0]),
       arguments.getArguments().toArray(new String[0]),
-      runnableSpec, instanceId, discoveryService, instanceCount,
+      runnableSpec, instanceId, discoveryService, discoveryService, instanceCount,
       containerInfo.getMemoryMB(), containerInfo.getVirtualCores()
     );
 
