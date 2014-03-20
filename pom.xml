@@ -137,6 +137,7 @@
         <module>twill-discovery-core</module>
         <module>twill-core</module>
         <module>twill-yarn</module>
+        <module>twill-ext</module>
     </modules>
 
 

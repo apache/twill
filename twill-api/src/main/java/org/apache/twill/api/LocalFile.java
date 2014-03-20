@@ -39,6 +39,9 @@ public interface LocalFile {
    */
   long getSize();
 
+  /**
+   * Indicates whether this file is an archive. If true, the file is expanded after being copied to the container host.
+   */
   boolean isArchive();
 
   @Nullable
