@@ -17,7 +17,10 @@
  */
 package org.apache.twill.filesystem;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
@@ -28,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -189,5 +193,42 @@ final class HDFSLocation implements Location {
   @Override
   public long lastModified() throws IOException {
     return fs.getFileStatus(path).getModificationTime();
+  }
+
+  @Override
+  public boolean isDirectory() throws IOException {
+    return fs.isDirectory(path);
+  }
+
+  @Override
+  public List<Location> list() throws IOException {
+    FileStatus[] statuses = fs.listStatus(path);
+    ImmutableList.Builder<Location> result = ImmutableList.builder();
+    if (statuses != null) {
+      for (FileStatus status : statuses) {
+        if (!Objects.equal(path, status.getPath())) {
+          result.add(new HDFSLocation(fs, status.getPath()));
+        }
+      }
+    }
+    return result.build();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    HDFSLocation other = (HDFSLocation) o;
+    return Objects.equal(path, other.path);
+  }
+
+  @Override
+  public int hashCode() {
+    return path.hashCode();
   }
 }

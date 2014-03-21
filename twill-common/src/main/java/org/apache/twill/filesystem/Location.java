@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -151,4 +152,19 @@ public interface Location {
    * @return Last modified time of file.
    */
   long lastModified() throws IOException;
+
+  /**
+   * Checks if this location represents a directory.
+   *
+   * @return {@code true} if it is a directory, {@code false} otherwise.
+   */
+  boolean isDirectory() throws IOException;
+
+  /**
+   * List the locations under this location.
+   *
+   * @return Immutable List of locations under this location.
+   *         An empty list is returned if this location is not a directory.
+   */
+  List<Location> list() throws IOException;
 }

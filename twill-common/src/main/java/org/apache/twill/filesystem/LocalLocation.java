@@ -17,10 +17,13 @@
  */
 package org.apache.twill.filesystem;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,6 +31,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -201,5 +205,42 @@ final class LocalLocation implements Location {
   @Override
   public long lastModified() {
     return file.lastModified();
+  }
+
+  @Override
+  public boolean isDirectory() throws IOException {
+    return file.isDirectory();
+  }
+
+  @Override
+  public List<Location> list() throws IOException {
+    File[] files = file.listFiles();
+    ImmutableList.Builder<Location> result = ImmutableList.builder();
+    if (files != null) {
+      for (File file : files) {
+        result.add(new LocalLocation(file));
+      }
+    } else if (!file.exists()) {
+      throw new FileNotFoundException("File " + file + " does not exist.");
+    }
+    return result.build();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    LocalLocation other = (LocalLocation) o;
+    return Objects.equal(file, other.file);
+  }
+
+  @Override
+  public int hashCode() {
+    return file.hashCode();
   }
 }
