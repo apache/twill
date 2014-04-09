@@ -57,6 +57,11 @@ public abstract class AbstractTwillRunnable implements TwillRunnable {
   }
 
   @Override
+  public void stop() {
+    // No-op by default. Left for children class to override.
+  }
+
+  @Override
   public void destroy() {
     // No-op by default. Left for children class to override.
   }
