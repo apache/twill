@@ -17,14 +17,19 @@
  */
 package org.apache.twill.internal;
 
+import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.state.StateNode;
+import org.apache.twill.launcher.FindFreePort;
 import org.apache.twill.launcher.TwillLauncher;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
@@ -34,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * This class helps launching a container.
@@ -48,12 +54,12 @@ public final class TwillContainerLauncher {
   private final ProcessLauncher.PrepareLaunchContext launchContext;
   private final ZKClient zkClient;
   private final int instanceCount;
-  private final String jvmOpts;
+  private final JvmOptions jvmOpts;
   private final int reservedMemory;
   private final Location secureStoreLocation;
 
   public TwillContainerLauncher(RuntimeSpecification runtimeSpec, ProcessLauncher.PrepareLaunchContext launchContext,
-                                ZKClient zkClient, int instanceCount, String jvmOpts, int reservedMemory,
+                                ZKClient zkClient, int instanceCount, JvmOptions jvmOpts, int reservedMemory,
                                 Location secureStoreLocation) {
     this.runtimeSpec = runtimeSpec;
     this.launchContext = launchContext;
@@ -110,24 +116,50 @@ public final class TwillContainerLauncher {
     }
 
     // Currently no reporting is supported for runnable containers
-    ProcessController<Void> processController = afterResources
+    ProcessLauncher.PrepareLaunchContext.MoreEnvironment afterEnvironment = afterResources
       .withEnvironment()
       .add(EnvKeys.TWILL_RUN_ID, runId.getId())
       .add(EnvKeys.TWILL_RUNNABLE_NAME, runtimeSpec.getName())
       .add(EnvKeys.TWILL_INSTANCE_ID, Integer.toString(instanceId))
-      .add(EnvKeys.TWILL_INSTANCE_COUNT, Integer.toString(instanceCount))
-      .withCommands()
-      .add("java",
-           "-Djava.io.tmpdir=tmp",
-           "-Dyarn.container=$" + EnvKeys.YARN_CONTAINER_ID,
-           "-Dtwill.runnable=$" + EnvKeys.TWILL_APP_NAME + ".$" + EnvKeys.TWILL_RUNNABLE_NAME,
-           "-cp", Constants.Files.LAUNCHER_JAR + ":" + classPath,
-           "-Xmx" + memory + "m",
-           jvmOpts,
-           TwillLauncher.class.getName(),
-           Constants.Files.CONTAINER_JAR,
-           mainClass.getName(),
-           Boolean.TRUE.toString())
+      .add(EnvKeys.TWILL_INSTANCE_COUNT, Integer.toString(instanceCount));
+
+    // assemble the command based on jvm options
+    ImmutableList.Builder<String> commandBuilder = ImmutableList.builder();
+    String firstCommand;
+    if (jvmOpts.getDebugOptions().doDebug(runtimeSpec.getName())) {
+      // for debugging we run a quick Java program to find a free port, then pass that port as the debug port and also
+      // as a System property to the runnable (Java has no general way to determine the port from within the JVM).
+      // PORT=$(java FindFreePort) && java -agentlib:jdwp=...,address=\$PORT -Dtwill.debug.port=\$PORT... TwillLauncher
+      // The $ must be escaped, otherwise it gets expanded (to "") before the command is submitted.
+      String suspend = jvmOpts.getDebugOptions().doSuspend() ? "y" : "n";
+      firstCommand = "TWILL_DEBUG_PORT=$($JAVA_HOME/bin/java";
+      commandBuilder.add("-cp", Constants.Files.LAUNCHER_JAR,
+                         FindFreePort.class.getName() + ")",
+                         "&&", // this will stop if FindFreePort fails
+                         "$JAVA_HOME/bin/java",
+                         "-agentlib:jdwp=transport=dt_socket,server=y,suspend=" + suspend + "," +
+                           "address=\\$TWILL_DEBUG_PORT",
+                         "-Dtwill.debug.port=\\$TWILL_DEBUG_PORT"
+                         );
+    } else {
+      firstCommand = "$JAVA_HOME/bin/java";
+    }
+    commandBuilder.add("-Djava.io.tmpdir=tmp",
+                       "-Dyarn.container=$" + EnvKeys.YARN_CONTAINER_ID,
+                       "-Dtwill.runnable=$" + EnvKeys.TWILL_APP_NAME + ".$" + EnvKeys.TWILL_RUNNABLE_NAME,
+                       "-cp", Constants.Files.LAUNCHER_JAR + ":" + classPath,
+                       "-Xmx" + memory + "m");
+    if (jvmOpts.getExtraOptions() != null) {
+      commandBuilder.add(jvmOpts.getExtraOptions());
+    }
+    commandBuilder.add(TwillLauncher.class.getName(),
+                       Constants.Files.CONTAINER_JAR,
+                       mainClass.getName(),
+                       Boolean.TRUE.toString());
+    List<String> command = commandBuilder.build();
+
+    ProcessController<Void> processController = afterEnvironment
+      .withCommands().add(firstCommand, command.toArray(new String[command.size()]))
       .redirectOutput(Constants.STDOUT).redirectError(Constants.STDERR)
       .launch();
 
@@ -140,6 +172,7 @@ public final class TwillContainerLauncher {
                                                           implements TwillContainerController {
 
     private final ProcessController<Void> processController;
+    private volatile ContainerLiveNodeData liveData;
 
     protected TwillContainerControllerImpl(ZKClient zkClient, RunId runId,
                                            ProcessController<Void> processController) {
@@ -159,7 +192,23 @@ public final class TwillContainerLauncher {
 
     @Override
     protected void instanceNodeUpdated(NodeData nodeData) {
-      // No-op
+      if (nodeData == null ||  nodeData.getData() == null) {
+        LOG.warn("Instance node was updated but data is null.");
+        return;
+      }
+      try {
+        Gson gson = new Gson();
+        JsonElement json = gson.fromJson(new String(nodeData.getData(), Charsets.UTF_8), JsonElement.class);
+        if (json.isJsonObject()) {
+          JsonElement data = json.getAsJsonObject().get("data");
+          if (data != null) {
+            this.liveData = gson.fromJson(data, ContainerLiveNodeData.class);
+            LOG.info("Container LiveNodeData updated: " + new String(nodeData.getData(), Charsets.UTF_8));
+          }
+        }
+      } catch (Throwable t) {
+        LOG.warn("Error deserializing updated instance node data", t);
+      }
     }
 
     @Override
@@ -183,6 +232,11 @@ public final class TwillContainerLauncher {
 //        fireStateChange(new StateNode(State.FAILED, new StackTraceElement[0]));
       }
       forceShutDown();
+    }
+
+    @Override
+    public ContainerLiveNodeData getLiveNodeData() {
+      return liveData;
     }
 
     @Override

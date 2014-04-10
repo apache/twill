@@ -15,27 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.internal;
+package org.apache.twill.launcher;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import org.apache.twill.api.ServiceController;
-import org.apache.twill.internal.state.Message;
+import java.net.ServerSocket;
 
 /**
- * A {@link ServiceController} that allows sending a message directly. Internal use only.
+ * Utility main class to find a free port on a machine.
  */
-public interface TwillContainerController extends ServiceController {
+public class FindFreePort {
 
-  ListenableFuture<Message> sendMessage(Message message);
+  public static void main(String[] args) throws Exception {
+    ServerSocket socket = new ServerSocket(0);
+    try {
+      System.out.println(socket.getLocalPort());
+    } finally {
+      socket.close();
+    }
+  }
 
-  /**
-   * Calls to indicated that the container that this controller is associated with is completed.
-   * Any resources it hold will be releases and all pending futures will be cancelled.
-   */
-  void completed(int exitStatus);
-
-  /**
-   * @returns the container's live node data.
-   */
-  ContainerLiveNodeData getLiveNodeData();
 }

@@ -49,7 +49,7 @@ import javax.management.QueryExp;
 import javax.management.StringValueExp;
 
 /**
- * Test for testing ZK session expire from AM container
+ * Test for testing ZK session expire from AM container.
  */
 public class SessionExpireTestRun extends BaseYarnTest {
 

@@ -17,6 +17,7 @@
  */
 package org.apache.twill.internal.appmaster;
 
+import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.twill.api.ResourceReport;
@@ -84,7 +85,7 @@ public final class TrackerService extends AbstractIdleService {
   private InetSocketAddress bindAddress;
   private URL url;
   private final ChannelGroup channelGroup;
-  private final ResourceReport resourceReport;
+  private final Supplier<ResourceReport> resourceReport;
 
   /**
    * Initialize the service.
@@ -92,7 +93,7 @@ public final class TrackerService extends AbstractIdleService {
    * @param resourceReport live report that the service will return to clients.
    * @param appMasterHost the application master host.
    */
-  public TrackerService(ResourceReport resourceReport, String appMasterHost) {
+  public TrackerService(Supplier<ResourceReport> resourceReport, String appMasterHost) {
     this.channelGroup = new DefaultChannelGroup("appMasterTracker");
     this.resourceReport = resourceReport;
     this.host = appMasterHost;
@@ -165,10 +166,10 @@ public final class TrackerService extends AbstractIdleService {
    * the host and port set when this application master registered itself to the resource manager.
    */
   public class ReportHandler extends SimpleChannelUpstreamHandler {
-    private final ResourceReport report;
+    private final Supplier<ResourceReport> report;
     private final ResourceReportAdapter reportAdapter;
 
-    public ReportHandler(ResourceReport report) {
+    public ReportHandler(Supplier<ResourceReport> report) {
       this.report = report;
       this.reportAdapter = ResourceReportAdapter.create();
     }
@@ -201,7 +202,7 @@ public final class TrackerService extends AbstractIdleService {
 
       ChannelBuffer content = ChannelBuffers.dynamicBuffer();
       Writer writer = new OutputStreamWriter(new ChannelBufferOutputStream(content), CharsetUtil.UTF_8);
-      reportAdapter.toJson(report, writer);
+      reportAdapter.toJson(report.get(), writer);
       try {
         writer.close();
       } catch (IOException e1) {

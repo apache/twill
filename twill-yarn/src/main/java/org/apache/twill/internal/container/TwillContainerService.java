@@ -57,7 +57,6 @@ public final class TwillContainerService extends AbstractTwillService {
 
   private final TwillRunnableSpecification specification;
   private final ClassLoader classLoader;
-  private final ContainerLiveNodeData containerLiveNode;
   private final BasicTwillContext context;
   private final ZKServiceDecorator serviceDelegate;
   private ExecutorService commandExecutor;
@@ -70,10 +69,10 @@ public final class TwillContainerService extends AbstractTwillService {
 
     this.specification = specification;
     this.classLoader = classLoader;
-    this.serviceDelegate = new ZKServiceDecorator(zkClient, runId, createLiveNodeSupplier(), new ServiceDelegate());
+    this.serviceDelegate = new ZKServiceDecorator(zkClient, runId,
+                                                  createLiveNodeSupplier(createLiveNodeData(containerInfo)),
+                                                  new ServiceDelegate());
     this.context = context;
-    this.containerLiveNode = new ContainerLiveNodeData(containerInfo.getId(),
-                                                       containerInfo.getHost().getCanonicalHostName());
   }
 
   private ListenableFuture<String> processMessage(final String messageId, final Message message) {
@@ -105,11 +104,22 @@ public final class TwillContainerService extends AbstractTwillService {
     return result;
   }
 
-  private Supplier<? extends JsonElement> createLiveNodeSupplier() {
+  private ContainerLiveNodeData createLiveNodeData(ContainerInfo containerInfo) {
+    // if debugging is enabled, log the port and register it in service discovery.
+    String debugPort = System.getProperty("twill.debug.port");
+    if (debugPort != null) {
+      LOG.info("JVM is listening for debugger on port {}", debugPort);
+    }
+    return new ContainerLiveNodeData(containerInfo.getId(),
+                                     containerInfo.getHost().getCanonicalHostName(),
+                                     debugPort);
+  }
+
+  private Supplier<? extends JsonElement> createLiveNodeSupplier(final ContainerLiveNodeData data) {
     return new Supplier<JsonElement>() {
       @Override
       public JsonElement get() {
-        return new Gson().toJsonTree(containerLiveNode);
+        return new Gson().toJsonTree(data);
       }
     };
   }
@@ -123,6 +133,7 @@ public final class TwillContainerService extends AbstractTwillService {
 
     @Override
     protected void startUp() throws Exception {
+
       commandExecutor = Executors.newSingleThreadExecutor(
         Threads.createDaemonThreadFactory("runnable-command-executor"));
 

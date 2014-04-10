@@ -28,14 +28,16 @@ public class DefaultTwillRunResources implements TwillRunResources {
   private final int virtualCores;
   private final int memoryMB;
   private final String host;
+  private final Integer debugPort;
 
   public DefaultTwillRunResources(int instanceId, String containerId,
-                                  int cores, int memoryMB, String host) {
+                                  int cores, int memoryMB, String host, Integer debugPort) {
     this.instanceId = instanceId;
     this.containerId = containerId;
     this.virtualCores = cores;
     this.memoryMB = memoryMB;
     this.host = host;
+    this.debugPort = debugPort;
   }
 
   /**
@@ -80,6 +82,11 @@ public class DefaultTwillRunResources implements TwillRunResources {
   }
 
   @Override
+  public Integer getDebugPort() {
+    return debugPort;
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (!(o instanceof TwillRunResources)) {
       return false;
@@ -90,6 +97,7 @@ public class DefaultTwillRunResources implements TwillRunResources {
       host.equals(other.getHost()) &&
       (virtualCores == other.getVirtualCores()) &&
       (memoryMB == other.getMemoryMB());
+    // debugPort is ignored here
   }
 
   @Override
@@ -97,9 +105,10 @@ public class DefaultTwillRunResources implements TwillRunResources {
     int hash = 17;
     hash = 31 *  hash + containerId.hashCode();
     hash = 31 *  hash + host.hashCode();
-    hash = 31 *  hash + (int) (instanceId ^ (instanceId >>> 32));
-    hash = 31 *  hash + (int) (virtualCores ^ (virtualCores >>> 32));
-    hash = 31 *  hash + (int) (memoryMB ^ (memoryMB >>> 32));
+    hash = 31 *  hash + (instanceId ^ (instanceId >>> 32));
+    hash = 31 *  hash + (virtualCores ^ (virtualCores >>> 32));
+    hash = 31 *  hash + (memoryMB ^ (memoryMB >>> 32));
+    // debugPort is ignored here
     return hash;
   }
 

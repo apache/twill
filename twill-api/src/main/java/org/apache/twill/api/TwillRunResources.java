@@ -48,4 +48,9 @@ public interface TwillRunResources {
    * @return id of the container the runnable is running in.
    */
   String getContainerId();
+
+  /**
+   * @return the debug port of the container's JVM, or null if not debug-enabled.
+   */
+  Integer getDebugPort();
 }

@@ -31,7 +31,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
-import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
 import com.google.common.io.InputSupplier;
 import com.google.common.reflect.TypeToken;
@@ -54,6 +53,7 @@ import org.apache.twill.api.Command;
 import org.apache.twill.api.EventHandler;
 import org.apache.twill.api.EventHandlerSpecification;
 import org.apache.twill.api.LocalFile;
+import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
@@ -66,9 +66,11 @@ import org.apache.twill.internal.Configs;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.DefaultTwillRunResources;
 import org.apache.twill.internal.EnvKeys;
+import org.apache.twill.internal.JvmOptions;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.TwillContainerLauncher;
 import org.apache.twill.internal.ZKServiceDecorator;
+import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
 import org.apache.twill.internal.json.TwillSpecificationAdapter;
 import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
@@ -124,7 +126,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
   private final ExpectedContainers expectedContainers;
   private final TrackerService trackerService;
   private final YarnAMClient amClient;
-  private final String jvmOpts;
+  private final JvmOptions jvmOpts;
   private final int reservedMemory;
   private final EventHandler eventHandler;
   private final Location applicationLocation;
@@ -159,17 +161,21 @@ public final class ApplicationMasterService extends AbstractTwillService {
     });
     expectedContainers = initExpectedContainers(twillSpec);
     runningContainers = initRunningContainers(amClient.getContainerId(), amClient.getHost());
-    trackerService = new TrackerService(runningContainers.getResourceReport(), amClient.getHost());
+    trackerService = new TrackerService(new Supplier<ResourceReport>() {
+      @Override
+      public ResourceReport get() {
+        return runningContainers.getResourceReport();
+      }
+    }, amClient.getHost());
     eventHandler = createEventHandler(twillSpec);
   }
 
-  private String loadJvmOptions() throws IOException {
+  private JvmOptions loadJvmOptions() throws IOException {
     final File jvmOptsFile = new File(Constants.Files.JVM_OPTIONS);
     if (!jvmOptsFile.exists()) {
-      return "";
+      return new JvmOptions(null, JvmOptions.DebugOptions.NO_DEBUG);
     }
-
-    return CharStreams.toString(new InputSupplier<Reader>() {
+    return JvmOptionsCodec.decode(new InputSupplier<Reader>() {
       @Override
       public Reader getInput() throws IOException {
         return new FileReader(jvmOptsFile);
@@ -220,7 +226,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
       appMasterContainerId.toString(),
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_VIRTUAL_CORES)),
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
-      appMasterHost);
+      appMasterHost, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
     return new RunningContainers(appId, appMasterResources);
   }

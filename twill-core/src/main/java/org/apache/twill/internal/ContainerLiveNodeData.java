@@ -24,10 +24,12 @@ public final class ContainerLiveNodeData {
 
   private final String containerId;
   private final String host;
+  private final String debugPort;
 
-  public ContainerLiveNodeData(String containerId, String host) {
+  public ContainerLiveNodeData(String containerId, String host, String debugPort) {
     this.containerId = containerId;
     this.host = host;
+    this.debugPort = debugPort;
   }
 
   public String getContainerId() {
@@ -36,5 +38,9 @@ public final class ContainerLiveNodeData {
 
   public String getHost() {
     return host;
+  }
+
+  public String getDebugPort() {
+    return debugPort;
   }
 }

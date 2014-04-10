@@ -36,6 +36,7 @@ import org.apache.twill.api.ServiceController;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.internal.ContainerExitCodes;
 import org.apache.twill.internal.ContainerInfo;
+import org.apache.twill.internal.ContainerLiveNodeData;
 import org.apache.twill.internal.DefaultResourceReport;
 import org.apache.twill.internal.DefaultTwillRunResources;
 import org.apache.twill.internal.RunIds;
@@ -115,12 +116,12 @@ final class RunningContainers {
       TwillContainerController controller = launcher.start(runId, instanceId,
                                                            TwillContainerMain.class, "$HADOOP_CONF_DIR");
       containers.put(runnableName, containerInfo.getId(), controller);
-
-      TwillRunResources resources = new DefaultTwillRunResources(instanceId,
+      TwillRunResources resources = new DynamicTwillRunResources(instanceId,
                                                                  containerInfo.getId(),
                                                                  containerInfo.getVirtualCores(),
                                                                  containerInfo.getMemoryMB(),
-                                                                 containerInfo.getHost().getHostName());
+                                                                 containerInfo.getHost().getHostName(),
+                                                                 controller);
       resourceReport.addRunResources(runnableName, resources);
 
       if (startSequence.isEmpty() || !runnableName.equals(startSequence.peekLast())) {
@@ -290,7 +291,8 @@ final class RunningContainers {
 
   /**
    * Handle completion of container.
-   * @param status The completion status.
+   *
+   * @param status           The completion status.
    * @param restartRunnables Set of runnable names that requires restart.
    */
   void handleCompleted(YarnContainerStatus status, Multiset<String> restartRunnables) {
@@ -433,5 +435,37 @@ final class RunningContainers {
   private int getInstanceId(RunId runId) {
     String id = runId.getId();
     return Integer.parseInt(id.substring(id.lastIndexOf('-') + 1));
+  }
+
+  /**
+   * A helper class that overrides the debug port of the resources with the live info from the container controller.
+   */
+  private static class DynamicTwillRunResources extends DefaultTwillRunResources {
+
+    private final TwillContainerController controller;
+    private Integer dynamicDebugPort = null;
+
+    private DynamicTwillRunResources(int instanceId, String containerId,
+                                     int cores, int memoryMB, String host,
+                                     TwillContainerController controller) {
+      super(instanceId, containerId, cores, memoryMB, host, null);
+      this.controller = controller;
+    }
+
+    @Override
+    public synchronized Integer getDebugPort() {
+      if (dynamicDebugPort == null) {
+        ContainerLiveNodeData liveData = controller.getLiveNodeData();
+        if (liveData != null && liveData.getDebugPort() != null) {
+          try {
+            dynamicDebugPort = Integer.parseInt(liveData.getDebugPort());
+          } catch (NumberFormatException e) {
+            LOG.warn("Live data for {} has debug port of '{}' which cannot be parsed as a number",
+                     getContainerId(), liveData.getDebugPort());
+          }
+        }
+      }
+      return dynamicDebugPort;
+    }
   }
 }

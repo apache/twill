@@ -34,7 +34,8 @@ import org.junit.runners.Suite;
                       ProvisionTimeoutTestRun.class,
                       LogHandlerTestRun.class,
                       SessionExpireTestRun.class,
-                      ServiceDiscoveryTest.class
+                      ServiceDiscoveryTest.class,
+                      DebugTestRun.class
                     })
 public final class YarnTestSuite {
 

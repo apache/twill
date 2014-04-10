@@ -15,18 +15,14 @@ out/
 .DS_Store
 lib/
 .idea
-data/
 
 # Gradle Files & Dir #
 build/
-.gradle/
 .stickyStorage
 .build/
 target/
 
-# Node log
-npm-*.log
+# relics of test runs 
 logs/
+zookeeper.out
 
-# Singlenode run files. 
-data/
