@@ -21,7 +21,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
-import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
@@ -113,7 +112,6 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final YarnAppClient yarnAppClient;
   private final ZKClient zkClient;
   private final LocationFactory locationFactory;
-  private final JvmOptions jvmOpts;
   private final YarnTwillControllerFactory controllerFactory;
   private final RunId runId;
 
@@ -126,22 +124,25 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final Credentials credentials;
   private final int reservedMemory;
   private String user;
+  private String extraOptions;
+  private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
 
-  YarnTwillPreparer(YarnConfiguration yarnConfig, TwillSpecification twillSpec, YarnAppClient yarnAppClient,
-                    ZKClient zkClient, LocationFactory locationFactory, Supplier<JvmOptions> jvmOpts,
+  YarnTwillPreparer(YarnConfiguration yarnConfig, TwillSpecification twillSpec,
+                    YarnAppClient yarnAppClient, ZKClient zkClient,
+                    LocationFactory locationFactory, String extraOptions,
                     YarnTwillControllerFactory controllerFactory) {
     this.yarnConfig = yarnConfig;
     this.twillSpec = twillSpec;
     this.yarnAppClient = yarnAppClient;
     this.zkClient = ZKClients.namespace(zkClient, "/" + twillSpec.getName());
     this.locationFactory = locationFactory;
-    this.jvmOpts = jvmOpts.get();
     this.controllerFactory = controllerFactory;
     this.runId = RunIds.generate();
     this.credentials = createCredentials();
     this.reservedMemory = yarnConfig.getInt(Configs.Keys.JAVA_RESERVED_MEMORY_MB,
                                             Configs.Defaults.JAVA_RESERVED_MEMORY_MB);
     this.user = System.getProperty("user.name");
+    this.extraOptions = extraOptions;
   }
 
   @Override
@@ -153,6 +154,29 @@ final class YarnTwillPreparer implements TwillPreparer {
   @Override
   public TwillPreparer setUser(String user) {
     this.user = user;
+    return this;
+  }
+
+  @Override
+  public TwillPreparer setJVMOptions(String options) {
+    this.extraOptions = options;
+    return this;
+  }
+
+  @Override
+  public TwillPreparer addJVMOptions(String options) {
+    this.extraOptions = extraOptions == null ? options : extraOptions + " " + options;
+    return this;
+  }
+
+  @Override
+  public TwillPreparer enableDebugging(String... runnables) {
+    return enableDebugging(false, runnables);
+  }
+
+  @Override
+  public TwillPreparer enableDebugging(boolean doSuspend, String... runnables) {
+    this.debugOptions = new JvmOptions.DebugOptions(true, doSuspend, ImmutableSet.copyOf(runnables));
     return this;
   }
 
@@ -242,7 +266,7 @@ final class YarnTwillPreparer implements TwillPreparer {
           saveSpecification(twillSpec, runnableLocalFiles, localFiles);
           saveLogback(localFiles);
           saveLauncher(localFiles);
-          saveJvmOptions(jvmOpts, localFiles);
+          saveJvmOptions(localFiles);
           saveArguments(new Arguments(arguments, runnableArgs), localFiles);
           saveLocalFiles(localFiles, ImmutableSet.of(Constants.Files.TWILL_SPEC,
                                                      Constants.Files.LOGBACK_TEMPLATE,
@@ -275,7 +299,7 @@ final class YarnTwillPreparer implements TwillPreparer {
               "-Dtwill.app=$" + EnvKeys.TWILL_APP_NAME,
               "-cp", Constants.Files.LAUNCHER_JAR + ":$HADOOP_CONF_DIR",
               "-Xmx" + (Constants.APP_MASTER_MEMORY_MB - Constants.APP_MASTER_RESERVED_MEMORY_MB) + "m",
-              jvmOpts.getExtraOptions() == null ? "" : jvmOpts.getExtraOptions(),
+              extraOptions == null ? "" : extraOptions,
               TwillLauncher.class.getName(),
               Constants.Files.APP_MASTER_JAR,
               ApplicationMasterMain.class.getName(),
@@ -499,15 +523,15 @@ final class YarnTwillPreparer implements TwillPreparer {
     localFiles.put(Constants.Files.LAUNCHER_JAR, createLocalFile(Constants.Files.LAUNCHER_JAR, location));
   }
 
-  private void saveJvmOptions(JvmOptions opts, Map<String, LocalFile> localFiles) throws IOException {
-    if ((opts.getExtraOptions() == null || opts.getExtraOptions().isEmpty()) &&
-      JvmOptions.DebugOptions.NO_DEBUG.equals(opts.getDebugOptions())) {
+  private void saveJvmOptions(Map<String, LocalFile> localFiles) throws IOException {
+    if ((extraOptions == null || extraOptions.isEmpty()) &&
+      JvmOptions.DebugOptions.NO_DEBUG.equals(debugOptions)) {
       // If no vm options, no need to localize the file.
       return;
     }
     LOG.debug("Create and copy {}", Constants.Files.JVM_OPTIONS);
     final Location location = createTempLocation(Constants.Files.JVM_OPTIONS);
-    JvmOptionsCodec.encode(opts, new OutputSupplier<Writer>() {
+    JvmOptionsCodec.encode(new JvmOptions(extraOptions, debugOptions), new OutputSupplier<Writer>() {
       @Override
       public Writer getOutput() throws IOException {
         return new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8);

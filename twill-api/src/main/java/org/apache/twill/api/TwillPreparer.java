@@ -45,6 +45,45 @@ public interface TwillPreparer {
   TwillPreparer setUser(String user);
 
   /**
+   * This methods sets the extra JVM options that will be passed to the java command line for every runnable
+   * of the application started through this {@link org.apache.twill.api.TwillPreparer} instance.
+   *
+   * This is intended for advance usage. All options will be passed unchanged to the java command line. Invalid
+   * options could cause application not able to start.
+   *
+   * @param options extra JVM options.
+   */
+  TwillPreparer setJVMOptions(String options);
+
+  /**
+   * This methods adds extra JVM options that will be passed to the java command line for every runnable
+   * of the application started through this {@link org.apache.twill.api.TwillPreparer} instance.
+   *
+   * This is intended for advance usage. All options will be passed unchanged to the java command line. Invalid
+   * options could cause application not able to start.
+   *
+   * @param options extra JVM options.
+   */
+  TwillPreparer addJVMOptions(String options);
+
+  /**
+   * Enable debugging for runnables, without suspending the virtual machine to wait for the debugger.
+   * This replaces any previous debug settings.
+   * @param runnables the names of runnables to enable for debugging. If empty, it means all runnables.
+   */
+  TwillPreparer enableDebugging(String ... runnables);
+
+  /**
+   * Enable debugging for runnables. This replaces any previous debug settings.
+   * @param doSuspend whether the virtual machines should be supended until the debugger connects. This
+   *                  option allows to debug a container from the very beginning. Note that in that case,
+   *                  the container cannot notify the controller of its debug port until the debugger is
+   *                  attached - you must figure out where it is running using the YARN console or APIs.
+   * @param runnables the names of runnables to enable for debugging. If empty, it means all runnables.
+   */
+  TwillPreparer enableDebugging(boolean doSuspend, String ... runnables);
+
+  /**
    * Sets the list of arguments that will be passed to the application. The arguments can be retrieved
    * from {@link TwillContext#getApplicationArguments()}.
    *

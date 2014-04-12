@@ -57,22 +57,13 @@ public final class LocalFileTestRun extends BaseYarnTest {
                                         Charsets.UTF_8);
 
     TwillRunner runner = YarnTestUtils.getTwillRunner();
-    String prevJVMOptions = "";
-    if (runner instanceof YarnTwillRunnerService) {
-      YarnTwillRunnerService yarnRunner = (YarnTwillRunnerService) runner;
-      prevJVMOptions = yarnRunner.getJVMOptions() != null ? yarnRunner.getJVMOptions() : "";
-      yarnRunner.setJVMOptions(prevJVMOptions + " -verbose:gc -Xloggc:gc.log -XX:+PrintGCDetails");
-    }
 
     TwillController controller = runner.prepare(new LocalFileApplication())
+      .addJVMOptions(" -verbose:gc -Xloggc:gc.log -XX:+PrintGCDetails")
       .withApplicationArguments("local")
       .withArguments("LocalFileSocketServer", "local2")
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
-
-    if (runner instanceof YarnTwillRunnerService) {
-      ((YarnTwillRunnerService) runner).setJVMOptions(prevJVMOptions);
-    }
 
     Iterable<Discoverable> discoverables = controller.discoverService("local");
     Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 1, 60));

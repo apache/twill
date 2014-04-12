@@ -21,7 +21,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.HashMultimap;
@@ -65,7 +64,6 @@ import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.filesystem.LocationFactory;
 import org.apache.twill.internal.Constants;
-import org.apache.twill.internal.JvmOptions;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.SingleRunnableApplication;
@@ -135,7 +133,6 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
   private Cancellable watchCancellable;
 
   private volatile String jvmOptions = null;
-  private volatile JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
 
   public YarnTwillRunnerService(YarnConfiguration config, String zkConnect) {
     this(config, zkConnect, new HDFSLocationFactory(getFileSystem(config), "/twill"));
@@ -170,38 +167,6 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
    */
   public String getJVMOptions() {
     return jvmOptions;
-  }
-
-  /**
-   * Disable debugging for runnables. It only affects applications that are started after this
-   * method is called. Note that debugging is disabled by default, and this method is only needed
-   * to revert a previous call of @link #enableDebugging.
-   */
-  public void disableDebugging() {
-    this.debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
-  }
-
-  /**
-   * Enable debugging for runnables, without suspending the virtual machine to wait for the debugger.
-   * This replaces any previous debug settings and only affects applications that are started after
-   * this method is called.
-   * @param runnables the names of runnables to enable for debugging.
-   */
-  public void enableDebugging(String ... runnables) {
-    this.debugOptions = new JvmOptions.DebugOptions(true, false, ImmutableSet.copyOf(runnables));
-  }
-
-  /**
-   * Enable debugging for runnables. This replaces any previous debug settings and only affects
-   * applications that are started after this method is called.
-   * @param doSuspend whether the virtual machines should be supended until the debugger connects. This
-   *                  option allows to debug a container from the very beginning. Note that in that case,
-   *                  the container cannot notify the controller of its debug port until the debugger is
-   *                  attached - you must figure out where it is running using the YARN console or APIs.
-   * @param runnables the names of runnables to enable for debugging.
-   */
-  public void enableDebugging(boolean doSuspend, String ... runnables) {
-    this.debugOptions = new JvmOptions.DebugOptions(true, false, ImmutableSet.copyOf(runnables));
   }
 
   @Override
@@ -273,8 +238,7 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
     final TwillSpecification twillSpec = application.configure();
     final String appName = twillSpec.getName();
 
-    return new YarnTwillPreparer(yarnConfig, twillSpec, yarnAppClient, zkClientService, locationFactory,
-                                 Suppliers.ofInstance(new JvmOptions(jvmOptions, debugOptions)),
+    return new YarnTwillPreparer(yarnConfig, twillSpec, yarnAppClient, zkClientService, locationFactory, jvmOptions,
                                  new YarnTwillControllerFactory() {
       @Override
       public YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,

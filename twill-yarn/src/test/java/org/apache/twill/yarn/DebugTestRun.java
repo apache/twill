@@ -104,10 +104,10 @@ public class DebugTestRun extends BaseYarnTest {
   @Test
   public void testDebugPort() throws Exception {
     YarnTwillRunnerService runner = (YarnTwillRunnerService) YarnTestUtils.getTwillRunner();
-    runner.enableDebugging("r1");
     runner.startAndWait();
 
     TwillController controller = runner.prepare(new DummyApplication())
+                                       .enableDebugging("r1")
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
                                        .start();
     final CountDownLatch running = new CountDownLatch(1);
