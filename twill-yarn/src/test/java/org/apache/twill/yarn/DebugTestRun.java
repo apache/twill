@@ -102,7 +102,7 @@ public class DebugTestRun extends BaseYarnTest {
   }
 
   @Test
-  public void testDebugPort() throws Exception {
+  public void testDebugPortOneRunnable() throws Exception {
     YarnTwillRunnerService runner = (YarnTwillRunnerService) YarnTestUtils.getTwillRunner();
     runner.startAndWait();
 
@@ -120,6 +120,31 @@ public class DebugTestRun extends BaseYarnTest {
 
     Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
     Assert.assertTrue(waitForDebugPort(controller, "r1", 30));
+    controller.stop().get(30, TimeUnit.SECONDS);
+    // Sleep a bit before exiting.
+    TimeUnit.SECONDS.sleep(2);
+  }
+
+  @Test
+  public void testDebugPortAllRunnables() throws Exception {
+    YarnTwillRunnerService runner = (YarnTwillRunnerService) YarnTestUtils.getTwillRunner();
+    runner.startAndWait();
+
+    TwillController controller = runner.prepare(new DummyApplication())
+                                       .enableDebugging()
+                                       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
+                                       .start();
+    final CountDownLatch running = new CountDownLatch(1);
+    controller.addListener(new ServiceListenerAdapter() {
+      @Override
+      public void running() {
+        running.countDown();
+      }
+    }, Threads.SAME_THREAD_EXECUTOR);
+
+    Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
+    Assert.assertTrue(waitForDebugPort(controller, "r1", 30));
+    Assert.assertTrue(waitForDebugPort(controller, "r2", 30));
     controller.stop().get(30, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);

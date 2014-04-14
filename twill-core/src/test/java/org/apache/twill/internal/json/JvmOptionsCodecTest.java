@@ -29,6 +29,8 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Tests the JvmOptions Codec.
@@ -61,6 +63,29 @@ public class JvmOptionsCodecTest {
   @Test
   public void testSomeNulls() throws Exception {
     JvmOptions options = new JvmOptions(null, new JvmOptions.DebugOptions(false, false, null));
+    final StringWriter writer = new StringWriter();
+    JvmOptionsCodec.encode(options, new OutputSupplier<Writer>() {
+      @Override
+      public Writer getOutput() throws IOException {
+        return writer;
+      }
+    });
+    JvmOptions options1 = JvmOptionsCodec.decode(new InputSupplier<Reader>() {
+      @Override
+      public Reader getInput() throws IOException {
+        return new StringReader(writer.toString());
+      }
+    });
+    Assert.assertEquals(options.getExtraOptions(), options1.getExtraOptions());
+    Assert.assertEquals(options.getDebugOptions().doDebug(), options1.getDebugOptions().doDebug());
+    Assert.assertEquals(options.getDebugOptions().doSuspend(), options1.getDebugOptions().doSuspend());
+    Assert.assertEquals(options.getDebugOptions().getRunnables(), options1.getDebugOptions().getRunnables());
+  }
+
+  @Test
+  public void testNoRunnables() throws Exception {
+    List<String> noRunnables = Collections.emptyList();
+    JvmOptions options = new JvmOptions(null, new JvmOptions.DebugOptions(true, false, noRunnables));
     final StringWriter writer = new StringWriter();
     JvmOptionsCodec.encode(options, new OutputSupplier<Writer>() {
       @Override

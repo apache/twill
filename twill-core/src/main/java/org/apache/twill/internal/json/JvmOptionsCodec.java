@@ -96,8 +96,9 @@ public class JvmOptionsCodec implements JsonSerializer<JvmOptions>, JsonDeserial
         return JvmOptions.DebugOptions.NO_DEBUG;
       }
       Boolean doSuspend = context.deserialize(jsonObj.get("doSuspend"), Boolean.class);
-      Set<String> runnables = context.deserialize(jsonObj.get("runnables"), new TypeToken<Set<String>>() { }.getType());
-      return new JvmOptions.DebugOptions(true, doSuspend, ImmutableSet.copyOf(runnables));
+      Set<String> runnables = context.deserialize(jsonObj.get("runnables"),
+                                                  new TypeToken<Set<String>>() { }.getType());
+      return new JvmOptions.DebugOptions(true, doSuspend, runnables == null ? null : ImmutableSet.copyOf(runnables));
     }
 
     @Override
@@ -105,7 +106,9 @@ public class JvmOptionsCodec implements JsonSerializer<JvmOptions>, JsonDeserial
       JsonObject json = new JsonObject();
       json.add("doDebug", context.serialize(src.doDebug()));
       json.add("doSuspend", context.serialize(src.doSuspend()));
-      json.add("runnables", context.serialize(src.getRunnables()));
+      if (src.getRunnables() != null) {
+        json.add("runnables", context.serialize(src.getRunnables()));
+      }
       return json;
     }
   }

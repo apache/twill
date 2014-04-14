@@ -18,6 +18,7 @@
 package org.apache.twill.internal;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 
 import java.util.Set;
 
@@ -60,7 +61,8 @@ public final class JvmOptions {
     public DebugOptions(boolean doDebug, boolean doSuspend, Iterable<String> runnables) {
       this.doDebug = doDebug;
       this.doSuspend = doDebug && doSuspend;
-      this.runnables = doDebug && runnables != null ? ImmutableSet.copyOf(runnables) : null;
+      this.runnables =
+        doDebug && runnables != null && Iterables.size(runnables) > 0 ? ImmutableSet.copyOf(runnables) : null;
     }
 
     public boolean doDebug() {
