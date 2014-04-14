@@ -269,6 +269,7 @@
                             <exclude>target/**/*</exclude>
                             <exclude>**/README</exclude>
                             <exclude>src/test/resources/header.txt</exclude>
+                            <exclude>**/zookeeper.out</exclude>
                         </excludes>
                     </configuration>
                 </plugin>
