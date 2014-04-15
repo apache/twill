@@ -29,7 +29,7 @@
 
     <artifactId>twill-api</artifactId>
     <packaging>jar</packaging>
-    <name>Twill API</name>
+    <name>Apache Twill API</name>
 
     <dependencies>
         <dependency>

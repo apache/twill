@@ -25,10 +25,10 @@ limitations under the License.
     <parent>
         <artifactId>twill-examples</artifactId>
         <groupId>org.apache.twill.example</groupId>
-        <version>0.2.0-incubating-SNAPSHOT</version>
+        <version>0.3.0-incubating-SNAPSHOT</version>
     </parent>
 
-    <name>Twill examples: Echo</name>
+    <name>Apache Twill examples: Echo</name>
     <description>
         Simple echo application that echos the command line arguments passed to it.
         Used to demonstrate usage of BundledJarApplication to run applications that have

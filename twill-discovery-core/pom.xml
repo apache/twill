@@ -27,7 +27,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>twill-discovery-core</artifactId>
-    <name>Twill discovery service implementations</name>
+    <name>Apache Twill discovery service implementations</name>
 
     <dependencies>
         <dependency>

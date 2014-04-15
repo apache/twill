@@ -24,10 +24,10 @@ limitations under the License.
     <parent>
         <artifactId>twill-examples</artifactId>
         <groupId>org.apache.twill.example</groupId>
-        <version>0.2.0-incubating-SNAPSHOT</version>
+        <version>0.3.0-incubating-SNAPSHOT</version>
     </parent>
 
-    <name>Twill examples: YARN</name>
+    <name>Apache Twill examples: YARN</name>
     <description>Examples demonstrating usage of twill-yarn</description>
     <artifactId>twill-examples-yarn</artifactId>
 

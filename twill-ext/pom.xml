@@ -27,7 +27,7 @@ limitations under the License.
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>twill-ext</artifactId>
-    <name>Twill extensions</name>
+    <name>Apache Twill extensions</name>
 
     <dependencies>
         <dependency>

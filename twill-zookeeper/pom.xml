@@ -27,7 +27,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>twill-zookeeper</artifactId>
-    <name>Twill ZooKeeper client library</name>
+    <name>Apache Twill ZooKeeper client library</name>
 
     <dependencies>
         <dependency>

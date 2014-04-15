@@ -27,7 +27,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>twill-common</artifactId>
-    <name>Twill common library</name>
+    <name>Apache Twill common library</name>
 
     <dependencies>
         <dependency>

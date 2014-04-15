@@ -27,7 +27,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>twill-yarn</artifactId>
-    <name>Twill Apache Hadoop YARN library</name>
+    <name>Apache Twill Apache Hadoop YARN library</name>
 
     <properties>
         <output.dir>target/classes</output.dir>
