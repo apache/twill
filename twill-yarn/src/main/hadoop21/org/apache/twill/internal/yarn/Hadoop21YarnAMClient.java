@@ -19,37 +19,30 @@ package org.apache.twill.internal.yarn;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.google.common.util.concurrent.AbstractIdleService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
+import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
-import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.appmaster.RunnableProcessLauncher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetSocketAddress;
-import java.net.URL;
 import java.util.List;
-import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  *
  */
-public final class Hadoop21YarnAMClient extends AbstractIdleService implements YarnAMClient {
+public final class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.ContainerRequest> {
 
   private static final Logger LOG = LoggerFactory.getLogger(Hadoop21YarnAMClient.class);
 
@@ -64,20 +57,12 @@ public final class Hadoop21YarnAMClient extends AbstractIdleService implements Y
     };
   }
 
-  private final ContainerId containerId;
-  private final Multimap<String, AMRMClient.ContainerRequest> containerRequests;
   private final AMRMClient<AMRMClient.ContainerRequest> amrmClient;
   private final Hadoop21YarnNMClient nmClient;
-  private InetSocketAddress trackerAddr;
-  private URL trackerUrl;
   private Resource maxCapability;
 
   public Hadoop21YarnAMClient(Configuration conf) {
-    String masterContainerId = System.getenv().get(ApplicationConstants.Environment.CONTAINER_ID.name());
-    Preconditions.checkArgument(masterContainerId != null,
-                                "Missing %s from environment", ApplicationConstants.Environment.CONTAINER_ID.name());
-    this.containerId = ConverterUtils.toContainerId(masterContainerId);
-    this.containerRequests = ArrayListMultimap.create();
+    super(ApplicationConstants.Environment.CONTAINER_ID.name());
 
     this.amrmClient = AMRMClient.createAMRMClient();
     this.amrmClient.init(conf);
@@ -105,89 +90,50 @@ public final class Hadoop21YarnAMClient extends AbstractIdleService implements Y
   }
 
   @Override
-  public ContainerId getContainerId() {
-    return containerId;
-  }
-
-  @Override
   public String getHost() {
     return System.getenv().get(ApplicationConstants.Environment.NM_HOST.name());
   }
 
   @Override
-  public void setTracker(InetSocketAddress trackerAddr, URL trackerUrl) {
-    this.trackerAddr = trackerAddr;
-    this.trackerUrl = trackerUrl;
+  protected AMRMClient.ContainerRequest createContainerRequest(Priority priority, Resource capability,
+                                                               @Nullable String[] hosts, @Nullable String[] racks) {
+    return new AMRMClient.ContainerRequest(capability, hosts, racks, priority);
   }
 
   @Override
-  public synchronized void allocate(float progress, AllocateHandler handler) throws Exception {
+  protected void addContainerRequest(AMRMClient.ContainerRequest request) {
+    amrmClient.addContainerRequest(request);
+  }
+
+  @Override
+  protected void removeContainerRequest(AMRMClient.ContainerRequest request) {
+    amrmClient.removeContainerRequest(request);
+  }
+
+  @Override
+  protected AllocateResult doAllocate(float progress) throws Exception {
     AllocateResponse allocateResponse = amrmClient.allocate(progress);
-    List<ProcessLauncher<YarnContainerInfo>> launchers
+    List<RunnableProcessLauncher> launchers
       = Lists.newArrayListWithCapacity(allocateResponse.getAllocatedContainers().size());
 
     for (Container container : allocateResponse.getAllocatedContainers()) {
       launchers.add(new RunnableProcessLauncher(new Hadoop21YarnContainerInfo(container), nmClient));
     }
 
-    if (!launchers.isEmpty()) {
-      handler.acquired(launchers);
-
-      // If no process has been launched through the given launcher, return the container.
-      for (ProcessLauncher<YarnContainerInfo> l : launchers) {
-        // This cast always works.
-        RunnableProcessLauncher launcher = (RunnableProcessLauncher) l;
-        if (!launcher.isLaunched()) {
-          Container container = launcher.getContainerInfo().getContainer();
-          LOG.info("Nothing to run in container, releasing it: {}", container);
-          amrmClient.releaseAssignedContainer(container.getId());
-        }
-      }
-    }
-
     List<YarnContainerStatus> completed = ImmutableList.copyOf(
       Iterables.transform(allocateResponse.getCompletedContainersStatuses(), STATUS_TRANSFORM));
-    if (!completed.isEmpty()) {
-      handler.completed(completed);
-    }
+
+    return new AllocateResult(launchers, completed);
   }
 
   @Override
-  public ContainerRequestBuilder addContainerRequest(Resource capability) {
-    return addContainerRequest(capability, 1);
+  protected void releaseAssignedContainer(YarnContainerInfo containerInfo) {
+    Container container = containerInfo.getContainer();
+    amrmClient.releaseAssignedContainer(container.getId());
   }
 
   @Override
-  public ContainerRequestBuilder addContainerRequest(Resource capability, int count) {
-    return new ContainerRequestBuilder(adjustCapability(capability), count) {
-      @Override
-      public String apply() {
-        synchronized (Hadoop21YarnAMClient.this) {
-          String id = UUID.randomUUID().toString();
-
-          String[] hosts = this.hosts.isEmpty() ? null : this.hosts.toArray(new String[this.hosts.size()]);
-          String[] racks = this.racks.isEmpty() ? null : this.racks.toArray(new String[this.racks.size()]);
-
-          for (int i = 0; i < count; i++) {
-            AMRMClient.ContainerRequest request = new AMRMClient.ContainerRequest(capability, hosts, racks, priority);
-            containerRequests.put(id, request);
-            amrmClient.addContainerRequest(request);
-          }
-
-          return id;
-        }
-      }
-    };
-  }
-
-  @Override
-  public synchronized void completeContainerRequest(String id) {
-    for (AMRMClient.ContainerRequest request : containerRequests.removeAll(id)) {
-      amrmClient.removeContainerRequest(request);
-    }
-  }
-
-  private Resource adjustCapability(Resource resource) {
+  protected Resource adjustCapability(Resource resource) {
     int cores = resource.getVirtualCores();
     int updatedCores = Math.min(resource.getVirtualCores(), maxCapability.getVirtualCores());
 

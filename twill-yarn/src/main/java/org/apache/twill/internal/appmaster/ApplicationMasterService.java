@@ -291,7 +291,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
     final Set<String> ids = Sets.newHashSet(runningContainers.getContainerIds());
     YarnAMClient.AllocateHandler handler = new YarnAMClient.AllocateHandler() {
       @Override
-      public void acquired(List<ProcessLauncher<YarnContainerInfo>> launchers) {
+      public void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers) {
         // no-op
       }
 
@@ -352,7 +352,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
 
     YarnAMClient.AllocateHandler allocateHandler = new YarnAMClient.AllocateHandler() {
       @Override
-      public void acquired(List<ProcessLauncher<YarnContainerInfo>> launchers) {
+      public void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers) {
         launchRunnable(launchers, provisioning);
       }
 
@@ -525,7 +525,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
   /**
    * Launches runnables in the provisioned containers.
    */
-  private void launchRunnable(List<ProcessLauncher<YarnContainerInfo>> launchers,
+  private void launchRunnable(List<? extends ProcessLauncher<YarnContainerInfo>> launchers,
                               Queue<ProvisionRequest> provisioning) {
     for (ProcessLauncher<YarnContainerInfo> processLauncher : launchers) {
       LOG.info("Got container {}", processLauncher.getContainerInfo().getId());

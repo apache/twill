@@ -19,7 +19,6 @@ package org.apache.twill.internal.yarn;
 
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Service;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -29,7 +28,6 @@ import org.apache.twill.internal.ProcessLauncher;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -95,7 +93,7 @@ public interface YarnAMClient extends Service {
    */
   // TODO: Move AM heartbeat logic into this interface so AM only needs to handle callback.
   interface AllocateHandler {
-    void acquired(List<ProcessLauncher<YarnContainerInfo>> launchers);
+    void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers);
 
     void completed(List<YarnContainerStatus> completed);
   }

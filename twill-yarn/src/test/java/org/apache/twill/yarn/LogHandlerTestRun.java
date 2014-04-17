@@ -23,12 +23,14 @@ import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.api.logging.LogThrowable;
+import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.Services;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.PrintWriter;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -62,6 +64,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
 
     TwillRunner runner = YarnTestUtils.getTwillRunner();
     TwillController controller = runner.prepare(new LogRunnable())
+                                       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                        .addLogHandler(logHandler)
                                        .start();
 
