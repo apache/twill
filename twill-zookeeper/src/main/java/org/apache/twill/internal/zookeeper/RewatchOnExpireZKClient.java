@@ -41,7 +41,7 @@ public final class RewatchOnExpireZKClient extends ForwardingZKClient {
   @Override
   public OperationFuture<Stat> exists(String path, Watcher watcher) {
     if (watcher == null) {
-      return super.exists(path, watcher);
+      return super.exists(path, null);
     }
     final RewatchOnExpireWatcher wrappedWatcher = new RewatchOnExpireWatcher(this, ActionType.EXISTS, path, watcher);
     OperationFuture<Stat> result = super.exists(path, wrappedWatcher);
@@ -62,7 +62,7 @@ public final class RewatchOnExpireZKClient extends ForwardingZKClient {
   @Override
   public OperationFuture<NodeChildren> getChildren(String path, Watcher watcher) {
     if (watcher == null) {
-      return super.getChildren(path, watcher);
+      return super.getChildren(path, null);
     }
     final RewatchOnExpireWatcher wrappedWatcher = new RewatchOnExpireWatcher(this, ActionType.CHILDREN, path, watcher);
     OperationFuture<NodeChildren> result = super.getChildren(path, wrappedWatcher);
@@ -83,7 +83,7 @@ public final class RewatchOnExpireZKClient extends ForwardingZKClient {
   @Override
   public OperationFuture<NodeData> getData(String path, Watcher watcher) {
     if (watcher == null) {
-      return super.getData(path, watcher);
+      return super.getData(path, null);
     }
     final RewatchOnExpireWatcher wrappedWatcher = new RewatchOnExpireWatcher(this, ActionType.DATA, path, watcher);
     OperationFuture<NodeData> result = super.getData(path, wrappedWatcher);

@@ -19,6 +19,7 @@ package org.apache.twill.zookeeper;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import javax.annotation.Nullable;
@@ -77,20 +78,9 @@ public final class ZKClientServices {
         client.addConnectionWatcher(watcher);
       }
 
-      @Override
-      public OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode) {
-        return client.create(path, data, createMode);
-      }
-
-      @Override
-      public OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode,
-                                            boolean createParent) {
-        return client.create(path, data, createMode, createParent);
-      }
-
-      @Override
-      public OperationFuture<Stat> exists(String path) {
-        return client.exists(path);
+      public OperationFuture<String> create(String path, @Nullable byte[] data,
+                                            CreateMode createMode, boolean createParent, Iterable<ACL> acl) {
+        return client.create(path, data, createMode, createParent, acl);
       }
 
       @Override
@@ -99,18 +89,8 @@ public final class ZKClientServices {
       }
 
       @Override
-      public OperationFuture<NodeChildren> getChildren(String path) {
-        return client.getChildren(path);
-      }
-
-      @Override
       public OperationFuture<NodeChildren> getChildren(String path, @Nullable Watcher watcher) {
         return client.getChildren(path, watcher);
-      }
-
-      @Override
-      public OperationFuture<NodeData> getData(String path) {
-        return client.getData(path);
       }
 
       @Override
@@ -119,23 +99,21 @@ public final class ZKClientServices {
       }
 
       @Override
-      public OperationFuture<Stat> setData(String path, byte[] data) {
-        return client.setData(path, data);
-      }
-
-      @Override
       public OperationFuture<Stat> setData(String dataPath, byte[] data, int version) {
         return client.setData(dataPath, data, version);
       }
 
       @Override
-      public OperationFuture<String> delete(String path) {
-        return client.delete(path);
-      }
-
-      @Override
       public OperationFuture<String> delete(String deletePath, int version) {
         return client.delete(deletePath, version);
+      }
+
+      public OperationFuture<ACLData> getACL(String path) {
+        return client.getACL(path);
+      }
+
+      public OperationFuture<Stat> setACL(String path, Iterable<ACL> acl, int version) {
+        return client.setACL(path, acl, version);
       }
     };
   }

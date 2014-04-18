@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,23 +17,23 @@
  */
 package org.apache.twill.zookeeper;
 
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
-import javax.annotation.Nullable;
+import java.util.List;
 
 /**
- * Represents result of call to {@link ZKClient#getData(String, org.apache.zookeeper.Watcher)}.
+ * Represents result of call to {@link ZKClient#getACL(String)}.
  */
-public interface NodeData {
+public interface ACLData {
+
+  /**
+   * @return list of {@link ACL} for the node.
+   */
+  List<ACL> getACL();
 
   /**
    * @return The {@link Stat} of the node.
    */
   Stat getStat();
-
-  /**
-   * @return Data stored in the node, or {@code null} if there is no data.
-   */
-  @Nullable
-  byte[] getData();
 }

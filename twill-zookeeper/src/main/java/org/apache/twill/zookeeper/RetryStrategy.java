@@ -31,7 +31,9 @@ public interface RetryStrategy {
     GET_CHILDREN,
     GET_DATA,
     SET_DATA,
-    DELETE
+    DELETE,
+    SET_ACL,
+    GET_ACL
   }
 
   /**

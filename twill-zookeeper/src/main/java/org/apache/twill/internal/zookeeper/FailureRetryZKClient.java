@@ -21,6 +21,7 @@ import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import org.apache.twill.common.Threads;
+import org.apache.twill.zookeeper.ACLData;
 import org.apache.twill.zookeeper.ForwardingZKClient;
 import org.apache.twill.zookeeper.NodeChildren;
 import org.apache.twill.zookeeper.NodeData;
@@ -30,12 +31,14 @@ import org.apache.twill.zookeeper.RetryStrategy.OperationType;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 
 /**
  * A {@link ZKClient} that will invoke {@link RetryStrategy} on operation failure.
@@ -56,34 +59,23 @@ public final class FailureRetryZKClient extends ForwardingZKClient {
   }
 
   @Override
-  public OperationFuture<String> create(String path, byte[] data, CreateMode createMode) {
-    return create(path, data, createMode, true);
-  }
-
-  @Override
-  public OperationFuture<String> create(final String path, final byte[] data,
-                                        final CreateMode createMode, final boolean createParent) {
-
+  public OperationFuture<String> create(final String path, @Nullable final byte[] data, final CreateMode createMode,
+                                        final boolean createParent, final Iterable<ACL> acl) {
     // No retry for any SEQUENTIAL node, as some algorithms depends on only one sequential node being created.
     if (createMode == CreateMode.PERSISTENT_SEQUENTIAL || createMode == CreateMode.EPHEMERAL_SEQUENTIAL) {
-      return super.create(path, data, createMode, createParent);
+      return super.create(path, data, createMode, createParent, acl);
     }
 
     final SettableOperationFuture<String> result = SettableOperationFuture.create(path, Threads.SAME_THREAD_EXECUTOR);
-    Futures.addCallback(super.create(path, data, createMode, createParent),
+    Futures.addCallback(super.create(path, data, createMode, createParent, acl),
                         new OperationFutureCallback<String>(OperationType.CREATE, System.currentTimeMillis(),
                                                             path, result, new Supplier<OperationFuture<String>>() {
                           @Override
                           public OperationFuture<String> get() {
-                            return FailureRetryZKClient.super.create(path, data, createMode, createParent);
+                            return FailureRetryZKClient.super.create(path, data, createMode, createParent, acl);
                           }
                         }));
     return result;
-  }
-
-  @Override
-  public OperationFuture<Stat> exists(String path) {
-    return exists(path, null);
   }
 
   @Override
@@ -98,11 +90,6 @@ public final class FailureRetryZKClient extends ForwardingZKClient {
                           }
                         }));
     return result;
-  }
-
-  @Override
-  public OperationFuture<NodeChildren> getChildren(String path) {
-    return getChildren(path, null);
   }
 
   @Override
@@ -122,11 +109,6 @@ public final class FailureRetryZKClient extends ForwardingZKClient {
   }
 
   @Override
-  public OperationFuture<NodeData> getData(String path) {
-    return getData(path, null);
-  }
-
-  @Override
   public OperationFuture<NodeData> getData(final String path, final Watcher watcher) {
     final SettableOperationFuture<NodeData> result = SettableOperationFuture.create(path, Threads.SAME_THREAD_EXECUTOR);
     Futures.addCallback(super.getData(path, watcher),
@@ -138,11 +120,6 @@ public final class FailureRetryZKClient extends ForwardingZKClient {
                           }
                         }));
     return result;
-  }
-
-  @Override
-  public OperationFuture<Stat> setData(String path, byte[] data) {
-    return setData(path, data, -1);
   }
 
   @Override
@@ -160,11 +137,6 @@ public final class FailureRetryZKClient extends ForwardingZKClient {
   }
 
   @Override
-  public OperationFuture<String> delete(String path) {
-    return delete(path, -1);
-  }
-
-  @Override
   public OperationFuture<String> delete(final String deletePath, final int version) {
     final SettableOperationFuture<String> result = SettableOperationFuture.create(deletePath,
                                                                                   Threads.SAME_THREAD_EXECUTOR);
@@ -175,6 +147,34 @@ public final class FailureRetryZKClient extends ForwardingZKClient {
                           @Override
                           public OperationFuture<String> get() {
                             return FailureRetryZKClient.super.delete(deletePath, version);
+                          }
+                        }));
+    return result;
+  }
+
+  @Override
+  public OperationFuture<ACLData> getACL(final String path) {
+    final SettableOperationFuture<ACLData> result = SettableOperationFuture.create(path, Threads.SAME_THREAD_EXECUTOR);
+    Futures.addCallback(super.getACL(path),
+                        new OperationFutureCallback<ACLData>(OperationType.GET_ACL, System.currentTimeMillis(),
+                                                          path, result, new Supplier<OperationFuture<ACLData>>() {
+                          @Override
+                          public OperationFuture<ACLData> get() {
+                            return FailureRetryZKClient.super.getACL(path);
+                          }
+                        }));
+    return result;
+  }
+
+  @Override
+  public OperationFuture<Stat> setACL(final String path, final Iterable<ACL> acl, final int version) {
+    final SettableOperationFuture<Stat> result = SettableOperationFuture.create(path, Threads.SAME_THREAD_EXECUTOR);
+    Futures.addCallback(super.setACL(path, acl, version),
+                        new OperationFutureCallback<Stat>(OperationType.SET_ACL, System.currentTimeMillis(),
+                                                          path, result, new Supplier<OperationFuture<Stat>>() {
+                          @Override
+                          public OperationFuture<Stat> get() {
+                            return FailureRetryZKClient.super.setACL(path, acl, version);
                           }
                         }));
     return result;

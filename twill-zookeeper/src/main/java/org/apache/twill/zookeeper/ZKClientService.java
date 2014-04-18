@@ -18,13 +18,12 @@
 package org.apache.twill.zookeeper;
 
 import com.google.common.base.Supplier;
-import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.Service;
 import org.apache.twill.internal.zookeeper.DefaultZKClientService;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.ACL;
 
 /**
  * A {@link ZKClient} that extends from {@link Service} to provide lifecycle management functions.
@@ -50,7 +49,7 @@ public interface ZKClientService extends ZKClient, Service {
     private final String connectStr;
     private int timeout = 10000;
     private Watcher connectionWatcher;
-    private Multimap<String, ACL> acls = HashMultimap.create();
+    private Multimap<String, byte[]> auths = ArrayListMultimap.create();
 
     /**
      * Creates a {@link Builder} with the given ZooKeeper connection string.
@@ -82,11 +81,23 @@ public interface ZKClientService extends ZKClient, Service {
     }
 
     /**
+     * Adds an authorization information.
+     *
+     * @param schema The authorization schema.
+     * @param auth The authorization bytes.
+     * @return This builder.
+     */
+    public Builder addAuthInfo(String schema, byte[] auth) {
+      this.auths.put(schema, auth);
+      return this;
+    }
+
+    /**
      * Creates an instance of {@link ZKClientService} with the settings of this builder.
      * @return A new instance of {@link ZKClientService}.
      */
     public ZKClientService build() {
-      return new DefaultZKClientService(connectStr, timeout, connectionWatcher);
+      return new DefaultZKClientService(connectStr, timeout, connectionWatcher, auths);
     }
 
     private Builder(String connectStr) {

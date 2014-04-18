@@ -17,15 +17,20 @@
  */
 package org.apache.twill.internal.zookeeper;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.AbstractService;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import org.apache.twill.common.Threads;
+import org.apache.twill.zookeeper.ACLData;
+import org.apache.twill.zookeeper.AbstractZKClient;
 import org.apache.twill.zookeeper.NodeChildren;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.OperationFuture;
@@ -43,7 +48,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -56,33 +63,37 @@ import javax.annotation.Nullable;
 /**
  * The base implementation of {@link ZKClientService}.
  */
-public final class DefaultZKClientService implements ZKClientService {
+public final class DefaultZKClientService extends AbstractZKClient implements ZKClientService {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultZKClientService.class);
 
   private final String zkStr;
   private final int sessionTimeout;
   private final List<Watcher> connectionWatchers;
+  private final Multimap<String, byte[]> authInfos;
   private final AtomicReference<ZooKeeper> zooKeeper;
-  private final Function<String, List<ACL>> aclMapper;
   private final Service serviceDelegate;
   private ExecutorService eventExecutor;
 
+  /**
+   * Creates a new instance.
+   * @deprecated Use {@link ZKClientService.Builder} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("unused")
   public DefaultZKClientService(String zkStr, int sessionTimeout, Watcher connectionWatcher) {
+    this(zkStr, sessionTimeout, connectionWatcher, ImmutableMultimap.<String, byte[]>of());
+  }
+
+  public DefaultZKClientService(String zkStr, int sessionTimeout,
+                                Watcher connectionWatcher, Multimap<String, byte[]> authInfos) {
     this.zkStr = zkStr;
     this.sessionTimeout = sessionTimeout;
     this.connectionWatchers = new CopyOnWriteArrayList<Watcher>();
+    this.authInfos = copyAuthInfo(authInfos);
     addConnectionWatcher(connectionWatcher);
 
     this.zooKeeper = new AtomicReference<ZooKeeper>();
-
-    // TODO (terence): Add ACL
-    aclMapper = new Function<String, List<ACL>>() {
-      @Override
-      public List<ACL> apply(String input) {
-        return ZooDefs.Ids.OPEN_ACL_UNSAFE;
-      }
-    };
     serviceDelegate = new ServiceDelegate();
   }
 
@@ -105,23 +116,19 @@ public final class DefaultZKClientService implements ZKClientService {
   }
 
   @Override
-  public OperationFuture<String> create(String path, byte[] data, CreateMode createMode) {
-    return create(path, data, createMode, true);
-  }
-
-  @Override
-  public OperationFuture<String> create(String path, @Nullable byte[] data,
-                                        CreateMode createMode, boolean createParent) {
-    return doCreate(path, data, createMode, createParent, false);
+  public OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode,
+                                        boolean createParent, Iterable<ACL> acl) {
+    return doCreate(path, data, createMode, createParent, ImmutableList.copyOf(acl), false);
   }
 
   private OperationFuture<String> doCreate(final String path,
-                                        @Nullable final byte[] data,
-                                        final CreateMode createMode,
-                                        final boolean createParent,
-                                        final boolean ignoreNodeExists) {
+                                           @Nullable final byte[] data,
+                                           final CreateMode createMode,
+                                           final boolean createParent,
+                                           final List<ACL> acl,
+                                           final boolean ignoreNodeExists) {
     final SettableOperationFuture<String> createFuture = SettableOperationFuture.create(path, eventExecutor);
-    getZooKeeper().create(path, data, aclMapper.apply(path), createMode, Callbacks.STRING, createFuture);
+    getZooKeeper().create(path, data, acl, createMode, Callbacks.STRING, createFuture);
     if (!createParent) {
       return createFuture;
     }
@@ -148,14 +155,14 @@ public final class DefaultZKClientService implements ZKClientService {
           result.setException(t);
           return;
         }
-        // Watch for parent creation complete
-        Futures.addCallback(
-          doCreate(parentPath, null, CreateMode.PERSISTENT, createParent, true), new FutureCallback<String>() {
+        // Watch for parent creation complete. Parent is created with the unsafe ACL.
+        Futures.addCallback(doCreate(parentPath, null, CreateMode.PERSISTENT,
+                                     true, ZooDefs.Ids.OPEN_ACL_UNSAFE, true), new FutureCallback<String>() {
           @Override
           public void onSuccess(String parentPath) {
             // Create the requested path again
             Futures.addCallback(
-              doCreate(path, data, createMode, false, ignoreNodeExists), new FutureCallback<String>() {
+              doCreate(path, data, createMode, false, acl, ignoreNodeExists), new FutureCallback<String>() {
               @Override
               public void onSuccess(String pathResult) {
                 result.set(pathResult);
@@ -219,11 +226,6 @@ public final class DefaultZKClientService implements ZKClientService {
   }
 
   @Override
-  public OperationFuture<Stat> exists(String path) {
-    return exists(path, null);
-  }
-
-  @Override
   public OperationFuture<Stat> exists(String path, Watcher watcher) {
     SettableOperationFuture<Stat> result = SettableOperationFuture.create(path, eventExecutor);
     getZooKeeper().exists(path, wrapWatcher(watcher), Callbacks.STAT_NONODE, result);
@@ -231,20 +233,10 @@ public final class DefaultZKClientService implements ZKClientService {
   }
 
   @Override
-  public OperationFuture<NodeChildren> getChildren(String path) {
-    return getChildren(path, null);
-  }
-
-  @Override
   public OperationFuture<NodeChildren> getChildren(String path, Watcher watcher) {
     SettableOperationFuture<NodeChildren> result = SettableOperationFuture.create(path, eventExecutor);
     getZooKeeper().getChildren(path, wrapWatcher(watcher), Callbacks.CHILDREN, result);
     return result;
-  }
-
-  @Override
-  public OperationFuture<NodeData> getData(String path) {
-    return getData(path, null);
   }
 
   @Override
@@ -256,11 +248,6 @@ public final class DefaultZKClientService implements ZKClientService {
   }
 
   @Override
-  public OperationFuture<Stat> setData(String path, byte[] data) {
-    return setData(path, data, -1);
-  }
-
-  @Override
   public OperationFuture<Stat> setData(String dataPath, byte[] data, int version) {
     SettableOperationFuture<Stat> result = SettableOperationFuture.create(dataPath, eventExecutor);
     getZooKeeper().setData(dataPath, data, version, Callbacks.STAT, result);
@@ -268,14 +255,23 @@ public final class DefaultZKClientService implements ZKClientService {
   }
 
   @Override
-  public OperationFuture<String> delete(String path) {
-    return delete(path, -1);
-  }
-
-  @Override
   public OperationFuture<String> delete(String deletePath, int version) {
     SettableOperationFuture<String> result = SettableOperationFuture.create(deletePath, eventExecutor);
     getZooKeeper().delete(deletePath, version, Callbacks.VOID, result);
+    return result;
+  }
+
+  @Override
+  public OperationFuture<ACLData> getACL(String path) {
+    SettableOperationFuture<ACLData> result = SettableOperationFuture.create(path, eventExecutor);
+    getZooKeeper().getACL(path, new Stat(), Callbacks.ACL, result);
+    return result;
+  }
+
+  @Override
+  public OperationFuture<Stat> setACL(String path, Iterable<ACL> acl, int version) {
+    SettableOperationFuture<Stat> result = SettableOperationFuture.create(path, eventExecutor);
+    getZooKeeper().setACL(path, ImmutableList.copyOf(acl), version, Callbacks.STAT, result);
     return result;
   }
 
@@ -359,6 +355,20 @@ public final class DefaultZKClientService implements ZKClientService {
     };
   }
 
+  /**
+   * Creates a deep copy of the given authInfos multimap.
+   */
+  private Multimap<String, byte[]> copyAuthInfo(Multimap<String, byte[]> authInfos) {
+    Multimap<String, byte[]> result = ArrayListMultimap.create();
+
+    for (Map.Entry<String, byte[]> entry : authInfos.entries()) {
+      byte[] info = entry.getValue();
+      result.put(entry.getKey(), info == null ? null : Arrays.copyOf(info, info.length));
+    }
+
+    return result;
+  }
+
   private final class ServiceDelegate extends AbstractService implements Watcher {
 
     @Override
@@ -374,7 +384,7 @@ public final class DefaultZKClientService implements ZKClientService {
       };
 
       try {
-        zooKeeper.set(new ZooKeeper(zkStr, sessionTimeout, this));
+        zooKeeper.set(createZooKeeper());
       } catch (IOException e) {
         notifyFailed(e);
       }
@@ -410,7 +420,7 @@ public final class DefaultZKClientService implements ZKClientService {
             @Override
             public void run() {
               try {
-                zooKeeper.set(new ZooKeeper(zkStr, sessionTimeout, ServiceDelegate.this));
+                zooKeeper.set(createZooKeeper());
               } catch (IOException e) {
                 zooKeeper.set(null);
                 notifyFailed(e);
@@ -427,6 +437,17 @@ public final class DefaultZKClientService implements ZKClientService {
           }
         }
       }
+    }
+
+    /**
+     * Creates a new ZooKeeper connection.
+     */
+    private ZooKeeper createZooKeeper() throws IOException {
+      ZooKeeper zk = new ZooKeeper(zkStr, sessionTimeout, this);
+      for (Map.Entry<String, byte[]> authInfo : authInfos.entries()) {
+        zk.addAuthInfo(authInfo.getKey(), authInfo.getValue());
+      }
+      return zk;
     }
   }
 
@@ -518,6 +539,20 @@ public final class DefaultZKClientService implements ZKClientService {
           return;
         }
         // Otherwise, it is an error
+        result.setException(KeeperException.create(code, result.getRequestPath()));
+      }
+    };
+
+    static final AsyncCallback.ACLCallback ACL = new AsyncCallback.ACLCallback() {
+      @Override
+      @SuppressWarnings("unchecked")
+      public void processResult(int rc, String path, Object ctx, List<ACL> acl, Stat stat) {
+        SettableOperationFuture<ACLData> result = (SettableOperationFuture<ACLData>) ctx;
+        KeeperException.Code code = KeeperException.Code.get(rc);
+        if (code == KeeperException.Code.OK) {
+          result.set(new BasicACLData(acl, stat));
+          return;
+        }
         result.setException(KeeperException.create(code, result.getRequestPath()));
       }
     };

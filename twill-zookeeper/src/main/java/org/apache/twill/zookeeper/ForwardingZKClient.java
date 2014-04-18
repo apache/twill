@@ -19,6 +19,7 @@ package org.apache.twill.zookeeper;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import javax.annotation.Nullable;
@@ -26,7 +27,7 @@ import javax.annotation.Nullable;
 /**
  *
  */
-public abstract class ForwardingZKClient implements ZKClient {
+public abstract class ForwardingZKClient extends AbstractZKClient {
 
   private final ZKClient delegate;
 
@@ -54,19 +55,9 @@ public abstract class ForwardingZKClient implements ZKClient {
   }
 
   @Override
-  public OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode) {
-    return create(path, data, createMode, true);
-  }
-
-  @Override
-  public OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode,
-                                        boolean createParent) {
-    return delegate.create(path, data, createMode, createParent);
-  }
-
-  @Override
-  public OperationFuture<Stat> exists(String path) {
-    return exists(path, null);
+  public OperationFuture<String> create(String path, @Nullable byte[] data,
+                                        CreateMode createMode, boolean createParent, Iterable<ACL> acl) {
+    return delegate.create(path, data, createMode, createParent, acl);
   }
 
   @Override
@@ -75,18 +66,8 @@ public abstract class ForwardingZKClient implements ZKClient {
   }
 
   @Override
-  public OperationFuture<NodeChildren> getChildren(String path) {
-    return getChildren(path, null);
-  }
-
-  @Override
   public OperationFuture<NodeChildren> getChildren(String path, @Nullable Watcher watcher) {
     return delegate.getChildren(path, watcher);
-  }
-
-  @Override
-  public OperationFuture<NodeData> getData(String path) {
-    return getData(path, null);
   }
 
   @Override
@@ -95,22 +76,22 @@ public abstract class ForwardingZKClient implements ZKClient {
   }
 
   @Override
-  public OperationFuture<Stat> setData(String path, byte[] data) {
-    return setData(path, data, -1);
-  }
-
-  @Override
   public OperationFuture<Stat> setData(String dataPath, byte[] data, int version) {
     return delegate.setData(dataPath, data, version);
   }
 
   @Override
-  public OperationFuture<String> delete(String path) {
-    return delete(path, -1);
+  public OperationFuture<String> delete(String deletePath, int version) {
+    return delegate.delete(deletePath, version);
   }
 
   @Override
-  public OperationFuture<String> delete(String deletePath, int version) {
-    return delegate.delete(deletePath, version);
+  public OperationFuture<ACLData> getACL(String path) {
+    return delegate.getACL(path);
+  }
+
+  @Override
+  public OperationFuture<Stat> setACL(String path, Iterable<ACL> acl, int version) {
+    return delegate.setACL(path, acl, version);
   }
 }

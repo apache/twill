@@ -20,19 +20,25 @@ package org.apache.twill.zookeeper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.io.Files;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.internal.zookeeper.KillZKSession;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 import org.junit.Assert;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -47,6 +53,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  */
 public class ZKClientTest {
+
+  @ClassRule
+  public static TemporaryFolder tmpFolder = new TemporaryFolder();
 
   @Test
   public void testChroot() throws Exception {
@@ -201,8 +210,8 @@ public class ZKClientTest {
   }
 
   @Test
-  public void testRetry() throws ExecutionException, InterruptedException, TimeoutException {
-    File dataDir = Files.createTempDir();
+  public void testRetry() throws ExecutionException, InterruptedException, TimeoutException, IOException {
+    File dataDir = tmpFolder.newFolder();
     InMemoryZKServer zkServer = InMemoryZKServer.builder().setDataDir(dataDir).setTickTime(1000).build();
     zkServer.startAndWait();
     int port = zkServer.getLocalAddress().getPort();
@@ -247,6 +256,66 @@ public class ZKClientTest {
 
     try {
       Assert.assertTrue(createLatch.await(5, TimeUnit.SECONDS));
+    } finally {
+      zkServer.stopAndWait();
+    }
+  }
+
+  @Test
+  public void testACL() throws IOException, ExecutionException, InterruptedException, NoSuchAlgorithmException {
+    InMemoryZKServer zkServer = InMemoryZKServer.builder().setDataDir(tmpFolder.newFolder()).setTickTime(1000).build();
+    zkServer.startAndWait();
+
+    try {
+      String userPass = "user:pass";
+      String digest = DigestAuthenticationProvider.generateDigest(userPass);
+
+      // Creates two zkclients
+      ZKClientService zkClient = ZKClientService.Builder
+                                                .of(zkServer.getConnectionStr())
+                                                .addAuthInfo("digest", userPass.getBytes())
+                                                .build();
+      zkClient.startAndWait();
+
+      ZKClientService noAuthClient = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
+      noAuthClient.startAndWait();
+
+
+      // Create a node that is readable by all client, but admin for the creator
+      String path = "/testacl";
+      zkClient.create(path, "test".getBytes(), CreateMode.PERSISTENT,
+                      ImmutableList.of(
+                        new ACL(ZooDefs.Perms.READ, ZooDefs.Ids.ANYONE_ID_UNSAFE),
+                        new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.AUTH_IDS)
+                      )).get();
+
+      // Verify the ACL
+      ACLData aclData = zkClient.getACL(path).get();
+      Assert.assertEquals(2, aclData.getACL().size());
+      ACL acl = aclData.getACL().get(1);
+      Assert.assertEquals(ZooDefs.Perms.ALL, acl.getPerms());
+      Assert.assertEquals("digest", acl.getId().getScheme());
+      Assert.assertEquals(digest, acl.getId().getId());
+
+      Assert.assertEquals("test", new String(noAuthClient.getData(path).get().getData()));
+
+      // When tries to write using the no-auth zk client, it should fail.
+      try {
+        noAuthClient.setData(path, "test2".getBytes()).get();
+        Assert.fail();
+      } catch (ExecutionException e) {
+        Assert.assertTrue(e.getCause() instanceof KeeperException.NoAuthException);
+      }
+
+      // Change ACL to make it open for all
+      zkClient.setACL(path, ImmutableList.of(new ACL(ZooDefs.Perms.WRITE, ZooDefs.Ids.ANYONE_ID_UNSAFE))).get();
+
+      // Write again with the non-auth client, now should succeed.
+      noAuthClient.setData(path, "test2".getBytes()).get();
+
+      noAuthClient.stopAndWait();
+      zkClient.stopAndWait();
+
     } finally {
       zkServer.stopAndWait();
     }

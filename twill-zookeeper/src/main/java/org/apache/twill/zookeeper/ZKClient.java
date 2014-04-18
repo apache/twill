@@ -19,6 +19,7 @@ package org.apache.twill.zookeeper;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import javax.annotation.Nullable;
@@ -46,12 +47,32 @@ public interface ZKClient {
   void addConnectionWatcher(Watcher watcher);
 
   /**
-   * Same as calling
+   * Creates a path in zookeeper. Same as calling
    * {@link #create(String, byte[], org.apache.zookeeper.CreateMode, boolean) create(path, data, createMode, true)}.
    *
    * @see #create(String, byte[], org.apache.zookeeper.CreateMode, boolean)
    */
   OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode);
+
+  /**
+   * Creates a path in zookeeper. Same as calling
+   *
+   * {@link #create(String, byte[], org.apache.zookeeper.CreateMode, boolean, Iterable)
+   * create(path, data, createMode, createParent, ZooDefs.Ids.OPEN_ACL_UNSAFE)}
+   *
+   * @see #create(String, byte[], org.apache.zookeeper.CreateMode, boolean, Iterable)
+   */
+  OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode, boolean createParent);
+
+  /**
+   * Creates a path in zookeeper. Same as calling
+   *
+   * {@link #create(String, byte[], org.apache.zookeeper.CreateMode, boolean, Iterable)
+   * create(path, data, createMode, true, acl)}
+   *
+   * @see #create(String, byte[], org.apache.zookeeper.CreateMode, boolean, Iterable)
+   */
+  OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode, Iterable<ACL> acl);
 
   /**
    * Creates a path in zookeeper, with given data and create mode.
@@ -60,11 +81,14 @@ public interface ZKClient {
    * @param data Data to be stored in the node, or {@code null} if no data to store.
    * @param createMode The {@link org.apache.zookeeper.CreateMode} for the node.
    * @param createParent If {@code true} and parent nodes are missing, it will create all parent nodes as normal
-   *                     persistent node before creating the request node.
+   *                     persistent node with the ACL {@link org.apache.zookeeper.ZooDefs.Ids#OPEN_ACL_UNSAFE}
+   *                     before creating the request node.
+   * @param acl Set of {@link ACL} to be set for the node being created.
    * @return A {@link OperationFuture} that will be completed when the
    *         creation is done. If there is error during creation, it will be reflected as error in the future.
    */
-  OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode, boolean createParent);
+  OperationFuture<String> create(String path, @Nullable byte[] data,
+                                 CreateMode createMode, boolean createParent, Iterable<ACL> acl);
 
   /**
    * Checks if the path exists. Same as calling
@@ -158,4 +182,32 @@ public interface ZKClient {
    *         given as the future result. If there is error, it will be reflected as error in the future.
    */
   OperationFuture<String> delete(String deletePath, int version);
+
+  /**
+   * Retrieves the Stat and ACL being set at the given path.
+   *
+   * @param path The path to get information from.
+   * @return A {@link OperationFuture} that will be completed when the getACL call is done, with the result given as
+   *         {@link ACLData}. If there is error, it will be reflected as error in the future.
+   */
+  OperationFuture<ACLData> getACL(String path);
+
+  /**
+   * Sets the ACL of the given path if the path exists. Same as calling
+   * {@link #setACL(String, Iterable, int) setACL(path, acl, -1)}
+   *
+   * @see #setACL(String, Iterable, int)
+   */
+  OperationFuture<Stat> setACL(String path, Iterable<ACL> acl);
+
+  /**
+   * Sets the ACL of the given path if the path exists and version matched.
+   *
+   * @param path The path to have ACL being set.
+   * @param acl ACL to set to.
+   * @param version Version of the node.
+   * @return A {@link OperationFuture} that will be completed when the setACL call is done, with the node {@link Stat}
+   *         available as the future result. If there is error, it will be reflected as error in the future.
+   */
+  OperationFuture<Stat> setACL(String path, Iterable<ACL> acl, int version);
 }

@@ -20,6 +20,7 @@ package org.apache.twill.internal.zookeeper;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import org.apache.twill.common.Threads;
+import org.apache.twill.zookeeper.ACLData;
 import org.apache.twill.zookeeper.ForwardingZKClient;
 import org.apache.twill.zookeeper.NodeChildren;
 import org.apache.twill.zookeeper.NodeData;
@@ -27,6 +28,7 @@ import org.apache.twill.zookeeper.OperationFuture;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 
 import javax.annotation.Nullable;
@@ -65,20 +67,10 @@ public final class NamespaceZKClient extends ForwardingZKClient {
   }
 
   @Override
-  public OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode) {
-    return relayPath(delegate.create(namespace + path, data, createMode), this.<String>createFuture(path));
-  }
-
-  @Override
-  public OperationFuture<String> create(String path, @Nullable byte[] data, CreateMode createMode,
-                                        boolean createParent) {
-    return relayPath(delegate.create(namespace + path, data, createMode, createParent),
+  public OperationFuture<String> create(String path, @Nullable byte[] data,
+                                        CreateMode createMode, boolean createParent, Iterable<ACL> acl) {
+    return relayPath(delegate.create(namespace + path, data, createMode, createParent, acl),
                      this.<String>createFuture(path));
-  }
-
-  @Override
-  public OperationFuture<Stat> exists(String path) {
-    return relayFuture(delegate.exists(namespace + path), this.<Stat>createFuture(path));
   }
 
   @Override
@@ -87,18 +79,8 @@ public final class NamespaceZKClient extends ForwardingZKClient {
   }
 
   @Override
-  public OperationFuture<NodeChildren> getChildren(String path) {
-    return relayFuture(delegate.getChildren(namespace + path), this.<NodeChildren>createFuture(path));
-  }
-
-  @Override
   public OperationFuture<NodeChildren> getChildren(String path, @Nullable Watcher watcher) {
     return relayFuture(delegate.getChildren(namespace + path, watcher), this.<NodeChildren>createFuture(path));
-  }
-
-  @Override
-  public OperationFuture<NodeData> getData(String path) {
-    return relayFuture(delegate.getData(namespace + path), this.<NodeData>createFuture(path));
   }
 
   @Override
@@ -107,23 +89,23 @@ public final class NamespaceZKClient extends ForwardingZKClient {
   }
 
   @Override
-  public OperationFuture<Stat> setData(String path, byte[] data) {
-    return relayFuture(delegate.setData(namespace + path, data), this.<Stat>createFuture(path));
-  }
-
-  @Override
   public OperationFuture<Stat> setData(String dataPath, byte[] data, int version) {
     return relayFuture(delegate.setData(namespace + dataPath, data, version), this.<Stat>createFuture(dataPath));
   }
 
   @Override
-  public OperationFuture<String> delete(String path) {
-    return relayPath(delegate.delete(namespace + path), this.<String>createFuture(path));
+  public OperationFuture<String> delete(String deletePath, int version) {
+    return relayPath(delegate.delete(namespace + deletePath, version), this.<String>createFuture(deletePath));
   }
 
   @Override
-  public OperationFuture<String> delete(String deletePath, int version) {
-    return relayPath(delegate.delete(namespace + deletePath, version), this.<String>createFuture(deletePath));
+  public OperationFuture<ACLData> getACL(String path) {
+    return relayFuture(delegate.getACL(namespace + path), this.<ACLData>createFuture(path));
+  }
+
+  @Override
+  public OperationFuture<Stat> setACL(String path, Iterable<ACL> acl, int version) {
+    return relayFuture(delegate.setACL(namespace + path, acl, version), this.<Stat>createFuture(path));
   }
 
   private <V> SettableOperationFuture<V> createFuture(String path) {
