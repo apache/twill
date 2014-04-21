@@ -72,7 +72,7 @@ public interface YarnAMClient extends Service {
     public abstract String apply();
 
     private <T> ContainerRequestBuilder add(Collection<T> collection, Collection<T> more) {
-      if (more != null){
+      if (more != null) {
         collection.addAll(more);
       }
       return this;

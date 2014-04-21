@@ -29,7 +29,7 @@ import org.unitils.reflectionassert.ReflectionAssert;
 import java.util.Arrays;
 
 /**
- * Maybe this checkstyle rule needs to be removed
+ * Maybe this checkstyle rule needs to be removed.
  */
 public class ResourceSpecificationCodecTest {
   private final Gson gson = new GsonBuilder().serializeNulls()

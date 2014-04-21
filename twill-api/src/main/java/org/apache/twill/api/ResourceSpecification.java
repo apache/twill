@@ -164,8 +164,8 @@ public interface ResourceSpecification {
         return new Done();
       }
 
-      public Done setRacks(Iterable<String> racks){
-        if (racks != null){
+      public Done setRacks(Iterable<String> racks) {
+        if (racks != null) {
           Iterables.addAll(Builder.this.racks, racks);
         }
         return new Done();
@@ -180,8 +180,8 @@ public interface ResourceSpecification {
         return new AfterHosts();
       }
 
-      public AfterHosts setHosts(Iterable<String> hosts){
-        if (hosts != null){
+      public AfterHosts setHosts(Iterable<String> hosts) {
+        if (hosts != null) {
           Iterables.addAll(Builder.this.hosts, hosts);
         }
         return new AfterHosts();
