@@ -21,7 +21,30 @@
   <title>Getting started</title>
 </head>
 
+### Maven dependencies
+For your application module
+
+```xml
+<dependency>
+    <groupId>org.apache.twill</groupId>
+    <artifactId>twill-api</artifactId>
+    <version>0.2.0-incubating</version>
+</dependency>
+```
+
+For the your Apache Twill YARN client module
+
+```xml
+<dependency>
+    <groupId>org.apache.twill</groupId>
+    <artifactId>twill-yarn</artifactId>
+    <version>0.2.0-incubating</version>
+</dependency>
+```
+
+
 ### Clone and build the Twill library
+You can also clone the source and build the latest snapshot.
 
 ```sh
 $ git clone https://git-wip-us.apache.org/repos/asf/incubator-twill.git twill

@@ -40,7 +40,12 @@
         <menu name="Apache Twill">
             <item name="Introduction" href="./index.html"/>
             <item name="Getting Started" href="./GettingStarted.html"/>
-            <item name="API documentations" href="./apidocs/index.html"/>
+            <item name="API (latest)" href="./apidocs/index.html"/>
+            <item name="API (0.2.0-incubating)" href="./apidocs-0.2.0-incubating/index.html"/>
+        </menu>
+
+        <menu name="Releases">
+            <item name="0.2.0-incubating" href="./releases/0.2.0-incubating.html"/>
         </menu>
 
         <menu name="Get Involved">

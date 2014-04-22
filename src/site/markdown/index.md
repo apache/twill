@@ -20,11 +20,30 @@
   <title>Home</title>
 </head>
 
-### What is Twill?
+### What is Apache Twill?
 
-Twill is an abstraction over Apache Hadoop® YARN that reduces the complexity of developing distributed applications,
-allowing developers to focus more on their business logic. Twill allows you to use YARN’s distributed capabilities
+Apache Twill is an abstraction over Apache Hadoop® YARN that reduces the complexity of developing distributed applications,
+allowing developers to focus more on their application logic. Apache Twill allows you to use YARN’s distributed capabilities
 with a programming model that is similar to running threads.
+
+### Why do I need Apache Twill?
+Apache Twill dramatically simplifies and reduces development efforts, enabling you to quickly and
+easily develop and manage distributed applications through its simple abstraction layer on top of YARN.
+YARN, although originally designed for MapReduce v2, can be used as a generic cluster resource management framework
+that can run almost any type of applications on a Hadoop® cluster. Given it's power, however, YARN can be quite difficult to use and
+requires a big ramp up effort since YARN's capabilities are quite low level and the learning curve is really steep.
+Moreover, many distributed applications have common needs such as application lifecycle management, service discovery,
+distributed process coordination and resiliency to failure, which are not out of the box features from YARN.
+
+Apache Twill allows you to develop, deploy and manage your distributed applications with a much simpler programming model,
+with rich build-in features for common distributed applications needs. Whether you are a developer or operating engineer
+will find Apache Twill helps you greatly reduces the effort in developing and operating your applications on a
+Hadoop® cluster.
+
+### Apache Twill Presentation in ApacheCon 2014
+
+<iframe src="http://www.slideshare.net/slideshow/embed_code/33789812" width="427" height="356" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px 1px 0; margin-bottom:5px; max-width: 100%;" allowfullscreen="true">
+</iframe>
 
 ### Disclaimer
 
