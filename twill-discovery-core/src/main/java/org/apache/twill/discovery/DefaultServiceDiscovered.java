@@ -49,7 +49,7 @@ final class DefaultServiceDiscovered implements ServiceDiscovered {
   }
 
   void setDiscoverables(Set<Discoverable> discoverables) {
-    this.discoverables.set(discoverables);
+    this.discoverables.set(ImmutableSet.copyOf(discoverables));
 
     // Collect all listeners with a read lock to the listener list.
     List<ListenerCaller> callers = Lists.newArrayList();
