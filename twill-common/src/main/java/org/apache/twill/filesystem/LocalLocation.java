@@ -39,14 +39,17 @@ import java.util.UUID;
  */
 final class LocalLocation implements Location {
   private final File file;
+  private final LocalLocationFactory locationFactory;
 
   /**
    * Constructs a LocalLocation.
    *
+   * @param locationFactory The {@link LocationFactory} instance used to create this instance.
    * @param file to the file.
    */
-  LocalLocation(File file) {
+  LocalLocation(LocalLocationFactory locationFactory, File file) {
     this.file = file;
+    this.locationFactory = locationFactory;
   }
 
   /**
@@ -119,13 +122,13 @@ final class LocalLocation implements Location {
    */
   @Override
   public Location append(String child) throws IOException {
-    return new LocalLocation(new File(file, child));
+    return new LocalLocation(locationFactory, new File(file, child));
   }
 
   @Override
   public Location getTempFile(String suffix) throws IOException {
-    return new LocalLocation(
-      new File(file.getAbsolutePath() + "." + UUID.randomUUID() + (suffix == null ? TEMP_FILE_SUFFIX : suffix)));
+    String newName = file.getAbsolutePath() + "." + UUID.randomUUID() + (suffix == null ? TEMP_FILE_SUFFIX : suffix);
+    return new LocalLocation(locationFactory, new File(newName));
   }
 
   /**
@@ -177,7 +180,7 @@ final class LocalLocation implements Location {
     // destination will always be of the same type as this location
     boolean success = file.renameTo(((LocalLocation) destination).file);
     if (success) {
-      return new LocalLocation(((LocalLocation) destination).file);
+      return new LocalLocation(locationFactory, ((LocalLocation) destination).file);
     } else {
       return null;
     }
@@ -218,12 +221,17 @@ final class LocalLocation implements Location {
     ImmutableList.Builder<Location> result = ImmutableList.builder();
     if (files != null) {
       for (File file : files) {
-        result.add(new LocalLocation(file));
+        result.add(new LocalLocation(locationFactory, file));
       }
     } else if (!file.exists()) {
       throw new FileNotFoundException("File " + file + " does not exist.");
     }
     return result.build();
+  }
+
+  @Override
+  public LocationFactory getLocationFactory() {
+    return locationFactory;
   }
 
   @Override
