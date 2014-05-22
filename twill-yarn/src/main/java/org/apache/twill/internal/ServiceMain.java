@@ -118,14 +118,14 @@ public abstract class ServiceMain {
 
       if ("hdfs".equals(appDir.getScheme())) {
         if (UserGroupInformation.isSecurityEnabled()) {
-          return new HDFSLocationFactory(FileSystem.get(conf)).create(appDir);
+          return new HDFSLocationFactory(FileSystem.get(appDir, conf)).create(appDir);
         }
 
         String fsUser = System.getenv(EnvKeys.TWILL_FS_USER);
         if (fsUser == null) {
           throw new IllegalStateException("Missing environment variable " + EnvKeys.TWILL_FS_USER);
         }
-        return new HDFSLocationFactory(FileSystem.get(FileSystem.getDefaultUri(conf), conf, fsUser)).create(appDir);
+        return new HDFSLocationFactory(FileSystem.get(appDir, conf, fsUser)).create(appDir);
       }
 
       LOG.warn("Unsupported location type {}.", appDir);

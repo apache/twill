@@ -19,13 +19,15 @@ package org.apache.twill.yarn;
 
 import com.google.common.collect.Iterables;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillRunnerService;
-import org.apache.twill.filesystem.LocalLocationFactory;
 import org.apache.twill.internal.yarn.YarnUtils;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,21 +43,28 @@ public final class YarnTestUtils {
   private static final Logger LOG = LoggerFactory.getLogger(YarnTestUtils.class);
 
   private static InMemoryZKServer zkServer;
+  private static MiniDFSCluster dfsCluster;
   private static MiniYARNCluster cluster;
   private static TwillRunnerService runnerService;
   private static YarnConfiguration config;
 
   private static final AtomicBoolean once = new AtomicBoolean(false);
 
-  public static final boolean initOnce(File folder) throws IOException {
+  public static final boolean initOnce() throws IOException {
     if (once.compareAndSet(false, true)) {
-      init(folder);
+      final TemporaryFolder tmpFolder = new TemporaryFolder();
+      tmpFolder.create();
+      init(tmpFolder.newFolder());
 
       // add shutdown hook because we want to initialized/cleanup once
       Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
         @Override
         public void run() {
-          finish();
+          try {
+            finish();
+          } finally {
+            tmpFolder.delete();
+          }
         }
       }));
       return true;
@@ -69,7 +78,12 @@ public final class YarnTestUtils {
     zkServer.startAndWait();
 
     // Start YARN mini cluster
-    config = new YarnConfiguration(new Configuration());
+    LOG.info("Starting Mini DFS on path {}", folder);
+    Configuration fsConf = new HdfsConfiguration(new Configuration());
+    fsConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, folder.getAbsolutePath());
+    dfsCluster = new MiniDFSCluster.Builder(fsConf).numDataNodes(1).build();
+
+    config = new YarnConfiguration(dfsCluster.getFileSystem().getConf());
 
     if (YarnUtils.isHadoop20()) {
       config.set("yarn.resourcemanager.scheduler.class",
@@ -90,7 +104,7 @@ public final class YarnTestUtils {
     cluster.init(config);
     cluster.start();
 
-    runnerService = createTwillRunnerService(folder);
+    runnerService = createTwillRunnerService();
     runnerService.startAndWait();
   }
 
@@ -98,6 +112,7 @@ public final class YarnTestUtils {
     if (once.compareAndSet(true, false)) {
       runnerService.stopAndWait();
       cluster.stop();
+      dfsCluster.shutdown();
       zkServer.stopAndWait();
 
       return true;
@@ -117,9 +132,8 @@ public final class YarnTestUtils {
   /**
    * Creates an unstarted instance of {@link org.apache.twill.api.TwillRunnerService}.
    */
-  public static final TwillRunnerService createTwillRunnerService(File folder) throws IOException {
-    YarnTwillRunnerService runner = new YarnTwillRunnerService(config, zkServer.getConnectionStr() + "/twill",
-            new LocalLocationFactory(folder));
+  public static final TwillRunnerService createTwillRunnerService() throws IOException {
+    YarnTwillRunnerService runner = new YarnTwillRunnerService(config, zkServer.getConnectionStr() + "/twill");
     // disable tests stealing focus
     runner.setJVMOptions("-Djava.awt.headless=true");
     return runner;

@@ -115,7 +115,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
     Assert.assertTrue(YarnTestUtils.waitForSize(apps, 1, 60));
 
     // Creates a new runner service to check it can regain control over running app.
-    TwillRunnerService runnerService = YarnTestUtils.createTwillRunnerService(tmpFolder.newFolder());
+    TwillRunnerService runnerService = YarnTestUtils.createTwillRunnerService();
     runnerService.startAndWait();
 
     try {

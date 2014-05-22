@@ -32,6 +32,6 @@ public abstract class BaseYarnTest {
 
   @BeforeClass
   public static final void init() throws IOException {
-    YarnTestUtils.initOnce(tmpFolder.newFolder());
+    YarnTestUtils.initOnce();
   }
 }
