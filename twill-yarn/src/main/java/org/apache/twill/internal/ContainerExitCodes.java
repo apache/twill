@@ -26,7 +26,7 @@ public final class ContainerExitCodes {
   public static final int SUCCESS = 0;
 
   /**
-   * When the container exit when it fails to initilize.
+   * When the container exit when it fails to initialize.
    */
   public static final int INIT_FAILED = 10;
 

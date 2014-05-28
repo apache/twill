@@ -188,7 +188,7 @@ public class BundledJarRunner {
     private final String mainClassName;
 
     /**
-     * Arguments to pass the the main() of the class specified by mainClassName.
+     * Arguments to pass the main() of the class specified by mainClassName.
      */
     private final String[] mainArgs;
 

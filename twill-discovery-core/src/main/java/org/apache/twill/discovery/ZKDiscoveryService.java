@@ -66,30 +66,31 @@ import java.util.concurrent.locks.ReentrantLock;
  * <p>
  *   Following is a simple example of how {@link ZKDiscoveryService} can be used for registering services
  *   and also for discovering the registered services.
- *   <blockquote>
- *    <pre>
- *      {@code
- *
- *      DiscoveryService service = new ZKDiscoveryService(zkClient);
- *      service.register(new Discoverable() {
- *        &#64;Override
- *        public String getName() {
- *          return 'service-name';
- *        }
- *
- *        &#64;Override
- *        public InetSocketAddress getSocketAddress() {
- *          return new InetSocketAddress(hostname, port);
- *        }
- *      });
- *      ...
- *      ...
- *      ServiceDiscovered services = service.discovery("service-name");
- *      ...
- *      }
- *    </pre>
- *   </blockquote>
  * </p>
+ *
+ * <blockquote>
+ *   <pre>
+ *     {@code
+ *
+ *     DiscoveryService service = new ZKDiscoveryService(zkClient);
+ *     service.register(new Discoverable() {
+ *       &#64;Override
+ *       public String getName() {
+ *         return 'service-name';
+ *       }
+ *
+ *       &#64;Override
+ *       public InetSocketAddress getSocketAddress() {
+ *         return new InetSocketAddress(hostname, port);
+ *       }
+ *     });
+ *     ...
+ *     ...
+ *     ServiceDiscovered services = service.discovery("service-name");
+ *     ...
+ *     }
+ *   </pre>
+ * </blockquote>
  */
 public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceClient {
   private static final Logger LOG = LoggerFactory.getLogger(ZKDiscoveryService.class);
@@ -115,7 +116,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   }
 
   /**
-   * Constructs ZKDiscoveryService using the provided zookeeper client for storing service registry under namepsace.
+   * Constructs ZKDiscoveryService using the provided zookeeper client for storing service registry under namespace.
    * @param zkClient of zookeeper quorum
    * @param namespace under which the service registered would be stored in zookeeper.
    *                  If namespace is {@code null}, no namespace will be used.
@@ -133,7 +134,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   /**
    * Registers a {@link Discoverable} in zookeeper.
    * <p>
-   *   Registering a {@link Discoverable} will create a node <base>/<service-name>
+   *   Registering a {@link Discoverable} will create a node &lt;base&gt;/&lt;service-name&gt;
    *   in zookeeper as a ephemeral node. If the node already exists (timeout associated with emphemeral node creation), 
    *   then a runtime exception is thrown to make sure that a service with an intent to register is not started without 
    *   registering. 

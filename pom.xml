@@ -138,6 +138,7 @@
         <module>twill-core</module>
         <module>twill-yarn</module>
         <module>twill-ext</module>
+        <module>twill-examples</module>
     </modules>
 
 
