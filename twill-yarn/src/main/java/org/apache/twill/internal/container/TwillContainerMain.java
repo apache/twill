@@ -36,6 +36,7 @@ import org.apache.twill.internal.Arguments;
 import org.apache.twill.internal.BasicTwillContext;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerInfo;
+import org.apache.twill.internal.ElectionRegistry;
 import org.apache.twill.internal.EnvContainerInfo;
 import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.RunIds;
@@ -87,6 +88,10 @@ public final class TwillContainerMain extends ServiceMain {
 
     ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
+    ZKClient electionZKClient = getAppRunZKClient(zkClientService, appRunId);
+    // leader elections are namespaced by the application
+    ElectionRegistry electionRegistry = new ElectionRegistry(electionZKClient);
+
     TwillSpecification twillSpec = loadTwillSpec(twillSpecFile);
     renameLocalFiles(twillSpec.getRunnables().get(runnableName));
     
@@ -97,13 +102,13 @@ public final class TwillContainerMain extends ServiceMain {
       runId, appRunId, containerInfo.getHost(),
       arguments.getRunnableArguments().get(runnableName).toArray(new String[0]),
       arguments.getArguments().toArray(new String[0]),
-      runnableSpec, instanceId, discoveryService, discoveryService, instanceCount,
-      containerInfo.getMemoryMB(), containerInfo.getVirtualCores()
+      runnableSpec, instanceId, discoveryService, discoveryService, electionRegistry,
+      instanceCount, containerInfo.getMemoryMB(), containerInfo.getVirtualCores()
     );
 
+    ZKClient containerZKClient = getContainerZKClient(zkClientService, appRunId, runnableName);
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
-    Service service = new TwillContainerService(context, containerInfo,
-                                                getContainerZKClient(zkClientService, appRunId, runnableName),
+    Service service = new TwillContainerService(context, containerInfo, containerZKClient,
                                                 runId, runnableSpec, getClassLoader(),
                                                 createAppLocation(conf));
     new TwillContainerMain().doMain(zkClientService, service);
@@ -139,6 +144,10 @@ public final class TwillContainerMain extends ServiceMain {
                                  name, file.getName());
       }
     }
+  }
+
+  private static ZKClient getAppRunZKClient(ZKClient zkClient, RunId appRunId) {
+    return ZKClients.namespace(zkClient, String.format("/%s", appRunId));
   }
 
   private static ZKClient getContainerZKClient(ZKClient zkClient, RunId appRunId, String runnableName) {
