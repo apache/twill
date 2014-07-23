@@ -195,9 +195,9 @@ public class ZKClientTest {
         client.create("/expireRewatch", null, CreateMode.PERSISTENT);
         Assert.assertEquals(Watcher.Event.EventType.NodeCreated, events.poll(2, TimeUnit.SECONDS));
 
-        KillZKSession.kill(client.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 1000);
+        KillZKSession.kill(client.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 10000);
 
-        Assert.assertTrue(expireReconnectLatch.await(5, TimeUnit.SECONDS));
+        Assert.assertTrue(expireReconnectLatch.await(10, TimeUnit.SECONDS));
 
         client.delete("/expireRewatch");
         Assert.assertEquals(Watcher.Event.EventType.NodeDeleted, events.poll(4, TimeUnit.SECONDS));
@@ -255,7 +255,7 @@ public class ZKClientTest {
     zkServer.startAndWait();
 
     try {
-      Assert.assertTrue(createLatch.await(5, TimeUnit.SECONDS));
+      Assert.assertTrue(createLatch.await(10, TimeUnit.SECONDS));
     } finally {
       zkServer.stopAndWait();
     }

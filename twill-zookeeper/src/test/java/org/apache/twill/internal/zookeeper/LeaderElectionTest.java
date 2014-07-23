@@ -39,7 +39,7 @@ public class LeaderElectionTest {
 
   private static InMemoryZKServer zkServer;
 
-  @Test(timeout = 5000)
+  @Test(timeout = 30000)
   public void testElection() throws ExecutionException, InterruptedException, BrokenBarrierException {
     ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -112,7 +112,7 @@ public class LeaderElectionTest {
     }
   }
 
-  @Test(timeout = 10000)
+  @Test(timeout = 30000)
   public void testCancel() throws InterruptedException, IOException {
     List<LeaderElection> leaderElections = Lists.newArrayList();
     List<ZKClientService> zkClients = Lists.newArrayList();
@@ -156,7 +156,7 @@ public class LeaderElectionTest {
 
       // Kill the follower session
       KillZKSession.kill(zkClients.get(follower).getZooKeeperSupplier().get(),
-                         zkClients.get(follower).getConnectString(), 5000);
+                         zkClients.get(follower).getConnectString(), 10000);
 
       // Cancel the leader
       leaderElections.get(leader).stopAndWait();
@@ -196,7 +196,7 @@ public class LeaderElectionTest {
     }
   }
 
-  @Test(timeout = 10000)
+  @Test(timeout = 30000)
   public void testDisconnect() throws IOException, InterruptedException {
     File zkDataDir = tmpFolder.newFolder();
     InMemoryZKServer ownZKServer = InMemoryZKServer.builder().setDataDir(zkDataDir).build();

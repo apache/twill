@@ -64,7 +64,7 @@ public class ZKDiscoveryServiceTest extends DiscoveryServiceTestBase {
     Futures.getUnchecked(Services.chainStop(zkClient, zkServer));
   }
 
-  @Test (timeout = 5000)
+  @Test (timeout = 10000)
   public void testDoubleRegister() throws Exception {
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
     DiscoveryService discoveryService = entry.getKey();
