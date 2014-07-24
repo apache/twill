@@ -48,6 +48,29 @@ limitations under the License.
                     <target>1.6</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.10</version>
+                <configuration>
+                    <excludes>
+                        <exclude>.git/**/*</exclude>
+                        <exclude>**/*.iml</exclude>
+                        <exclude>target/**/*</exclude>
+                        <exclude>**/README</exclude>
+                        <exclude>src/test/resources/header.txt</exclude>
+                        <exclude>**/zookeeper.out</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
