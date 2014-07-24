@@ -128,7 +128,7 @@ public class ZKDiscoveryServiceTest extends DiscoveryServiceTestBase {
     // Discover that registered host:port.
     Assert.assertTrue(waitTillExpected(1, discoverables));
 
-    KillZKSession.kill(zkClient.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 5000);
+    KillZKSession.kill(zkClient.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 10000);
 
     // Register one more endpoint to make sure state has been reflected after reconnection
     Cancellable cancellable2 = register(discoveryService, "test_expires", "localhost", 54322);

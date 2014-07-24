@@ -23,7 +23,7 @@ limitations under the License.
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.apache.twill.example</groupId>
     <artifactId>twill-examples</artifactId>
-    <version>0.3.0-incubating-SNAPSHOT</version>
+    <version>0.4.0-incubating-SNAPSHOT</version>
     <name>Apache Twill examples</name>
     <packaging>pom</packaging>
 
@@ -33,7 +33,7 @@ limitations under the License.
     </modules>
 
     <properties>
-        <twill.version>0.3.0-incubating-SNAPSHOT</twill.version>
+        <twill.version>0.4.0-incubating-SNAPSHOT</twill.version>
         <twill.groupId>org.apache.twill</twill.groupId>
     </properties>
 
