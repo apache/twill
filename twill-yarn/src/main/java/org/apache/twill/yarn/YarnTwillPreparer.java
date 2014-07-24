@@ -287,7 +287,9 @@ final class YarnTwillPreparer implements TwillPreparer {
                         .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
                         .put(EnvKeys.TWILL_RUN_ID, runId.getId())
                         .put(EnvKeys.TWILL_RESERVED_MEMORY_MB, Integer.toString(reservedMemory))
-                        .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName()).build(),
+                        .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
+                        .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS))
+                        .build(),
             localFiles.values(), credentials
           )
             .noResources()

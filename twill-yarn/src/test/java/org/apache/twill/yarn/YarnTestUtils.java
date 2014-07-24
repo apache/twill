@@ -83,26 +83,27 @@ public final class YarnTestUtils {
     fsConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, folder.getAbsolutePath());
     dfsCluster = new MiniDFSCluster.Builder(fsConf).numDataNodes(1).build();
 
-    config = new YarnConfiguration(dfsCluster.getFileSystem().getConf());
+    Configuration conf = new YarnConfiguration(dfsCluster.getFileSystem().getConf());
 
     if (YarnUtils.isHadoop20()) {
-      config.set("yarn.resourcemanager.scheduler.class",
-              "org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler");
+      conf.set("yarn.resourcemanager.scheduler.class",
+                 "org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler");
     } else {
-      config.set("yarn.resourcemanager.scheduler.class",
-              "org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler");
-      config.set("yarn.scheduler.capacity.resource-calculator",
-              "org.apache.hadoop.yarn.util.resource.DominantResourceCalculator");
+      conf.set("yarn.resourcemanager.scheduler.class",
+                 "org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler");
+      conf.set("yarn.scheduler.capacity.resource-calculator",
+                 "org.apache.hadoop.yarn.util.resource.DominantResourceCalculator");
     }
-    config.set("yarn.minicluster.fixed.ports", "true");
-    config.set("yarn.nodemanager.vmem-pmem-ratio", "20.1");
-    config.set("yarn.nodemanager.vmem-check-enabled", "false");
-    config.set("yarn.scheduler.minimum-allocation-mb", "128");
-    config.set("yarn.nodemanager.delete.debug-delay-sec", "3600");
+    conf.set("yarn.nodemanager.vmem-pmem-ratio", "20.1");
+    conf.set("yarn.nodemanager.vmem-check-enabled", "false");
+    conf.set("yarn.scheduler.minimum-allocation-mb", "128");
+    conf.set("yarn.nodemanager.delete.debug-delay-sec", "3600");
 
     cluster = new MiniYARNCluster("test-cluster", 1, 1, 1);
-    cluster.init(config);
+    cluster.init(conf);
     cluster.start();
+
+    config = new YarnConfiguration(cluster.getConfig());
 
     runnerService = createTwillRunnerService();
     runnerService.startAndWait();
