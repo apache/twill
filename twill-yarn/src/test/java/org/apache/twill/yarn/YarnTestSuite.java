@@ -25,6 +25,7 @@ import org.junit.runners.Suite;
  */
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
+                      PlacementPolicyTestRun.class,
                       EchoServerTestRun.class,
                       ResourceReportTestRun.class,
                       TaskCompletedTestRun.class,
@@ -36,7 +37,8 @@ import org.junit.runners.Suite;
                       SessionExpireTestRun.class,
                       ServiceDiscoveryTestRun.class,
                       DebugTestRun.class,
-                      PlacementPolicyTestRun.class
+                      ContainerSizeTestRun.class,
+                      InitializeFailTestRun.class
                     })
 public final class YarnTestSuite {
 
