@@ -26,3 +26,12 @@ branches:
     - master
     - /^branch\-.*$/
     - /^feature\/.*$/
+
+script: mvn install -P $PROFILE
+
+install: true
+
+env:
+  - PROFILE='hadoop-2.0'
+  - PROFILE='hadoop-2.3'
+  - PROFILE='cdh-4.4.0'
