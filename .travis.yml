@@ -27,9 +27,9 @@ branches:
     - /^branch\-.*$/
     - /^feature\/.*$/
 
-script: mvn install -P $PROFILE
+script: mvn test -P $PROFILE
 
-install: true
+install: mvn install -P $PROFILE -DskipTests=true
 
 env:
   - PROFILE='hadoop-2.0'
