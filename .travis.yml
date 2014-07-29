@@ -27,7 +27,7 @@ branches:
     - /^branch\-.*$/
     - /^feature\/.*$/
 
-script: mvn test -P $PROFILE
+script: mvn test -P $PROFILE -Dsurefire.redirectTestOutputToFile=false
 
 install: mvn install -P $PROFILE -DskipTests=true
 

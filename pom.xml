@@ -344,6 +344,8 @@
                     <systemPropertyVariables>
                         <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
                     </systemPropertyVariables>
+                    <reuseForks>false</reuseForks>
+                    <reportFormat>plain</reportFormat>
                     <includes>
                         <include>**/*TestSuite.java</include>
                         <include>**/Test*.java</include>

@@ -56,7 +56,7 @@ public class LeaderElectionTest {
 
   private static InMemoryZKServer zkServer;
 
-  @Test(timeout = 30000)
+  @Test(timeout = 100000)
   public void testElection() throws ExecutionException, InterruptedException, BrokenBarrierException {
     ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -129,7 +129,7 @@ public class LeaderElectionTest {
     }
   }
 
-  @Test(timeout = 30000)
+  @Test(timeout = 100000)
   public void testCancel() throws InterruptedException, IOException {
     List<LeaderElection> leaderElections = Lists.newArrayList();
     List<ZKClientService> zkClients = Lists.newArrayList();
@@ -173,13 +173,13 @@ public class LeaderElectionTest {
 
       // Kill the follower session
       KillZKSession.kill(zkClients.get(follower).getZooKeeperSupplier().get(),
-                         zkClients.get(follower).getConnectString(), 10000);
+                         zkClients.get(follower).getConnectString(), 20000);
 
       // Cancel the leader
       leaderElections.get(leader).stopAndWait();
 
       // Now follower should still be able to become leader.
-      leaderSem.tryAcquire(10, TimeUnit.SECONDS);
+      leaderSem.tryAcquire(30, TimeUnit.SECONDS);
 
       leader = leaderIdx.get();
       follower = 1 - leader;
@@ -205,7 +205,7 @@ public class LeaderElectionTest {
       leaderElections.get(leader).stopAndWait();
 
       // Since the follower has been cancelled before leader, there should be no leader.
-      Assert.assertFalse(leaderSem.tryAcquire(2, TimeUnit.SECONDS));
+      Assert.assertFalse(leaderSem.tryAcquire(10, TimeUnit.SECONDS));
     } finally {
       for (ZKClientService zkClient : zkClients) {
         zkClient.stopAndWait();
@@ -213,7 +213,7 @@ public class LeaderElectionTest {
     }
   }
 
-  @Test(timeout = 30000)
+  @Test(timeout = 100000)
   public void testDisconnect() throws IOException, InterruptedException {
     File zkDataDir = tmpFolder.newFolder();
     InMemoryZKServer ownZKServer = InMemoryZKServer.builder().setDataDir(zkDataDir).build();
@@ -239,7 +239,7 @@ public class LeaderElectionTest {
         });
         leaderElection.start();
 
-        leaderSem.tryAcquire(10, TimeUnit.SECONDS);
+        leaderSem.tryAcquire(20, TimeUnit.SECONDS);
 
         int zkPort = ownZKServer.getLocalAddress().getPort();
 
@@ -247,19 +247,19 @@ public class LeaderElectionTest {
         ownZKServer.stopAndWait();
 
         // Right after disconnect, it should become follower
-        followerSem.tryAcquire(10, TimeUnit.SECONDS);
+        followerSem.tryAcquire(20, TimeUnit.SECONDS);
 
         ownZKServer = InMemoryZKServer.builder().setDataDir(zkDataDir).setPort(zkPort).build();
         ownZKServer.startAndWait();
 
         // Right after reconnect, it should be leader again.
-        leaderSem.tryAcquire(10, TimeUnit.SECONDS);
+        leaderSem.tryAcquire(20, TimeUnit.SECONDS);
 
         // Now disconnect it again, but then cancel it before reconnect, it shouldn't become leader
         ownZKServer.stopAndWait();
 
         // Right after disconnect, it should become follower
-        followerSem.tryAcquire(10, TimeUnit.SECONDS);
+        followerSem.tryAcquire(20, TimeUnit.SECONDS);
 
         ListenableFuture<?> cancelFuture = leaderElection.stop();
 
@@ -269,7 +269,7 @@ public class LeaderElectionTest {
         Futures.getUnchecked(cancelFuture);
 
         // After reconnect, it should not be leader
-        Assert.assertFalse(leaderSem.tryAcquire(2, TimeUnit.SECONDS));
+        Assert.assertFalse(leaderSem.tryAcquire(10, TimeUnit.SECONDS));
       } finally {
         zkClient.stopAndWait();
       }

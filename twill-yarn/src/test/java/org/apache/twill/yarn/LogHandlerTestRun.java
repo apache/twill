@@ -24,7 +24,6 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -68,8 +67,11 @@ public class LogHandlerTestRun extends BaseYarnTest {
                                        .addLogHandler(logHandler)
                                        .start();
 
-    Services.getCompletionFuture(controller).get();
-    latch.await(1, TimeUnit.SECONDS);
+    try {
+      Assert.assertTrue(latch.await(100, TimeUnit.SECONDS));
+    } finally {
+      controller.stopAndWait();
+    }
 
     // Verify the log throwable
     Assert.assertEquals(1, throwables.size());
@@ -90,7 +92,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
   public static final class LogRunnable extends AbstractTwillRunnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LogRunnable.class);
-
+    private final CountDownLatch stopLatch = new CountDownLatch(1);
 
     @Override
     public void run() {
@@ -105,11 +107,17 @@ public class LogHandlerTestRun extends BaseYarnTest {
       } catch (Throwable t) {
         LOG.error("Got exception", t);
       }
+
+      try {
+        stopLatch.await();
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted", e);
+      }
     }
 
     @Override
     public void stop() {
-
+      stopLatch.countDown();
     }
   }
 }
