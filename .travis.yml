@@ -33,5 +33,7 @@ install: mvn install -P $PROFILE -DskipTests=true
 
 env:
   - PROFILE='hadoop-2.0'
+  - PROFILE='hadoop-2.1'
+  - PROFILE='hadoop-2.2'
   - PROFILE='hadoop-2.3'
   - PROFILE='cdh-4.4.0'
