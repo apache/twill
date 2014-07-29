@@ -17,10 +17,12 @@
  */
 package org.apache.twill.example.yarn;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.twill.api.*;
+import org.apache.twill.api.TwillApplication;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunnerService;
+import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.Services;
 import org.apache.twill.ext.BundledJarRunnable;
@@ -32,9 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.PrintWriter;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -83,7 +83,6 @@ public class BundledJarExample {
       Arrays.copyOfRange(args, 1, args.length));
 
     File jarFile = new File(arguments.getJarFileName());
-    Preconditions.checkArgument(jarFile != null);
     Preconditions.checkState(jarFile.exists());
     Preconditions.checkState(jarFile.canRead());
 

@@ -24,7 +24,7 @@ limitations under the License.
 
     <parent>
         <artifactId>twill-examples</artifactId>
-        <groupId>org.apache.twill.example</groupId>
+        <groupId>org.apache.twill</groupId>
         <version>0.4.0-incubating-SNAPSHOT</version>
     </parent>
 
@@ -45,13 +45,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.5</version>
-        </dependency>
-        <dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-            <version>1.2.17</version>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
     </dependencies>
 

@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutionException;
  * Hello World example using twill-yarn to run a TwillApplication over YARN.
  */
 public class HelloWorld {
-  public static Logger LOG = LoggerFactory.getLogger(HelloWorld.class);
+  public static final Logger LOG = LoggerFactory.getLogger(HelloWorld.class);
 
   /**
    * Hello World runnable that is provided to TwillRunnerService to be run.
