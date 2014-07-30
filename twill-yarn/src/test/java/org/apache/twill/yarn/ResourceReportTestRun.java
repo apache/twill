@@ -18,6 +18,7 @@
 package org.apache.twill.yarn;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.LineReader;
 import org.apache.twill.api.ResourceReport;
@@ -44,6 +45,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.URISyntaxException;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -198,7 +200,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     URISyntaxException, TimeoutException {
     TwillRunner runner = YarnTestUtils.getTwillRunner();
 
-    TwillController controller = runner.prepare(new ResourceApplication())
+    final TwillController controller = runner.prepare(new ResourceApplication())
                                         .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                         .withApplicationArguments("echo")
                                         .withArguments("echo1", "echo1")
@@ -224,6 +226,15 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertEquals(2, usedResources.keySet().size());
     Assert.assertTrue(usedResources.containsKey("echo1"));
     Assert.assertTrue(usedResources.containsKey("echo2"));
+
+    YarnTestUtils.waitForSize(new Iterable<String>() {
+      @Override
+      public Iterator<String> iterator() {
+        return controller.getResourceReport().getServices().iterator();
+      }
+    }, 3, 120);
+    report = controller.getResourceReport();
+    Assert.assertEquals(ImmutableSet.of("echo", "echo1", "echo2"), ImmutableSet.copyOf(report.getServices()));
 
     Collection<TwillRunResources> echo1Resources = usedResources.get("echo1");
     // 2 instances of echo1

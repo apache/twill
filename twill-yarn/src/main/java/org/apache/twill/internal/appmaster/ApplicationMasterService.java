@@ -227,7 +227,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
       appMasterHost, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
-    return new RunningContainers(appId, appMasterResources);
+    return new RunningContainers(appId, appMasterResources, zkClient);
   }
 
   private ExpectedContainers initExpectedContainers(TwillSpecification twillSpec) {
@@ -262,6 +262,8 @@ public final class ApplicationMasterService extends AbstractTwillService {
       zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT),
       zkClient.create("/" + runId.getId() + "/kafka", null, CreateMode.PERSISTENT))
     ).get();
+
+    runningContainers.addWatcher("/discoverable");
 
     // Starts kafka server
     LOG.info("Starting kafka server");

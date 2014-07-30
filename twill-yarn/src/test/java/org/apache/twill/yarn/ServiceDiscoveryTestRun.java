@@ -57,7 +57,7 @@ public final class ServiceDiscoveryTestRun extends BaseYarnTest {
 
     ListenableFuture<Service.State> completion = Services.getCompletionFuture(controller);
     try {
-      completion.get(60, TimeUnit.SECONDS);
+      completion.get(120, TimeUnit.SECONDS);
     } finally {
       controller.stopAndWait();
     }

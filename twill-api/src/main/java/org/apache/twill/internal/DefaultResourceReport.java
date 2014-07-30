@@ -18,13 +18,17 @@
 package org.apache.twill.internal;
 
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.TwillRunResources;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Implementation of {@link org.apache.twill.api.ResourceReport} with some
@@ -34,21 +38,26 @@ public final class DefaultResourceReport implements ResourceReport {
   private final SetMultimap<String, TwillRunResources> usedResources;
   private final TwillRunResources appMasterResources;
   private final String applicationId;
+  private final AtomicReference<List<String>> services;
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources) {
-    this.applicationId = applicationId;
-    this.appMasterResources = masterResources;
-    this.usedResources = HashMultimap.create();
+    this(applicationId, masterResources, ImmutableMap.<String, Collection<TwillRunResources>>of());
   }
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources,
                                Map<String, Collection<TwillRunResources>> resources) {
+    this(applicationId, masterResources, resources, ImmutableList.<String>of());
+  }
+
+  public DefaultResourceReport(String applicationId, TwillRunResources masterResources,
+                               Map<String, Collection<TwillRunResources>> resources, List<String> services) {
     this.applicationId = applicationId;
     this.appMasterResources = masterResources;
     this.usedResources = HashMultimap.create();
     for (Map.Entry<String, Collection<TwillRunResources>> entry : resources.entrySet()) {
       this.usedResources.putAll(entry.getKey(), entry.getValue());
     }
+    this.services = new AtomicReference<List<String>>(services);
   }
 
   /**
@@ -119,5 +128,24 @@ public final class DefaultResourceReport implements ResourceReport {
   @Override
   public String getApplicationId() {
     return applicationId;
+  }
+
+  /**
+   * Set the list of services of the application master.
+   *
+   * @param services list of services to set.
+   */
+  public void setServices(List<String> services) {
+    this.services.set(ImmutableList.copyOf(services));
+  }
+
+  /**
+   * Get the list of services of the application master.
+   *
+   * @return list of services of the application master.
+   */
+  @Override
+  public List<String> getServices() {
+    return services.get();
   }
 }

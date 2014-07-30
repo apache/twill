@@ -45,6 +45,9 @@ import org.apache.twill.internal.TwillContainerLauncher;
 import org.apache.twill.internal.container.TwillContainerMain;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.yarn.YarnContainerStatus;
+import org.apache.twill.zookeeper.NodeChildren;
+import org.apache.twill.zookeeper.ZKClient;
+import org.apache.twill.zookeeper.ZKOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,14 +89,16 @@ final class RunningContainers {
   private final Deque<String> startSequence;
   private final Lock containerLock;
   private final Condition containerChange;
+  private final ZKClient zkClient;
 
-  RunningContainers(String appId, TwillRunResources appMasterResources) {
+  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient) {
     containers = HashBasedTable.create();
     runnableInstances = Maps.newHashMap();
     startSequence = Lists.newLinkedList();
     containerLock = new ReentrantLock();
     containerChange = containerLock.newCondition();
     resourceReport = new DefaultResourceReport(appId, appMasterResources);
+    zkClient = zookeeperClient;
   }
 
   /**
@@ -132,6 +137,19 @@ final class RunningContainers {
     } finally {
       containerLock.unlock();
     }
+  }
+
+  /**
+   * Watch for changes to services under given path.
+   * @param path to check for changes.
+   */
+  void addWatcher(String path) {
+    ZKOperations.watchChildren(zkClient, path, new ZKOperations.ChildrenCallback() {
+      @Override
+      public void updated(NodeChildren nodeChildren) {
+        resourceReport.setServices(nodeChildren.getChildren());
+      }
+    });
   }
 
   ResourceReport getResourceReport() {
