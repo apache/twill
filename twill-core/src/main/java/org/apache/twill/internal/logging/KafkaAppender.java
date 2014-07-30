@@ -79,6 +79,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   private KafkaClientService kafkaClient;
   private String zkConnectStr;
   private String hostname;
+  private String runnableName;
   private String topic;
   private Queue<String> buffer;
   private int flushLimit = 20;
@@ -109,6 +110,14 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   }
 
   /**
+   * Sets the runnableName.
+   */
+  @SuppressWarnings("unused")
+  public void setRunnableName(String runnableName) {
+    this.runnableName = runnableName;
+  }
+
+  /**
    * Sets the topic name for publishing logs. Called by slf4j.
    */
   @SuppressWarnings("unused")
@@ -136,7 +145,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   public void start() {
     Preconditions.checkNotNull(zkConnectStr);
 
-    eventConverter = new LogEventConverter(hostname);
+    eventConverter = new LogEventConverter(hostname, runnableName);
     scheduler = Executors.newSingleThreadScheduledExecutor(Threads.createDaemonThreadFactory("kafka-logger"));
 
     zkClientService = ZKClientServices.delegate(
@@ -286,11 +295,11 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
 
     private final Gson gson;
 
-    private LogEventConverter(String hostname) {
+    private LogEventConverter(String hostname, String runnableName) {
       gson = new GsonBuilder()
         .registerTypeAdapter(StackTraceElement.class, new StackTraceElementCodec())
         .registerTypeAdapter(LogThrowable.class, new LogThrowableCodec())
-        .registerTypeAdapter(ILoggingEvent.class, new ILoggingEventSerializer(hostname))
+        .registerTypeAdapter(ILoggingEvent.class, new ILoggingEventSerializer(hostname, runnableName))
         .create();
     }
 

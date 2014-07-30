@@ -187,4 +187,9 @@ public final class TwillContainerMain extends ServiceMain {
   protected String getKafkaZKConnect() {
     return System.getenv(EnvKeys.TWILL_LOG_KAFKA_ZK);
   }
+
+  @Override
+  protected String getRunnableName() {
+    return System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
+  }
 }

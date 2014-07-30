@@ -100,4 +100,9 @@ public final class ApplicationMasterMain extends ServiceMain {
   protected String getKafkaZKConnect() {
     return kafkaZKConnect;
   }
+
+  @Override
+  protected String getRunnableName() {
+    return System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
+  }
 }

@@ -104,6 +104,8 @@ public abstract class ServiceMain {
 
   protected abstract String getKafkaZKConnect();
 
+  protected abstract String getRunnableName();
+
   /**
    * Returns the {@link Location} for the application based on the env {@link EnvKeys#TWILL_APP_DIR}.
    */
@@ -177,12 +179,23 @@ public abstract class ServiceMain {
       "        <topic>" + Constants.LOG_TOPIC + "</topic>\n" +
       "        <hostname>" + getHostname() + "</hostname>\n" +
       "        <zookeeper>" + getKafkaZKConnect() + "</zookeeper>\n" +
+      appendRunnable() +
       "    </appender>\n" +
       "    <logger name=\"org.apache.twill.internal.logging\" additivity=\"false\" />\n" +
       "    <root level=\"" + rootLevel + "\">\n" +
       "        <appender-ref ref=\"KAFKA\"/>\n" +
       "    </root>\n" +
       "</configuration>";
+  }
+
+
+  private String appendRunnable() {
+    // RunnableName for AM is null, so append runnable name to log config only if the name is not null.
+    if (getRunnableName() == null) {
+     return "";
+    } else {
+      return "        <runnableName>" + getRunnableName() + "</runnableName>\n";
+    }
   }
 
   private String getLoggerLevel(Logger logger) {

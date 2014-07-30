@@ -41,9 +41,11 @@ public final class ILoggingEventSerializer implements JsonSerializer<ILoggingEve
   private final FileOfCallerConverter fileConverter = new FileOfCallerConverter();
   private final LineOfCallerConverter lineConverter = new LineOfCallerConverter();
   private final String hostname;
+  private final String runnableName;
 
-  public ILoggingEventSerializer(String hostname) {
+  public ILoggingEventSerializer(String hostname, String runnableName) {
     this.hostname = hostname;
+    this.runnableName = runnableName;
   }
 
   @Override
@@ -59,7 +61,7 @@ public final class ILoggingEventSerializer implements JsonSerializer<ILoggingEve
     json.addProperty("line", lineConverter.convert(event));
     json.addProperty("thread", event.getThreadName());
     json.addProperty("message", event.getFormattedMessage());
-
+    json.addProperty("runnableName", runnableName);
     if (event.getThrowableProxy() == null) {
       json.add("throwable", JsonNull.INSTANCE);
     } else {
