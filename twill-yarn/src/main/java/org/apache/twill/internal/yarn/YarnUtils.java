@@ -21,6 +21,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -57,8 +58,17 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class YarnUtils {
 
+  /**
+   * Defines different versions of Hadoop.
+   */
+  public enum HadoopVersions {
+    HADOOP_20,
+    HADOOP_21,
+    HADOOP_22
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
-  private static final AtomicReference<Boolean> HADOOP_20 = new AtomicReference<Boolean>();
+  private static final AtomicReference<HadoopVersions> HADOOP_VERSION = new AtomicReference<HadoopVersions>();
 
   public static YarnLocalResource createLocalResource(LocalFile localFile) {
     Preconditions.checkArgument(localFile.getLastModified() >= 0, "Last modified time should be >= 0.");
@@ -202,21 +212,27 @@ public class YarnUtils {
   }
 
   /**
-   * Returns true if Hadoop-2.0 classes are in the classpath.
+   * Returns {@link org.apache.twill.internal.yarn.YarnUtils.HadoopVersions} for the current build profile,
+   * depending on the classes in the classpath.
+   * @return The version of Hadoop for the current build profile.
    */
-  public static boolean isHadoop20() {
-    Boolean hadoop20 = HADOOP_20.get();
-    if (hadoop20 != null) {
-      return hadoop20;
+  public static HadoopVersions getHadoopVersion() {
+    HadoopVersions hadoopVersion = HADOOP_VERSION.get();
+    if (hadoopVersion != null) {
+      return hadoopVersion;
     }
     try {
       Class.forName("org.apache.hadoop.yarn.client.api.NMClient");
-      HADOOP_20.set(false);
-      return false;
+      try {
+        Class.forName("org.apache.hadoop.yarn.client.cli.LogsCLI");
+        HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
+      } catch (ClassNotFoundException e) {
+        HADOOP_VERSION.set(HadoopVersions.HADOOP_21);
+      }
     } catch (ClassNotFoundException e) {
-      HADOOP_20.set(true);
-      return true;
+      HADOOP_VERSION.set(HadoopVersions.HADOOP_20);
     }
+    return HADOOP_VERSION.get();
   }
 
   /**
@@ -225,7 +241,7 @@ public class YarnUtils {
   private static <T> T createAdapter(Class<T> clz) {
     String className = clz.getPackage().getName();
 
-    if (isHadoop20()) {
+    if (getHadoopVersion().equals(HadoopVersions.HADOOP_20)) {
       className += ".Hadoop20" + clz.getSimpleName();
     } else {
       className += ".Hadoop21" + clz.getSimpleName();

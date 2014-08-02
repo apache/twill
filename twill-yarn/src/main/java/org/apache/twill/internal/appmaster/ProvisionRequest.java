@@ -26,11 +26,18 @@ final class ProvisionRequest {
   private final RuntimeSpecification runtimeSpec;
   private final String requestId;
   private int requestCount;
+  private final AllocationSpecification.Type type;
 
   ProvisionRequest(RuntimeSpecification runtimeSpec, String requestId, int requestCount) {
+    this(runtimeSpec, requestId, requestCount, AllocationSpecification.Type.DEFAULT);
+  }
+
+  ProvisionRequest(RuntimeSpecification runtimeSpec, String requestId, int requestCount,
+                   AllocationSpecification.Type type) {
     this.runtimeSpec = runtimeSpec;
     this.requestId = requestId;
     this.requestCount = requestCount;
+    this.type = type;
   }
 
   RuntimeSpecification getRuntimeSpec() {
@@ -48,5 +55,9 @@ final class ProvisionRequest {
   boolean containerAcquired() {
     requestCount--;
     return requestCount == 0;
+  }
+
+  AllocationSpecification.Type getType() {
+    return this.type;
   }
 }

@@ -35,7 +35,8 @@ import org.junit.runners.Suite;
                       LogHandlerTestRun.class,
                       SessionExpireTestRun.class,
                       ServiceDiscoveryTestRun.class,
-                      DebugTestRun.class
+                      DebugTestRun.class,
+                      PlacementPolicyTestRun.class
                     })
 public final class YarnTestSuite {
 

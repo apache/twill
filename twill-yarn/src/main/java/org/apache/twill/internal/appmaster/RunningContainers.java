@@ -20,10 +20,13 @@ package org.apache.twill.internal.appmaster;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Table;
 import com.google.common.util.concurrent.FutureCallback;
@@ -53,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -85,20 +89,24 @@ final class RunningContainers {
 
   // Map from runnableName to a BitSet, with the <instanceId> bit turned on for having an instance running.
   private final Map<String, BitSet> runnableInstances;
+  private final Map<String, Integer> completedContainerCount;
   private final DefaultResourceReport resourceReport;
   private final Deque<String> startSequence;
   private final Lock containerLock;
   private final Condition containerChange;
   private final ZKClient zkClient;
+  private final Multimap<String, ContainerInfo> containerStats;
 
   RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient) {
     containers = HashBasedTable.create();
     runnableInstances = Maps.newHashMap();
+    completedContainerCount = Maps.newHashMap();
     startSequence = Lists.newLinkedList();
     containerLock = new ReentrantLock();
     containerChange = containerLock.newCondition();
     resourceReport = new DefaultResourceReport(appId, appMasterResources);
     zkClient = zookeeperClient;
+    containerStats = HashMultimap.create();
   }
 
   /**
@@ -128,6 +136,7 @@ final class RunningContainers {
                                                                  containerInfo.getHost().getHostName(),
                                                                  controller);
       resourceReport.addRunResources(runnableName, resources);
+      containerStats.put(runnableName, containerInfo);
 
       if (startSequence.isEmpty() || !runnableName.equals(startSequence.peekLast())) {
         startSequence.addLast(runnableName);
@@ -154,6 +163,15 @@ final class RunningContainers {
 
   ResourceReport getResourceReport() {
     return resourceReport;
+  }
+
+  /**
+   * Given a runnable name, returns a list of {@link org.apache.twill.internal.ContainerInfo} for it's instances.
+   * @param runnableName name of a runnable.
+   * @return a list of {@link org.apache.twill.internal.ContainerInfo} for instances of a runnable.
+   */
+  Collection<ContainerInfo> getContainerInfo(String runnableName) {
+    return containerStats.get(runnableName);
   }
 
   /**
@@ -186,6 +204,7 @@ final class RunningContainers {
       LOG.info("Stopping service: {} {}", runnableName, lastController.getRunId());
       lastController.stopAndWait();
       containers.remove(runnableName, lastContainerId);
+      removeContainerInfo(lastContainerId);
       removeInstanceId(runnableName, maxInstanceId);
       resourceReport.removeRunnableResources(runnableName, lastContainerId);
       containerChange.signalAll();
@@ -227,6 +246,18 @@ final class RunningContainers {
     containerLock.lock();
     try {
       return ImmutableMap.copyOf(Maps.transformValues(runnableInstances, BITSET_CARDINALITY));
+    } finally {
+      containerLock.unlock();
+    }
+  }
+
+  /**
+   * Returns a Map containing number of successfully completed containers for all runnables.
+   */
+  Map<String, Integer> getCompletedContainerCount() {
+    containerLock.lock();
+    try {
+      return ImmutableMap.copyOf(completedContainerCount);
     } finally {
       containerLock.unlock();
     }
@@ -293,6 +324,7 @@ final class RunningContainers {
       }
       containers.clear();
       runnableInstances.clear();
+      containerStats.clear();
     } finally {
       containerLock.unlock();
     }
@@ -320,6 +352,7 @@ final class RunningContainers {
     ContainerState state = status.getState();
 
     try {
+      removeContainerInfo(containerId);
       Map<String, TwillContainerController> lookup = containers.column(containerId);
       if (lookup.isEmpty()) {
         // It's OK because if a container is stopped through removeLast, this would be empty.
@@ -346,6 +379,12 @@ final class RunningContainers {
         TwillContainerController controller = completedEntry.getValue();
         controller.completed(exitStatus);
 
+        if (exitStatus == ContainerExitCodes.SUCCESS) {
+          if (!completedContainerCount.containsKey(runnableName)) {
+            completedContainerCount.put(runnableName, 0);
+          }
+          completedContainerCount.put(runnableName, completedContainerCount.get(runnableName) + 1);
+        }
         removeInstanceId(runnableName, getInstanceId(controller.getRunId()));
         resourceReport.removeRunnableResources(runnableName, containerId);
       }
@@ -453,6 +492,21 @@ final class RunningContainers {
   private int getInstanceId(RunId runId) {
     String id = runId.getId();
     return Integer.parseInt(id.substring(id.lastIndexOf('-') + 1));
+  }
+
+  /**
+   * Given the containerId, removes the corresponding containerInfo.
+   * @param containerId Id for the container to be removed.
+   * @return Returns {@code false} if container with the provided id was not found, {@code true} otherwise.
+   */
+  private boolean removeContainerInfo(String containerId) {
+    for (ContainerInfo containerInfo : this.containerStats.values()) {
+      if (containerInfo.getId().equals(containerId)) {
+        this.containerStats.values().remove(containerInfo);
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

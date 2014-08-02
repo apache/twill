@@ -17,11 +17,7 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.twill.api.ResourceSpecification;
-
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Straightforward implementation of {@link org.apache.twill.api.ResourceSpecification}.
@@ -32,24 +28,13 @@ public final class DefaultResourceSpecification implements ResourceSpecification
   private final int instances;
   private final int uplink;
   private final int downlink;
-  private final List<String> hosts;
-  private final List<String> racks;
 
   public DefaultResourceSpecification(int virtualCores, int memorySize, int instances, int uplink, int downlink) {
-    this(virtualCores, memorySize, instances, uplink, downlink,
-            Collections.<String>emptyList(), Collections.<String>emptyList());
-  }
-
-  public DefaultResourceSpecification(int virtualCores, int memorySize, int instances,
-                                      int uplink, int downlink,
-                                      List<String> hosts, List<String> racks) {
     this.virtualCores = virtualCores;
     this.memorySize = memorySize;
     this.instances = instances;
     this.uplink = uplink;
     this.downlink = downlink;
-    this.hosts = ImmutableList.copyOf(hosts);
-    this.racks = ImmutableList.copyOf(racks);
   }
 
   @Deprecated
@@ -71,16 +56,6 @@ public final class DefaultResourceSpecification implements ResourceSpecification
   @Override
   public int getInstances() {
     return instances;
-  }
-
-  @Override
-  public List<String> getHosts() {
-    return this.hosts;
-  }
-
-  @Override
-  public List<String> getRacks() {
-    return this.racks;
   }
 
   @Override

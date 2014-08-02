@@ -31,6 +31,12 @@ public final class Constants {
 
   public static final long PROVISION_TIMEOUT = 30000;
 
+  /**
+   * Milliseconds AM should wait for RM to allocate a constrained provision request.
+   * On timeout, AM relaxes the request constraints.
+   */
+  public static final int CONSTRAINED_PROVISION_REQUEST_TIMEOUT = 5000;
+
   /** Memory size of AM. */
   public static final int APP_MASTER_MEMORY_MB = 512;
 

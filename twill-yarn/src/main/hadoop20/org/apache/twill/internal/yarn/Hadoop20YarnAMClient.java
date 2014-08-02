@@ -100,6 +100,11 @@ public final class Hadoop20YarnAMClient extends AbstractYarnAMClient<AMRMClient.
   }
 
   @Override
+  public int getNMPort() {
+    return Integer.parseInt(System.getenv().get(ApplicationConstants.NM_PORT_ENV));
+  }
+
+  @Override
   protected Resource adjustCapability(Resource resource) {
     int cores = YarnUtils.getVirtualCores(resource);
     int updatedCores = Math.max(Math.min(cores, YarnUtils.getVirtualCores(maxCapability)),
@@ -123,7 +128,9 @@ public final class Hadoop20YarnAMClient extends AbstractYarnAMClient<AMRMClient.
 
   @Override
   protected AMRMClient.ContainerRequest createContainerRequest(Priority priority, Resource capability,
-                                                               @Nullable String[] hosts, @Nullable String[] racks) {
+                                                               @Nullable String[] hosts, @Nullable String[] racks,
+                                                               boolean relaxLocality) {
+    // Ignore relaxLocality param since the corresponding support is not present in Hadoop 2.0.
     return new AMRMClient.ContainerRequest(capability, hosts, racks, priority, 1);
   }
 
@@ -135,6 +142,14 @@ public final class Hadoop20YarnAMClient extends AbstractYarnAMClient<AMRMClient.
   @Override
   protected void removeContainerRequest(AMRMClient.ContainerRequest request) {
     amrmClient.removeContainerRequest(request);
+  }
+
+  @Override
+  protected void updateBlacklist(List<String> blacklistAdditions, List<String> blacklistRemovals) {
+    // An empty implementation since Blacklist is not supported in Hadoop-2.0.
+    if (recordUnsupportedFeature("blacklist")) {
+      LOG.warn("Blacklist is not supported in Hadoop 2.0");
+    }
   }
 
   @Override

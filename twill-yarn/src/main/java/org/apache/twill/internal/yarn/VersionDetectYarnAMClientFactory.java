@@ -36,14 +36,23 @@ public final class VersionDetectYarnAMClientFactory implements YarnAMClientFacto
   public YarnAMClient create() {
     try {
       Class<YarnAMClient> clz;
-      if (YarnUtils.isHadoop20()) {
-        // Uses hadoop-2.0 class
-        String clzName = getClass().getPackage().getName() + ".Hadoop20YarnAMClient";
-        clz = (Class<YarnAMClient>) Class.forName(clzName);
-      } else {
-        // Uses hadoop-2.1 class
-        String clzName = getClass().getPackage().getName() + ".Hadoop21YarnAMClient";
-        clz = (Class<YarnAMClient>) Class.forName(clzName);
+      String clzName;
+      switch (YarnUtils.getHadoopVersion()) {
+        case HADOOP_20:
+          // Uses hadoop-2.0 class
+          clzName = getClass().getPackage().getName() + ".Hadoop20YarnAMClient";
+          clz = (Class<YarnAMClient>) Class.forName(clzName);
+          break;
+        case HADOOP_21:
+          // Uses hadoop-2.1 class
+          clzName = getClass().getPackage().getName() + ".Hadoop21YarnAMClient";
+          clz = (Class<YarnAMClient>) Class.forName(clzName);
+          break;
+        default:
+          // Uses hadoop-2.2 class
+          clzName = getClass().getPackage().getName() + ".Hadoop22YarnAMClient";
+          clz = (Class<YarnAMClient>) Class.forName(clzName);
+          break;
       }
 
       return clz.getConstructor(Configuration.class).newInstance(conf);

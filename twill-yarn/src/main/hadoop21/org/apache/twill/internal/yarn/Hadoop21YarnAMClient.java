@@ -42,11 +42,11 @@ import javax.annotation.Nullable;
 /**
  *
  */
-public final class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.ContainerRequest> {
+public class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.ContainerRequest> {
 
   private static final Logger LOG = LoggerFactory.getLogger(Hadoop21YarnAMClient.class);
 
-  private static final Function<ContainerStatus, YarnContainerStatus> STATUS_TRANSFORM;
+  protected static final Function<ContainerStatus, YarnContainerStatus> STATUS_TRANSFORM;
 
   static {
     STATUS_TRANSFORM = new Function<ContainerStatus, YarnContainerStatus>() {
@@ -57,9 +57,9 @@ public final class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.
     };
   }
 
-  private final AMRMClient<AMRMClient.ContainerRequest> amrmClient;
-  private final Hadoop21YarnNMClient nmClient;
-  private Resource maxCapability;
+  protected final AMRMClient<AMRMClient.ContainerRequest> amrmClient;
+  protected final Hadoop21YarnNMClient nmClient;
+  protected Resource maxCapability;
 
   public Hadoop21YarnAMClient(Configuration conf) {
     super(ApplicationConstants.Environment.CONTAINER_ID.name());
@@ -95,9 +95,15 @@ public final class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.
   }
 
   @Override
+  public int getNMPort() {
+    return Integer.parseInt(System.getenv().get(ApplicationConstants.Environment.NM_PORT.name()));
+  }
+
+  @Override
   protected AMRMClient.ContainerRequest createContainerRequest(Priority priority, Resource capability,
-                                                               @Nullable String[] hosts, @Nullable String[] racks) {
-    return new AMRMClient.ContainerRequest(capability, hosts, racks, priority);
+                                                               @Nullable String[] hosts, @Nullable String[] racks,
+                                                               boolean relaxLocality) {
+    return new AMRMClient.ContainerRequest(capability, hosts, racks, priority, relaxLocality);
   }
 
   @Override
@@ -108,6 +114,14 @@ public final class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.
   @Override
   protected void removeContainerRequest(AMRMClient.ContainerRequest request) {
     amrmClient.removeContainerRequest(request);
+  }
+
+  @Override
+  protected void updateBlacklist(List<String> blacklistAdditions, List<String> blacklistRemovals) {
+    // An empty implementation since Blacklist is not supported in Hadoop-2.1 AMRMClient.
+    if (recordUnsupportedFeature("blacklist")) {
+      LOG.warn("Blacklist is not supported in Hadoop 2.1 AMRMClient");
+    }
   }
 
   @Override

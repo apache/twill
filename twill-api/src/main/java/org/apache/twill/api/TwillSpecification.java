@@ -60,6 +60,46 @@ public interface TwillSpecification {
   }
 
   /**
+   * Defines a container placement policy.
+   */
+  interface PlacementPolicy {
+
+    /**
+     * Lists different types of Placement Policies available.
+     */
+    enum Type {
+      /**
+       * Runnables should be scattered over different hosts.
+       */
+      DISTRIBUTED,
+      /**
+       * No specific placement policy.
+       */
+      DEFAULT
+    }
+
+    /**
+     * @return Set of {@link org.apache.twill.api.TwillRunnable} names that belongs to this placement policy.
+     */
+    Set<String> getNames();
+
+    /**
+     * @return {@link org.apache.twill.api.TwillSpecification.PlacementPolicy.Type Type} of this placement policy.
+     */
+    Type getType();
+
+    /**
+     * @return Set of hosts associated with this placement policy.
+     */
+    Set<String> getHosts();
+
+    /**
+     * @return Set of racks associated with this placement policy.
+     */
+    Set<String> getRacks();
+  }
+
+  /**
    * @return Name of the application.
    */
   String getName();
@@ -73,6 +113,11 @@ public interface TwillSpecification {
    * @return Returns a list of runnable names that should be executed in the given order.
    */
   List<Order> getOrders();
+
+  /**
+   * @return Returns all {@link org.apache.twill.api.TwillSpecification.PlacementPolicy} for this application.
+   */
+  List<PlacementPolicy> getPlacementPolicies();
 
   /**
    * @return The {@link EventHandlerSpecification} for the {@link EventHandler} to be used for this application,
@@ -89,6 +134,7 @@ public interface TwillSpecification {
     private String name;
     private Map<String, RuntimeSpecification> runnables = Maps.newHashMap();
     private List<Order> orders = Lists.newArrayList();
+    private List<PlacementPolicy> placementPolicies = Lists.newArrayList();
     private EventHandlerSpecification eventHandler;
 
     public static NameSetter with() {
@@ -128,6 +174,8 @@ public interface TwillSpecification {
       FirstOrder withOrder();
 
       AfterOrder anyOrder();
+
+      PlacementPolicySetter withPlacementPolicy();
     }
 
     public final class RunnableSetter implements MoreRunnable, AfterRunnable {
@@ -169,6 +217,11 @@ public interface TwillSpecification {
       @Override
       public AfterOrder anyOrder() {
         return new OrderSetter();
+      }
+
+      @Override
+      public PlacementPolicySetter withPlacementPolicy() {
+        return new PlacementPolicySetter();
       }
     }
 
@@ -252,6 +305,125 @@ public interface TwillSpecification {
       }
     }
 
+    /**
+     * Interface to add placement policies to the application.
+     */
+    public interface MorePlacementPolicies {
+
+      /**
+       * Specify hosts for a list of runnables.
+       * @param hosts {@link org.apache.twill.api.Hosts} specifying a set of hosts.
+       * @param runnableName a runnable name.
+       * @param runnableNames a list of runnable names.
+       * @return A reference to either add more placement policies or skip to defining execution order.
+       */
+      PlacementPolicySetter add(Hosts hosts, String runnableName, String... runnableNames);
+
+      /**
+       * Specify racks for a list of runnables.
+       * @param racks {@link org.apache.twill.api.Racks} specifying a set of racks.
+       * @param runnableName a runnable name.
+       * @param runnableNames a list of runnable names.
+       * @return A reference to either add more placement policies or skip to defining execution order.
+       */
+      PlacementPolicySetter add(Racks racks, String runnableName, String... runnableNames);
+
+      /**
+       * Specify hosts and racks for a list of runnables.
+       * @param hosts {@link org.apache.twill.api.Hosts} specifying a set of hosts.
+       * @param racks {@link org.apache.twill.api.Racks} specifying a set of racks.
+       * @param runnableName a runnable name.
+       * @param runnableNames a list of runnable names.
+       * @return A reference to either add more placement policies or skip to defining execution order.
+       */
+      PlacementPolicySetter add(Hosts hosts, Racks racks, String runnableName, String... runnableNames);
+
+      /**
+       * Specify a placement policy for a list of runnables.
+       * @param type {@link PlacementPolicy.Type} specifying a specific placement policy type.
+       * @param runnableName a runnable name.
+       * @param runnableNames a list of runnable names.
+       * @return A reference to either add more placement policies or skip to defining execution order.
+       */
+      PlacementPolicySetter add(PlacementPolicy.Type type, String runnableName, String... runnableNames);
+    }
+
+    /**
+     * Interface to define execution order after adding placement policies.
+     */
+    public interface AfterPlacementPolicy {
+      /**
+       * Start defining execution order.
+       */
+      FirstOrder withOrder();
+
+      /**
+       * No particular execution order is needed.
+       */
+      AfterOrder anyOrder();
+    }
+
+    public final class PlacementPolicySetter implements MorePlacementPolicies, AfterPlacementPolicy {
+
+      @Override
+      public PlacementPolicySetter add(Hosts hosts, String runnableName, String... runnableNames) {
+        return addPlacementPolicy(PlacementPolicy.Type.DEFAULT, hosts, null, runnableName, runnableNames);
+      }
+
+      @Override
+      public PlacementPolicySetter add(Racks racks, String runnableName, String... runnableNames) {
+        return addPlacementPolicy(PlacementPolicy.Type.DEFAULT, null, racks, runnableName, runnableNames);
+      }
+
+      @Override
+      public PlacementPolicySetter add(Hosts hosts, Racks racks, String runnableName, String... runnableNames) {
+        return addPlacementPolicy(PlacementPolicy.Type.DEFAULT, hosts, racks, runnableName, runnableNames);
+      }
+
+      @Override
+      public PlacementPolicySetter add(PlacementPolicy.Type type, String runnableName, String...runnableNames) {
+        return addPlacementPolicy(type, null, null, runnableName, runnableNames);
+      }
+
+      private PlacementPolicySetter addPlacementPolicy(PlacementPolicy.Type type, Hosts hosts, Racks racks,
+                                                       String runnableName, String...runnableNames) {
+        Preconditions.checkArgument(runnableName != null, "Name cannot be null.");
+        Preconditions.checkArgument(runnables.containsKey(runnableName), "Runnable not exists.");
+        Preconditions.checkArgument(!contains(runnableName),
+                                    "Runnable (" + runnableName + ") cannot belong to more than one Placement Policy");
+        Set<String> runnableNamesSet = Sets.newHashSet(runnableName);
+        for (String name : runnableNames) {
+          Preconditions.checkArgument(name != null, "Name cannot be null.");
+          Preconditions.checkArgument(runnables.containsKey(name), "Runnable not exists.");
+          Preconditions.checkArgument(!contains(name),
+                                      "Runnable (" + name + ") cannot belong to more than one Placement Policy");
+          runnableNamesSet.add(name);
+        }
+        placementPolicies.add(
+          new DefaultTwillSpecification.DefaultPlacementPolicy(runnableNamesSet, type, hosts, racks));
+        return this;
+      }
+
+      private boolean contains(String runnableName) {
+        for (PlacementPolicy placementPolicy : placementPolicies) {
+          if (placementPolicy.getNames().contains(runnableName)) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      @Override
+      public FirstOrder withOrder() {
+        return new OrderSetter();
+      }
+
+      @Override
+      public AfterOrder anyOrder() {
+        return new OrderSetter();
+      }
+    }
+
     public interface FirstOrder {
       NextOrder begin(String name, String...names);
     }
@@ -303,8 +475,7 @@ public interface TwillSpecification {
 
         // For all unordered runnables, add it to the end of orders list
         orders.add(new DefaultTwillSpecification.DefaultOrder(runnableNames, Order.Type.STARTED));
-
-        return new DefaultTwillSpecification(name, runnables, orders, eventHandler);
+        return new DefaultTwillSpecification(name, runnables, orders, placementPolicies, eventHandler);
       }
 
       private void addOrder(final Order.Type type, String name, String...names) {

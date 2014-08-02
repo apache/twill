@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
+import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.client.api.YarnClientApplication;
@@ -40,6 +41,8 @@ import org.apache.twill.internal.appmaster.ApplicationMasterProcessLauncher;
 import org.apache.twill.internal.appmaster.ApplicationSubmitter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 /**
  *
@@ -133,6 +136,11 @@ public final class Hadoop21YarnAppClient extends AbstractIdleService implements 
   @Override
   public ProcessController<YarnApplicationReport> createProcessController(ApplicationId appId) {
     return new ProcessControllerImpl(yarnClient, appId);
+  }
+
+  @Override
+  public List<NodeReport> getNodeReports() throws Exception {
+    return this.yarnClient.getNodeReports();
   }
 
   @Override

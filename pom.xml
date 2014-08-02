@@ -508,6 +508,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/main/hadoop21</source>
+                                        <source>src/main/hadoop22</source>
                                     </sources>
                                 </configuration>
                             </execution>
@@ -552,6 +553,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/main/hadoop21</source>
+                                        <source>src/main/hadoop22</source>
                                     </sources>
                                 </configuration>
                             </execution>
