@@ -17,6 +17,7 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.apache.twill.discovery.ServiceDiscovered;
 
@@ -85,4 +86,12 @@ public interface TwillContext extends ServiceAnnouncer, DiscoveryServiceClient {
    */
   @Override
   ServiceDiscovered discover(String name);
+
+  /**
+   * Register to participate in a leader election by instances within the same {@link TwillApplication}.
+   *
+   * @param name Unique name for the election
+   * @return A {@link org.apache.twill.common.Cancellable} object representing this candidate's participation.
+   */
+  Cancellable electLeader(String name, ElectionHandler participantHandler);
 }

@@ -52,6 +52,7 @@ public final class LogEntryDecoder implements JsonDeserializer<LogEntry> {
     final String line = JsonUtils.getAsString(jsonObj, "line");
     final String thread = JsonUtils.getAsString(jsonObj, "thread");
     final String message = JsonUtils.getAsString(jsonObj, "message");
+    final String runnableName = JsonUtils.getAsString(jsonObj, "runnableName");
     final LogThrowable logThrowable = context.deserialize(jsonObj.get("throwable"), LogThrowable.class);
 
     return new LogEntry() {
@@ -107,6 +108,11 @@ public final class LogEntryDecoder implements JsonDeserializer<LogEntry> {
       @Override
       public String getMessage() {
         return message;
+      }
+
+      @Override
+      public String getRunnableName() {
+        return runnableName;
       }
 
       @Override

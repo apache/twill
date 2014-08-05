@@ -15,23 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.yarn;
-
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.rules.TemporaryFolder;
-
-import java.io.IOException;
+package org.apache.twill.api;
 
 /**
- * Base class for all YARN tests.
+ * Handles events of election/un-election of leader.
  */
-public abstract class BaseYarnTest {
-  @ClassRule
-  public static TemporaryFolder tmpFolder = new TemporaryFolder();
+public interface ElectionHandler {
 
-  @BeforeClass
-  public static final void init() throws IOException {
-    YarnTestUtils.initOnce();
-  }
+  /**
+   * This method will get invoked when a participant becomes a leader in a
+   * leader election process. It is guaranteed that this method won't get called
+   * consecutively (i.e. called twice or more in a row).
+   */
+  void leader();
+
+  /**
+   * This method will get invoked when a participant is a follower in a
+   * leader election process. This method might get called multiple times without
+   * the {@link #leader()} method being called.
+   */
+  void follower();
 }

@@ -69,11 +69,9 @@ public class ZKKafkaClientService extends AbstractIdleService implements KafkaCl
   @Override
   public KafkaPublisher getPublisher(KafkaPublisher.Ack ack, Compression compression) {
     Preconditions.checkState(isRunning(), "Service is not running.");
-    String brokerList = brokerService.getBrokerList();
-    Preconditions.checkState(!brokerList.isEmpty(), "No broker available. Try again later.");
 
     // Wrap the publisher with a weak reference and save the cancellable for closing the publisher.
-    SimpleKafkaPublisher publisher = new SimpleKafkaPublisher(brokerList, ack, compression);
+    SimpleKafkaPublisher publisher = new SimpleKafkaPublisher(brokerService, ack, compression);
     publishers.put(new WeakReference<KafkaPublisher>(publisher, referenceQueue), publisher.start());
     return publisher;
   }

@@ -27,6 +27,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.net.InetSocketAddress;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -242,6 +243,42 @@ public abstract class DiscoveryServiceTestBase {
     Assert.assertTrue(waitTillExpected(0, discoveryServiceClient.discover("service1")));
     Assert.assertTrue(waitTillExpected(0, discoveryServiceClient.discover("service2")));
     Assert.assertTrue(waitTillExpected(0, discoveryServiceClient.discover("service3")));
+  }
+
+  @Test
+  public void testIterator() throws InterruptedException {
+    // This test is to verify TWILL-75
+    Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
+    final DiscoveryService service = entry.getKey();
+    DiscoveryServiceClient client = entry.getValue();
+
+    final String serviceName = "iterator";
+    ServiceDiscovered discovered = client.discover(serviceName);
+
+    // Create a thread for performing registration.
+    Thread t = new Thread() {
+      @Override
+      public void run() {
+        service.register(new Discoverable() {
+          @Override
+          public String getName() {
+            return serviceName;
+          }
+
+          @Override
+          public InetSocketAddress getSocketAddress() {
+            return new InetSocketAddress(12345);
+          }
+        });
+      }
+    };
+
+    Iterator<Discoverable> iterator = discovered.iterator();
+    t.start();
+    t.join();
+
+    // This would throw exception if there is race condition.
+    Assert.assertFalse(iterator.hasNext());
   }
 
   protected Cancellable register(DiscoveryService service, final String name, final String host, final int port) {

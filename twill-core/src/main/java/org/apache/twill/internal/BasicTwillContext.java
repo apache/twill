@@ -17,6 +17,7 @@
  */
 package org.apache.twill.internal;
 
+import org.apache.twill.api.ElectionHandler;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillContext;
 import org.apache.twill.api.TwillRunnableSpecification;
@@ -46,10 +47,12 @@ public final class BasicTwillContext implements TwillContext {
   private final int allowedMemoryMB;
   private final int virtualCores;
   private volatile int instanceCount;
+  private final ElectionRegistry elections;
 
   public BasicTwillContext(RunId runId, RunId appRunId, InetAddress host, String[] args, String[] appArgs,
                            TwillRunnableSpecification spec, int instanceId,
                            DiscoveryService discoveryService, DiscoveryServiceClient discoveryServiceClient,
+                           ElectionRegistry electionRegistry,
                            int instanceCount, int allowedMemoryMB, int virtualCores) {
     this.runId = runId;
     this.appRunId = appRunId;
@@ -60,6 +63,7 @@ public final class BasicTwillContext implements TwillContext {
     this.instanceId = instanceId;
     this.discoveryService = discoveryService;
     this.discoveryServiceClient = discoveryServiceClient;
+    this.elections = electionRegistry;
     this.instanceCount = instanceCount;
     this.allowedMemoryMB = allowedMemoryMB;
     this.virtualCores = virtualCores;
@@ -137,5 +141,17 @@ public final class BasicTwillContext implements TwillContext {
   @Override
   public ServiceDiscovered discover(String name) {
     return discoveryServiceClient.discover(name);
+  }
+
+  @Override
+  public Cancellable electLeader(String name, ElectionHandler participantHandler) {
+    return elections.register(name, participantHandler);
+  }
+
+  /**
+   * Stops and frees any currently allocated resources.
+   */
+  public void stop() {
+    elections.shutdown();
   }
 }

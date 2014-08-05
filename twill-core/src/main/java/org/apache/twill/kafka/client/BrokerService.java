@@ -18,6 +18,9 @@
 package org.apache.twill.kafka.client;
 
 import com.google.common.util.concurrent.Service;
+import org.apache.twill.common.Cancellable;
+
+import java.util.concurrent.Executor;
 
 /**
  * Service for providing information of kafka brokers.
@@ -45,4 +48,28 @@ public interface BrokerService extends Service {
    * @return A string in the format {@code host1:port1,host2:port2} or empty string if no broker has been discovered.
    */
   String getBrokerList();
+
+  /**
+   * Adds a listener to changes in broker list managed by this service.
+   *
+   * @param listener The listener to invoke when there is changes.
+   * @param executor Executor to use for invocation to the listener.
+   * @return A {@link Cancellable} to stop listening.
+   */
+  Cancellable addChangeListener(BrokerChangeListener listener, Executor executor);
+
+  /**
+   * Listener for changes in broker list.
+   */
+  abstract class BrokerChangeListener {
+
+    /**
+     * Invoked when there is a change in the broker list.
+     *
+     * @param brokerService The {@link BrokerService} that has broker list changes.
+     */
+    public void changed(BrokerService brokerService) {
+      // No-op
+    }
+  }
 }

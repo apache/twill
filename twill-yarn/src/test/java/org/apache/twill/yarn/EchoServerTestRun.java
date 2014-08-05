@@ -75,10 +75,10 @@ public final class EchoServerTestRun extends BaseYarnTest {
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
-    Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
+    Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
 
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 120));
 
     for (Discoverable discoverable : echoServices) {
       String msg = "Hello: " + discoverable.getSocketAddress();
@@ -98,36 +98,36 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
     // Increase number of instances
     controller.changeInstances("EchoServer", 3);
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 120));
 
     echoServices = controller.discoverService("echo2");
 
     // Decrease number of instances
     controller.changeInstances("EchoServer", 1);
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 1, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 1, 120));
 
     // Increase number of instances again
     controller.changeInstances("EchoServer", 2);
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 120));
 
     // Make sure still only one app is running
     Iterable<TwillRunner.LiveInfo> apps = runner.lookupLive();
-    Assert.assertTrue(YarnTestUtils.waitForSize(apps, 1, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(apps, 1, 120));
 
     // Creates a new runner service to check it can regain control over running app.
-    TwillRunnerService runnerService = YarnTestUtils.createTwillRunnerService(tmpFolder.newFolder());
+    TwillRunnerService runnerService = YarnTestUtils.createTwillRunnerService();
     runnerService.startAndWait();
 
     try {
       Iterable <TwillController> controllers = runnerService.lookup("EchoServer");
-      Assert.assertTrue(YarnTestUtils.waitForSize(controllers, 1, 60));
+      Assert.assertTrue(YarnTestUtils.waitForSize(controllers, 1, 120));
 
       for (TwillController c : controllers) {
         LOG.info("Stopping application: " + c.getRunId());
         c.stop().get(30, TimeUnit.SECONDS);
       }
 
-      Assert.assertTrue(YarnTestUtils.waitForSize(apps, 0, 60));
+      Assert.assertTrue(YarnTestUtils.waitForSize(apps, 0, 120));
     } finally {
       runnerService.stopAndWait();
     }

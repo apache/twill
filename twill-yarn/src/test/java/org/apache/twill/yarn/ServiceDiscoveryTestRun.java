@@ -43,7 +43,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Test for ability to discover existence of services through {@link TwillContext}.
  */
-public final class ServiceDiscoveryTest extends BaseYarnTest {
+public final class ServiceDiscoveryTestRun extends BaseYarnTest {
 
   @Test
   public void testServiceDiscovery() throws InterruptedException, ExecutionException, TimeoutException {
@@ -57,7 +57,7 @@ public final class ServiceDiscoveryTest extends BaseYarnTest {
 
     ListenableFuture<Service.State> completion = Services.getCompletionFuture(controller);
     try {
-      completion.get(60, TimeUnit.SECONDS);
+      completion.get(120, TimeUnit.SECONDS);
     } finally {
       controller.stopAndWait();
     }

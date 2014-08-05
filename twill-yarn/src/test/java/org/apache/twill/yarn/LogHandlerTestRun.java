@@ -24,7 +24,6 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -46,11 +45,19 @@ public class LogHandlerTestRun extends BaseYarnTest {
   public void testLogHandler() throws ExecutionException, InterruptedException {
     final CountDownLatch latch = new CountDownLatch(3);
     final Queue<LogThrowable> throwables = new ConcurrentLinkedQueue<LogThrowable>();
+    final Queue<String> runnables = new ConcurrentLinkedQueue<String>();
 
     LogHandler logHandler = new LogHandler() {
       @Override
       public void onLog(LogEntry logEntry) {
         // Would expect logs from AM and the runnable.
+        if (logEntry.getSourceClassName().contains("LogHandlerTestRun")) {
+          runnables.add(logEntry.getRunnableName());
+        }
+        // Runnable name for AM should be null
+        if (logEntry.getSourceClassName().contains("ApplicationMasterService")) {
+          Assert.assertNull(logEntry.getRunnableName());
+        }
         if (logEntry.getMessage().startsWith("Starting runnable " + LogRunnable.class.getSimpleName())) {
           latch.countDown();
         } else if (logEntry.getMessage().equals("Running")) {
@@ -68,8 +75,15 @@ public class LogHandlerTestRun extends BaseYarnTest {
                                        .addLogHandler(logHandler)
                                        .start();
 
-    Services.getCompletionFuture(controller).get();
-    latch.await(1, TimeUnit.SECONDS);
+    try {
+      Assert.assertTrue(latch.await(100, TimeUnit.SECONDS));
+    } finally {
+      controller.stopAndWait();
+    }
+
+    // Verify the runnable names
+    Assert.assertEquals(2, runnables.size());
+    Assert.assertArrayEquals(new String[] {"LogRunnable", "LogRunnable"}, runnables.toArray());
 
     // Verify the log throwable
     Assert.assertEquals(1, throwables.size());
@@ -90,7 +104,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
   public static final class LogRunnable extends AbstractTwillRunnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LogRunnable.class);
-
+    private final CountDownLatch stopLatch = new CountDownLatch(1);
 
     @Override
     public void run() {
@@ -105,11 +119,17 @@ public class LogHandlerTestRun extends BaseYarnTest {
       } catch (Throwable t) {
         LOG.error("Got exception", t);
       }
+
+      try {
+        stopLatch.await();
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted", e);
+      }
     }
 
     @Override
     public void stop() {
-
+      stopLatch.countDown();
     }
   }
 }

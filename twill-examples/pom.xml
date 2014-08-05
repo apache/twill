@@ -21,9 +21,14 @@ limitations under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.apache.twill.example</groupId>
+
+    <parent>
+        <groupId>org.apache.twill</groupId>
+        <artifactId>twill-parent</artifactId>
+        <version>0.4.0-incubating-SNAPSHOT</version>
+    </parent>
+
     <artifactId>twill-examples</artifactId>
-    <version>0.3.0-incubating-SNAPSHOT</version>
     <name>Apache Twill examples</name>
     <packaging>pom</packaging>
 
@@ -32,9 +37,17 @@ limitations under the License.
         <module>yarn</module>
     </modules>
 
-    <properties>
-        <twill.version>0.3.0-incubating-SNAPSHOT</twill.version>
-        <twill.groupId>org.apache.twill</twill.groupId>
-    </properties>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>2.8.1</version>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

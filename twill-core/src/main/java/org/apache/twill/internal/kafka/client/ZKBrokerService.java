@@ -29,12 +29,14 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.gson.Gson;
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.kafka.client.BrokerInfo;
 import org.apache.twill.kafka.client.BrokerService;
@@ -49,7 +51,9 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -82,7 +86,7 @@ final class ZKBrokerService extends AbstractIdleService implements BrokerService
   private final ZKClient zkClient;
   private final LoadingCache<BrokerId, Supplier<BrokerInfo>> brokerInfos;
   private final LoadingCache<KeyPathTopicPartition, Supplier<PartitionInfo>> partitionInfos;
-  // A comma separated list of brokers (host:port,host:port)
+  private final Set<ListenerExecutor> listeners;
 
   private ExecutorService executorService;
   private Supplier<Iterable<BrokerInfo>> brokerList;
@@ -102,6 +106,9 @@ final class ZKBrokerService extends AbstractIdleService implements BrokerService
         partitionInfos.invalidate(key);
       }
     }, PartitionInfo.class));
+
+    // Use CopyOnWriteArraySet so that it's thread safe and order of listener is maintain as the insertion order.
+    this.listeners = Sets.newCopyOnWriteArraySet();
   }
 
   @Override
@@ -149,6 +156,9 @@ final class ZKBrokerService extends AbstractIdleService implements BrokerService
                     Suppliers.<BrokerInfo>supplierFunction())));
               readerFuture.set(null);
 
+              for (ListenerExecutor listener : listeners) {
+                listener.changed(ZKBrokerService.this);
+              }
             } catch (ExecutionException e) {
               readerFuture.setException(e.getCause());
             }
@@ -187,6 +197,19 @@ final class ZKBrokerService extends AbstractIdleService implements BrokerService
   @Override
   public String getBrokerList() {
     return Joiner.on(',').join(Iterables.transform(getBrokers(), BROKER_INFO_TO_ADDRESS));
+  }
+
+  @Override
+  public Cancellable addChangeListener(BrokerChangeListener listener, Executor executor) {
+    final ListenerExecutor listenerExecutor = new ListenerExecutor(listener, executor);
+    listeners.add(listenerExecutor);
+
+    return new Cancellable() {
+      @Override
+      public void cancel() {
+        listeners.remove(listenerExecutor);
+      }
+    };
   }
 
   /**
@@ -398,6 +421,40 @@ final class ZKBrokerService extends AbstractIdleService implements BrokerService
 
     private int getLeader() {
       return leader;
+    }
+  }
+
+
+  /**
+   * Helper class to invoke {@link BrokerChangeListener} from an {@link Executor}.
+   */
+  private static final class ListenerExecutor extends BrokerChangeListener {
+
+    private final BrokerChangeListener listener;
+    private final Executor executor;
+
+    private ListenerExecutor(BrokerChangeListener listener, Executor executor) {
+      this.listener = listener;
+      this.executor = executor;
+    }
+
+    @Override
+    public void changed(final BrokerService brokerService) {
+      try {
+        executor.execute(new Runnable() {
+
+          @Override
+          public void run() {
+            try {
+              listener.changed(brokerService);
+            } catch (Throwable t) {
+              LOG.error("Failure when calling BrokerChangeListener.", t);
+            }
+          }
+        });
+      } catch (Throwable t) {
+        LOG.error("Failure when calling BrokerChangeListener.", t);
+      }
     }
   }
 }

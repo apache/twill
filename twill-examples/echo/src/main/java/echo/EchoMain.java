@@ -37,7 +37,7 @@ public class EchoMain {
     System.out.println("Got args: " + Arrays.toString(args));
   }
 
-  public static class TestConverter extends Converter<String, Integer> {
+  private static final class TestConverter extends Converter<String, Integer> {
 
     @Override
     protected Integer doForward(String s) {

@@ -158,6 +158,7 @@ public final class TwillContainerService extends AbstractTwillService {
     protected void shutDown() throws Exception {
       commandExecutor.shutdownNow();
       runnable.destroy();
+      context.stop();
       Loggings.forceFlush();
     }
 

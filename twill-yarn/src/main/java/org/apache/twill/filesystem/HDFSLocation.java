@@ -40,16 +40,18 @@ import java.util.UUID;
 final class HDFSLocation implements Location {
   private final FileSystem fs;
   private final Path path;
+  private final HDFSLocationFactory locationFactory;
 
   /**
    * Constructs a HDFSLocation.
    *
-   * @param fs  An instance of {@link FileSystem}
+   * @param locationFactory The {@link HDFSLocationFactory} that creates this instance.
    * @param path of the file.
    */
-  HDFSLocation(FileSystem fs, Path path) {
-    this.fs = fs;
+  HDFSLocation(HDFSLocationFactory locationFactory, Path path) {
+    this.fs = locationFactory.getFileSystem();
     this.path = path;
+    this.locationFactory = locationFactory;
   }
 
   /**
@@ -108,14 +110,14 @@ final class HDFSLocation implements Location {
     if (child.startsWith("/")) {
       child = child.substring(1);
     }
-    return new HDFSLocation(fs, new Path(URI.create(path.toUri() + "/" + child)));
+    return new HDFSLocation(locationFactory, new Path(URI.create(path.toUri() + "/" + child)));
   }
 
   @Override
   public Location getTempFile(String suffix) throws IOException {
     Path path = new Path(
       URI.create(this.path.toUri() + "." + UUID.randomUUID() + (suffix == null ? TEMP_FILE_SUFFIX : suffix)));
-    return new HDFSLocation(fs, path);
+    return new HDFSLocation(locationFactory, path);
   }
 
   /**
@@ -161,11 +163,11 @@ final class HDFSLocation implements Location {
     // Destination will always be of the same type as this location.
     if (fs instanceof DistributedFileSystem) {
       ((DistributedFileSystem) fs).rename(path, ((HDFSLocation) destination).path, Options.Rename.OVERWRITE);
-      return new HDFSLocation(fs, new Path(destination.toURI()));
+      return new HDFSLocation(locationFactory, new Path(destination.toURI()));
     }
 
     if (fs.rename(path, ((HDFSLocation) destination).path)) {
-      return new HDFSLocation(fs, new Path(destination.toURI()));
+      return new HDFSLocation(locationFactory, new Path(destination.toURI()));
     } else {
       return null;
     }
@@ -207,11 +209,16 @@ final class HDFSLocation implements Location {
     if (statuses != null) {
       for (FileStatus status : statuses) {
         if (!Objects.equal(path, status.getPath())) {
-          result.add(new HDFSLocation(fs, status.getPath()));
+          result.add(new HDFSLocation(locationFactory, status.getPath()));
         }
       }
     }
     return result.build();
+  }
+
+  @Override
+  public LocationFactory getLocationFactory() {
+    return locationFactory;
   }
 
   @Override

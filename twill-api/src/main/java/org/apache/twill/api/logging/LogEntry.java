@@ -85,6 +85,11 @@ public interface LogEntry {
   String getMessage();
 
   /**
+   * Returns the runnable name.
+   */
+  String getRunnableName();
+
+  /**
    * Returns the {@link Throwable} information emitted with the log.
    *
    * @return A {@link LogThrowable} or {@code null} if {@link Throwable} information is not available.

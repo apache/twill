@@ -167,4 +167,11 @@ public interface Location {
    *         An empty list is returned if this location is not a directory.
    */
   List<Location> list() throws IOException;
+
+  /**
+   * Returns the location factory used to create this instance.
+   *
+   * @return The {@link LocationFactory} instance for creating this instance.
+   */
+  LocationFactory getLocationFactory();
 }

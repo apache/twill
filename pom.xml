@@ -29,7 +29,7 @@
 
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-parent</artifactId>
-    <version>0.3.0-incubating-SNAPSHOT</version>
+    <version>0.4.0-incubating-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Apache Twill</name>
     <url>http://twill.incubator.apache.org</url>
@@ -138,6 +138,7 @@
         <module>twill-core</module>
         <module>twill-yarn</module>
         <module>twill-ext</module>
+        <module>twill-examples</module>
     </modules>
 
 
@@ -178,7 +179,7 @@
         <netty.version>3.6.6.Final</netty.version>
         <snappy-java.version>1.0.5</snappy-java.version>
         <jcl-over-slf4j.version>1.7.2</jcl-over-slf4j.version>
-        <asm.version>4.0</asm.version>
+        <asm.version>5.0.2</asm.version>
         <kafka.version>0.8.0</kafka.version>
         <zookeeper.version>3.4.5</zookeeper.version>
         <junit.version>4.11</junit.version>
@@ -272,6 +273,14 @@
                             <exclude>**/zookeeper.out</exclude>
                         </excludes>
                     </configuration>
+                    <executions>
+                        <execution>
+                            <phase>validate</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -289,6 +298,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>2.2.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.10</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -330,20 +344,14 @@
                     <systemPropertyVariables>
                         <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
                     </systemPropertyVariables>
+                    <reuseForks>false</reuseForks>
+                    <reportFormat>plain</reportFormat>
                     <includes>
                         <include>**/*TestSuite.java</include>
                         <include>**/Test*.java</include>
                         <include>**/*Test.java</include>
                         <include>**/*TestCase.java</include>
                     </includes>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-deploy-plugin</artifactId>
-                <version>2.8</version>
-                <configuration>
-                    <deployAtEnd>true</deployAtEnd>
                 </configuration>
             </plugin>
         </plugins>
@@ -364,18 +372,6 @@
                                 <format>tar.gz</format>
                             </formats>
                         </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.rat</groupId>
-                        <artifactId>apache-rat-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>check</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
                 </plugins>
             </build>
@@ -693,6 +689,10 @@
                         <groupId>io.netty</groupId>
                         <artifactId>netty</artifactId>
                     </exclusion>
+                  <exclusion>
+                    <groupId>asm</groupId>
+                    <artifactId>asm</artifactId>
+                  </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -712,6 +712,10 @@
                         <groupId>io.netty</groupId>
                         <artifactId>netty</artifactId>
                     </exclusion>
+                  <exclusion>
+                    <groupId>asm</groupId>
+                    <artifactId>asm</artifactId>
+                  </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -727,6 +731,10 @@
                         <groupId>io.netty</groupId>
                         <artifactId>netty</artifactId>
                     </exclusion>
+                  <exclusion>
+                    <groupId>asm</groupId>
+                    <artifactId>asm</artifactId>
+                  </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -817,6 +825,10 @@
                         <groupId>com.sun.jersey</groupId>
                         <artifactId>jersey-core</artifactId>
                     </exclusion>
+                  <exclusion>
+                    <groupId>asm</groupId>
+                    <artifactId>asm</artifactId>
+                  </exclusion>
                 </exclusions>
             </dependency>
             <dependency>

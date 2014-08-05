@@ -94,7 +94,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.net.URI;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Iterator;
@@ -228,7 +227,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
       appMasterHost, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
-    return new RunningContainers(appId, appMasterResources);
+    return new RunningContainers(appId, appMasterResources, zkClient);
   }
 
   private ExpectedContainers initExpectedContainers(TwillSpecification twillSpec) {
@@ -263,6 +262,8 @@ public final class ApplicationMasterService extends AbstractTwillService {
       zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT),
       zkClient.create("/" + runId.getId() + "/kafka", null, CreateMode.PERSISTENT))
     ).get();
+
+    runningContainers.addWatcher("/discoverable");
 
     // Starts kafka server
     LOG.info("Starting kafka server");
@@ -321,7 +322,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
     } finally {
       try {
         // App location cleanup
-        cleanupDir(URI.create(System.getenv(EnvKeys.TWILL_APP_DIR)));
+        cleanupDir();
         Loggings.forceFlush();
         // Sleep a short while to let kafka clients to have chance to fetch the log
         TimeUnit.SECONDS.sleep(1);
@@ -332,15 +333,15 @@ public final class ApplicationMasterService extends AbstractTwillService {
     }
   }
 
-  private void cleanupDir(URI appDir) {
+  private void cleanupDir() {
     try {
       if (applicationLocation.delete(true)) {
-        LOG.info("Application directory deleted: {}", appDir);
+        LOG.info("Application directory deleted: {}", applicationLocation);
       } else {
-        LOG.warn("Failed to cleanup directory {}.", appDir);
+        LOG.warn("Failed to cleanup directory {}.", applicationLocation);
       }
     } catch (Exception e) {
-      LOG.warn("Exception while cleanup directory {}.", appDir, e);
+      LOG.warn("Exception while cleanup directory {}.", applicationLocation, e);
     }
   }
 

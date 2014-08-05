@@ -40,6 +40,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.security.Credentials;
@@ -134,10 +135,24 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
 
   private volatile String jvmOptions = null;
 
+  /**
+   * Creates an instance with a {@link HDFSLocationFactory} created base on the given configuration with the
+   * user home directory as the location factory namespace.
+   *
+   * @param config Configuration of the yarn cluster
+   * @param zkConnect ZooKeeper connection string
+   */
   public YarnTwillRunnerService(YarnConfiguration config, String zkConnect) {
-    this(config, zkConnect, new HDFSLocationFactory(getFileSystem(config), "/twill"));
+    this(config, zkConnect, createDefaultLocationFactory(config));
   }
 
+  /**
+   * Creates an instance.
+   *
+   * @param config Configuration of the yarn cluster
+   * @param zkConnect ZooKeeper connection string
+   * @param locationFactory Factory to create {@link Location} instances that are readable and writable by this service
+   */
   public YarnTwillRunnerService(YarnConfiguration config, String zkConnect, LocationFactory locationFactory) {
     this.yarnConfig = config;
     this.yarnAppClient = new VersionDetectYarnAppClientFactory().create(config);
@@ -580,9 +595,10 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
     LOG.debug("Secure store for {} {} saved to {}.", application, runId, credentialsLocation.toURI());
   }
 
-  private static FileSystem getFileSystem(YarnConfiguration configuration) {
+  private static LocationFactory createDefaultLocationFactory(Configuration configuration) {
     try {
-      return FileSystem.get(configuration);
+      FileSystem fs = FileSystem.get(configuration);
+      return new HDFSLocationFactory(fs, fs.getHomeDirectory().toUri().getPath());
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

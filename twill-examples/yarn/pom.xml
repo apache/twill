@@ -23,8 +23,8 @@ limitations under the License.
 
     <parent>
         <artifactId>twill-examples</artifactId>
-        <groupId>org.apache.twill.example</groupId>
-        <version>0.3.0-incubating-SNAPSHOT</version>
+        <groupId>org.apache.twill</groupId>
+        <version>0.4.0-incubating-SNAPSHOT</version>
     </parent>
 
     <name>Apache Twill examples: YARN</name>
@@ -33,19 +33,21 @@ limitations under the License.
 
     <dependencies>
         <dependency>
-            <groupId>${twill.groupId}</groupId>
+            <groupId>${project.groupId}</groupId>
             <artifactId>twill-yarn</artifactId>
-            <version>${twill.version}</version>
+            <version>${project.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>${twill.groupId}</groupId>
+            <groupId>${project.groupId}</groupId>
             <artifactId>twill-ext</artifactId>
-            <version>${twill.version}</version>
+            <version>${project.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>13.0.1</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 

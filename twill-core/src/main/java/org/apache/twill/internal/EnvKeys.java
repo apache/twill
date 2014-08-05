@@ -41,6 +41,7 @@ public final class EnvKeys {
 
   public static final String TWILL_LOG_KAFKA_ZK = "TWILL_LOG_KAFKA_ZK";
 
+  public static final String YARN_RM_SCHEDULER_ADDRESS = "YARN_RM_SCHEDULER_ADDRESS";
   public static final String YARN_APP_ID = "YARN_APP_ID";
   public static final String YARN_APP_ID_CLUSTER_TIME = "YARN_APP_ID_CLUSTER_TIME";
   public static final String YARN_APP_ID_STR = "YARN_APP_ID_STR";

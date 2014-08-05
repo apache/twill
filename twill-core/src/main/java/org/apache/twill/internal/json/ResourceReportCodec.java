@@ -31,6 +31,7 @@ import org.apache.twill.internal.DefaultResourceReport;
 
 import java.lang.reflect.Type;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -48,7 +49,8 @@ public final class ResourceReportCodec implements JsonSerializer<ResourceReport>
       src.getAppMasterResources(), new TypeToken<TwillRunResources>() { }.getType()));
     json.add("runnableResources", context.serialize(
       src.getResources(), new TypeToken<Map<String, Collection<TwillRunResources>>>() { }.getType()));
-
+    json.add("services", context.serialize(
+      src.getServices(), new TypeToken<List<String>>() {}.getType()));
     return json;
   }
 
@@ -61,7 +63,9 @@ public final class ResourceReportCodec implements JsonSerializer<ResourceReport>
       jsonObj.get("appMasterResources"), TwillRunResources.class);
     Map<String, Collection<TwillRunResources>> resources = context.deserialize(
       jsonObj.get("runnableResources"), new TypeToken<Map<String, Collection<TwillRunResources>>>() { }.getType());
+    List<String> services = context.deserialize(
+      jsonObj.get("services"), new TypeToken<List<String>>() {}.getType());
 
-    return new DefaultResourceReport(appMasterId, masterResources, resources);
+    return new DefaultResourceReport(appMasterId, masterResources, resources, services);
   }
 }

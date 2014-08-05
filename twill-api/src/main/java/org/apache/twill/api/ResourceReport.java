@@ -18,6 +18,7 @@
 package org.apache.twill.api;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -53,4 +54,11 @@ public interface ResourceReport {
    * @return id of the application master.
    */
   public String getApplicationId();
+
+  /**
+   * Get the list of services of the application master.
+   *
+   * @return list of services of the application master.
+   */
+  public List<String> getServices();
 }

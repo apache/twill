@@ -64,9 +64,27 @@ public final class ApplicationMasterMain extends ServiceMain {
             RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
 
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
+    setRMSchedulerAddress(conf);
     Service service = new ApplicationMasterService(runId, zkClientService, twillSpec,
                                                    new VersionDetectYarnAMClientFactory(conf), createAppLocation(conf));
     new ApplicationMasterMain(String.format("%s/%s/kafka", zkConnect, runId.getId())).doMain(zkClientService, service);
+  }
+
+  /**
+   * Optionally sets the RM scheduler address based on the environment variable if it is not set in the cluster config.
+   */
+  private static void setRMSchedulerAddress(Configuration conf) {
+    String schedulerAddress = System.getenv(EnvKeys.YARN_RM_SCHEDULER_ADDRESS);
+    if (schedulerAddress == null) {
+      return;
+    }
+
+    // If the RM scheduler address is not in the config or it's from yarn-default.xml,
+    // replace it with the one from the env, which is the same as the one client connected to.
+    String[] sources = conf.getPropertySources(YarnConfiguration.RM_SCHEDULER_ADDRESS);
+    if (sources == null || sources.length == 0 || "yarn-default.xml".equals(sources[sources.length - 1])) {
+      conf.set(YarnConfiguration.RM_SCHEDULER_ADDRESS, schedulerAddress);
+    }
   }
 
   @Override
@@ -81,5 +99,10 @@ public final class ApplicationMasterMain extends ServiceMain {
   @Override
   protected String getKafkaZKConnect() {
     return kafkaZKConnect;
+  }
+
+  @Override
+  protected String getRunnableName() {
+    return System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
   }
 }

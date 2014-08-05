@@ -18,6 +18,7 @@
 package org.apache.twill.yarn;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.LineReader;
 import org.apache.twill.api.ResourceReport;
@@ -44,6 +45,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.URISyntaxException;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -66,11 +68,11 @@ public final class ResourceReportTestRun extends BaseYarnTest {
         .withRunnable()
           .add("echo1", new EchoServer(), ResourceSpecification.Builder.with()
             .setVirtualCores(1)
-            .setMemory(128, ResourceSpecification.SizeUnit.MEGA)
+            .setMemory(256, ResourceSpecification.SizeUnit.MEGA)
             .setInstances(2).build()).noLocalFiles()
           .add("echo2", new EchoServer(), ResourceSpecification.Builder.with()
             .setVirtualCores(2)
-            .setMemory(256, ResourceSpecification.SizeUnit.MEGA)
+            .setMemory(512, ResourceSpecification.SizeUnit.MEGA)
             .setInstances(1).build()).noLocalFiles()
         .anyOrder()
         .build();
@@ -138,7 +140,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
 
     ResourceSpecification resourceSpec = ResourceSpecification.Builder.with()
       .setVirtualCores(1)
-      .setMemory(128, ResourceSpecification.SizeUnit.MEGA)
+      .setMemory(256, ResourceSpecification.SizeUnit.MEGA)
       .setInstances(2)
       .build();
     TwillController controller = runner.prepare(new BuggyServer(), resourceSpec)
@@ -155,10 +157,10 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
-    Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
+    Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
 
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 120));
     // check that we have 2 runnables.
     ResourceReport report = controller.getResourceReport();
     Assert.assertEquals(2, report.getRunnableResources("BuggyServer").size());
@@ -176,7 +178,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
 
     // takes some time for app master to find out the container completed...
     int count = 0;
-    while (count < 20) {
+    while (count < 100) {
       report = controller.getResourceReport();
       // check that we have 1 runnable, not 2.
       if (report.getRunnableResources("BuggyServer").size() == 1) {
@@ -188,7 +190,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     }
     Assert.assertTrue("Still has 2 contains running after 20 seconds", count < 20);
 
-    controller.stop().get(30, TimeUnit.SECONDS);
+    controller.stop().get(100, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -198,7 +200,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     URISyntaxException, TimeoutException {
     TwillRunner runner = YarnTestUtils.getTwillRunner();
 
-    TwillController controller = runner.prepare(new ResourceApplication())
+    final TwillController controller = runner.prepare(new ResourceApplication())
                                         .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                         .withApplicationArguments("echo")
                                         .withArguments("echo1", "echo1")
@@ -217,7 +219,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
 
     // wait for 3 echo servers to come up
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 120));
     ResourceReport report = controller.getResourceReport();
     // make sure resources for echo1 and echo2 are there
     Map<String, Collection<TwillRunResources>> usedResources = report.getResources();
@@ -225,12 +227,21 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertTrue(usedResources.containsKey("echo1"));
     Assert.assertTrue(usedResources.containsKey("echo2"));
 
+    YarnTestUtils.waitForSize(new Iterable<String>() {
+      @Override
+      public Iterator<String> iterator() {
+        return controller.getResourceReport().getServices().iterator();
+      }
+    }, 3, 120);
+    report = controller.getResourceReport();
+    Assert.assertEquals(ImmutableSet.of("echo", "echo1", "echo2"), ImmutableSet.copyOf(report.getServices()));
+
     Collection<TwillRunResources> echo1Resources = usedResources.get("echo1");
     // 2 instances of echo1
     Assert.assertEquals(2, echo1Resources.size());
     // TODO: check cores after hadoop-2.1.0
     for (TwillRunResources resources : echo1Resources) {
-      Assert.assertEquals(128, resources.getMemoryMB());
+      Assert.assertEquals(256, resources.getMemoryMB());
     }
 
     Collection<TwillRunResources> echo2Resources = usedResources.get("echo2");
@@ -238,7 +249,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertEquals(1, echo2Resources.size());
     // TODO: check cores after hadoop-2.1.0
     for (TwillRunResources resources : echo2Resources) {
-      Assert.assertEquals(256, resources.getMemoryMB());
+      Assert.assertEquals(512, resources.getMemoryMB());
     }
 
     // Decrease number of instances of echo1 from 2 to 1
@@ -258,7 +269,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertEquals(1, echo1Resources.size());
     // TODO: check cores after hadoop-2.1.0
     for (TwillRunResources resources : echo1Resources) {
-      Assert.assertEquals(128, resources.getMemoryMB());
+      Assert.assertEquals(256, resources.getMemoryMB());
     }
 
     echo2Resources = usedResources.get("echo2");
@@ -266,7 +277,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertEquals(1, echo2Resources.size());
     // TODO: check cores after hadoop-2.1.0
     for (TwillRunResources resources : echo2Resources) {
-      Assert.assertEquals(256, resources.getMemoryMB());
+      Assert.assertEquals(512, resources.getMemoryMB());
     }
 
     controller.stop().get(30, TimeUnit.SECONDS);
