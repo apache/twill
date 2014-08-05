@@ -41,6 +41,7 @@
             <item name="Introduction" href="./index.html"/>
             <item name="Getting Started" href="./GettingStarted.html"/>
             <item name="API (latest)" href="./apidocs/index.html"/>
+            <item name="API (0.3.0-incubating)" href="./apidocs-0.3.0-incubating/index.html"/>
             <item name="API (0.2.0-incubating)" href="./apidocs-0.2.0-incubating/index.html"/>
         </menu>
 
@@ -65,13 +66,12 @@
         </menu>
 
         <footer>
-            <div class="row span16">
+            <div class="row span16" style="margin-bottom: 20px">
                 <div>
                     Apache Twill, Apache, the Apache feather logo,
                     and the Apache Twill project logos are trademarks of The Apache Software Foundation.
                     All other marks mentioned may be trademarks or registered trademarks of their respective owners.
                 </div>
-                <a href="${project.url}/privacy-policy.html">Privacy Policy</a>
             </div>
         </footer>
     </body>
