@@ -46,6 +46,7 @@
         </menu>
 
         <menu name="Releases">
+            <item name="0.3.0-incubating" href="./releases/0.3.0-incubating.html"/>
             <item name="0.2.0-incubating" href="./releases/0.2.0-incubating.html"/>
         </menu>
 
