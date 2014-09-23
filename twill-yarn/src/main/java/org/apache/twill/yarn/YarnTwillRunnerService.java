@@ -309,8 +309,14 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
 
     // Schedule an updater for updating HDFS delegation tokens
     if (UserGroupInformation.isSecurityEnabled()) {
-      long delay = yarnConfig.getLong(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
-                                      DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT);
+      long renewalInterval = yarnConfig.getLong(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
+                                                DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT);
+      // Schedule it five minutes before it expires.
+      long delay = renewalInterval - TimeUnit.MINUTES.toMillis(5);
+      // Just to safeguard. In practice, the value shouldn't be that small, otherwise nothing could work.
+      if (delay <= 0) {
+        delay = (renewalInterval <= 2) ? 1 : renewalInterval / 2;
+      }
       scheduleSecureStoreUpdate(new LocationSecureStoreUpdater(yarnConfig, locationFactory),
                                 delay, delay, TimeUnit.MILLISECONDS);
     }
