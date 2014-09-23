@@ -19,9 +19,12 @@ package org.apache.twill.internal.yarn;
 
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
+
+import java.util.List;
 
 /**
  * Interface for launching Yarn application from client.
@@ -42,4 +45,11 @@ public interface YarnAppClient extends Service {
   ProcessLauncher<ApplicationId> createLauncher(String user, TwillSpecification twillSpec) throws Exception;
 
   ProcessController<YarnApplicationReport> createProcessController(ApplicationId appId);
+
+  /**
+   * Returns a list of {@link org.apache.hadoop.yarn.api.records.NodeReport} for the nodes in the cluster.
+   * @return a list of {@link org.apache.hadoop.yarn.api.records.NodeReport} for the nodes in the cluster.
+   * @throws Exception Propagates exceptions thrown by {@link org.apache.hadoop.yarn.client.api.YarnClient}.
+   */
+  List<NodeReport> getNodeReports() throws Exception;
 }

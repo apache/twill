@@ -17,34 +17,26 @@
  */
 package org.apache.twill.internal.yarn;
 
-import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 /**
- *
+ * Wrapper class for AMRMClient for Hadoop version 2.2 or greater.
  */
-public final class VersionDetectYarnAppClientFactory implements YarnAppClientFactory {
+public final class Hadoop22YarnAMClient extends Hadoop21YarnAMClient {
+
+  private static final Logger LOG = LoggerFactory.getLogger(Hadoop22YarnAMClient.class);
+
+  public Hadoop22YarnAMClient(Configuration conf) {
+    super(conf);
+  }
 
   @Override
-  @SuppressWarnings("unchecked")
-  public YarnAppClient create(Configuration configuration) {
-    try {
-      Class<YarnAppClient> clz;
-
-      if (YarnUtils.getHadoopVersion().equals(YarnUtils.HadoopVersions.HADOOP_20)) {
-        // Uses hadoop-2.0 class.
-        String clzName = getClass().getPackage().getName() + ".Hadoop20YarnAppClient";
-        clz = (Class<YarnAppClient>) Class.forName(clzName);
-      } else {
-        // Uses hadoop-2.1 class
-        String clzName = getClass().getPackage().getName() + ".Hadoop21YarnAppClient";
-        clz = (Class<YarnAppClient>) Class.forName(clzName);
-      }
-
-      return clz.getConstructor(Configuration.class).newInstance(configuration);
-
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
-    }
+  protected void updateBlacklist(List<String> blacklistAdditions, List<String> blacklistRemovals) {
+    LOG.debug("Blacklist Additions: {} , Blacklist Removals: {}", blacklistAdditions, blacklistRemovals);
+    amrmClient.updateBlacklist(blacklistAdditions, blacklistRemovals);
   }
 }

@@ -47,10 +47,12 @@ public interface YarnAMClient extends Service {
     protected final Set<String> hosts = Sets.newHashSet();
     protected final Set<String> racks = Sets.newHashSet();
     protected final Priority priority = Records.newRecord(Priority.class);
+    protected boolean relaxLocality;
 
     protected ContainerRequestBuilder(Resource capability, int count) {
       this.capability = capability;
       this.count = count;
+      this.relaxLocality = true;
     }
 
     public ContainerRequestBuilder addHosts(Collection<String> newHosts) {
@@ -63,6 +65,11 @@ public interface YarnAMClient extends Service {
 
     public ContainerRequestBuilder setPriority(int prio) {
       priority.setPriority(prio);
+      return this;
+    }
+
+    public ContainerRequestBuilder setRelaxLocality(boolean relaxLocality) {
+      this.relaxLocality = relaxLocality;
       return this;
     }
 
@@ -82,6 +89,8 @@ public interface YarnAMClient extends Service {
   ContainerId getContainerId();
 
   String getHost();
+
+  int getNMPort();
 
   /**
    * Sets the tracker address and tracker url. This method should be called before calling {@link #start()}.
@@ -103,6 +112,12 @@ public interface YarnAMClient extends Service {
   ContainerRequestBuilder addContainerRequest(Resource capability);
 
   ContainerRequestBuilder addContainerRequest(Resource capability, int count);
+
+  void addToBlacklist(String resource);
+
+  void removeFromBlacklist(String resource);
+
+  void clearBlacklist();
 
   /**
    * Notify a container request is fulfilled.

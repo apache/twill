@@ -17,13 +17,7 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.collect.Iterables;
 import org.apache.twill.internal.DefaultResourceSpecification;
-
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
 
 /**
  * This interface provides specifications for resource requirements including set and get methods
@@ -85,20 +79,6 @@ public interface ResourceSpecification {
   int getInstances();
 
   /**
-   * Returns the execution hosts, expects Fully Qualified Domain Names host + domain.
-   * This is a suggestion for the scheduler depending on cluster load it may ignore it
-   * @return An array containing the hosts where the containers should run
-   */
-  List<String> getHosts();
-
-  /**
-   * Returns the execution racks.
-   * This is a suggestion for the scheduler depending on cluster load it may ignore it
-   * @return An array containing the racks where the containers should run
-   */
-  List<String> getRacks();
-
-  /**
    * Builder for creating {@link ResourceSpecification}.
    */
   static final class Builder {
@@ -108,8 +88,6 @@ public interface ResourceSpecification {
     private int uplink = -1;
     private int downlink = -1;
     private int instances = 1;
-    private List<String> hosts = new LinkedList<String>();
-    private List<String> racks = new LinkedList<String>();
 
     public static CoreSetter with() {
       return new Builder().new CoreSetter();
@@ -150,41 +128,9 @@ public interface ResourceSpecification {
     }
 
     public final class AfterUplink extends Build {
-      public AfterDownlink setDownlink(int downlink, SizeUnit unit) {
+      public Done setDownlink(int downlink, SizeUnit unit) {
         Builder.this.downlink = downlink * unit.multiplier;
-        return new AfterDownlink();
-      }
-    }
-
-    public final class AfterHosts extends Build {
-      public Done setRacks(String... racks) {
-        if (racks != null) {
-          Builder.this.racks = Arrays.asList(racks);
-        }
         return new Done();
-      }
-
-      public Done setRacks(Iterable<String> racks) {
-        if (racks != null) {
-          Iterables.addAll(Builder.this.racks, racks);
-        }
-        return new Done();
-      }
-    }
-
-    public final class AfterDownlink extends Build {
-      public AfterHosts setHosts(String... hosts) {
-        if (hosts != null) {
-          Builder.this.hosts = Arrays.asList(hosts);
-        }
-        return new AfterHosts();
-      }
-
-      public AfterHosts setHosts(Iterable<String> hosts) {
-        if (hosts != null) {
-          Iterables.addAll(Builder.this.hosts, hosts);
-        }
-        return new AfterHosts();
       }
     }
 
@@ -193,7 +139,7 @@ public interface ResourceSpecification {
 
     public abstract class Build {
       public ResourceSpecification build() {
-        return new DefaultResourceSpecification(cores, memory, instances, uplink, downlink, hosts, racks);
+        return new DefaultResourceSpecification(cores, memory, instances, uplink, downlink);
       }
     }
 

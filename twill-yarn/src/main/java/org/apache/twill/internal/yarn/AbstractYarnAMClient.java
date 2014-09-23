@@ -22,6 +22,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.AbstractIdleService;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Priority;
@@ -35,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 
@@ -54,6 +56,16 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
   private final List<T> requests;
   // List of requests pending to remove through allocate call
   private final List<T> removes;
+  //List of pending blacklist additions for the next allocate call
+  private final List<String> blacklistAdditions;
+  //List of pending blacklist removals for the next allocate call
+  private final List<String> blacklistRemovals;
+  //Keep track of blacklisted resources
+  private final List<String> blacklistedResources;
+  /**
+   * Contains a list of known unsupported features.
+   */
+  protected final Set<String> unsupportedFeatures = Sets.newHashSet();
 
   protected final ContainerId containerId;
   protected InetSocketAddress trackerAddr;
@@ -72,6 +84,9 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
     this.containerRequests = ArrayListMultimap.create();
     this.requests = Lists.newLinkedList();
     this.removes = Lists.newLinkedList();
+    this.blacklistAdditions = Lists.newArrayList();
+    this.blacklistRemovals = Lists.newArrayList();
+    this.blacklistedResources = Lists.newArrayList();
   }
 
 
@@ -104,6 +119,12 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
         removeContainerRequest(request);
       }
       removes.clear();
+    }
+
+    if (!blacklistAdditions.isEmpty() || !blacklistRemovals.isEmpty()) {
+      updateBlacklist(blacklistAdditions, blacklistRemovals);
+      blacklistAdditions.clear();
+      blacklistRemovals.clear();
     }
 
     AllocateResult allocateResponse = doAllocate(progress);
@@ -147,7 +168,7 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
           String[] racks = this.racks.isEmpty() ? null : this.racks.toArray(new String[this.racks.size()]);
 
           for (int i = 0; i < count; i++) {
-            T request = createContainerRequest(priority, capability, hosts, racks);
+            T request = createContainerRequest(priority, capability, hosts, racks, relaxLocality);
             containerRequests.put(id, request);
             requests.add(request);
           }
@@ -160,10 +181,48 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
   }
 
   @Override
+  public final void addToBlacklist(String resource) {
+    if (!blacklistAdditions.contains(resource) && !blacklistedResources.contains(resource)) {
+      blacklistAdditions.add(resource);
+      blacklistedResources.add(resource);
+      blacklistRemovals.remove(resource);
+    }
+  }
+
+  @Override
+  public final void removeFromBlacklist(String resource) {
+    if (!blacklistRemovals.contains(resource) && blacklistedResources.contains(resource)) {
+      blacklistRemovals.add(resource);
+      blacklistedResources.remove(resource);
+      blacklistAdditions.remove(resource);
+    }
+  }
+
+  @Override
+  public final void clearBlacklist() {
+    blacklistRemovals.addAll(blacklistedResources);
+    blacklistedResources.clear();
+    blacklistAdditions.clear();
+  }
+
+  @Override
   public final synchronized void completeContainerRequest(String id) {
     for (T request : containerRequests.removeAll(id)) {
       removes.add(request);
     }
+  }
+
+  /**
+   * Records an unsupported feature.
+   * @param unsupportedFeature A string identifying an unsupported feature.
+   * @return Returns {@code false} if the feature has already been recorded, {@code true} otherwise.
+   */
+  protected boolean recordUnsupportedFeature(String unsupportedFeature) {
+    if (unsupportedFeatures.contains(unsupportedFeature)) {
+      return false;
+    }
+    unsupportedFeatures.add(unsupportedFeature);
+    return true;
   }
 
   /**
@@ -181,10 +240,12 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
    * @param capability The resource capability.
    * @param hosts Sets of hosts. Could be {@code null}.
    * @param racks Sets of racks. Could be {@code null}.
+   * @param relaxLocality If set {@code false}, locality constraints will not be relaxed.
    * @return A container request.
    */
   protected abstract T createContainerRequest(Priority priority, Resource capability,
-                                              @Nullable String[] hosts, @Nullable String[] racks);
+                                              @Nullable String[] hosts, @Nullable String[] racks,
+                                              boolean relaxLocality);
 
   /**
    * Adds the given request to prepare for next allocate call.
@@ -195,6 +256,11 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
    * Removes the given request to prepare for the next allocate call.
    */
   protected abstract void removeContainerRequest(T request);
+
+  /**
+   * Send blacklist updates in the next allocate call.
+   */
+  protected abstract void updateBlacklist(List<String> blacklistAdditions, List<String> blacklistRemovals);
 
   /**
    * Performs actual allocate call to RM.
