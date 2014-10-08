@@ -103,10 +103,10 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
-    Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
+    Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
 
     Iterable<Discoverable> envEchoServices = controller.discoverService("envecho");
-    Assert.assertTrue(YarnTestUtils.waitForSize(envEchoServices, 1, 30));
+    Assert.assertTrue(YarnTestUtils.waitForSize(envEchoServices, 1, 120));
 
     // TODO: check virtual cores once yarn adds the ability
     Map<String, String> expectedValues = Maps.newHashMap();
@@ -128,7 +128,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       }
     }
 
-    controller.stop().get(30, TimeUnit.SECONDS);
+    controller.stop().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -215,7 +215,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
-    Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
+    Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
 
     // wait for 3 echo servers to come up
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
@@ -280,7 +280,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       Assert.assertEquals(512, resources.getMemoryMB());
     }
 
-    controller.stop().get(30, TimeUnit.SECONDS);
+    controller.stop().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }

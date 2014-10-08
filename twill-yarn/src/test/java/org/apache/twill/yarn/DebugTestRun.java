@@ -118,9 +118,9 @@ public class DebugTestRun extends BaseYarnTest {
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
-    Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
+    Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
     Assert.assertTrue(waitForDebugPort(controller, "r1", 30));
-    controller.stop().get(30, TimeUnit.SECONDS);
+    controller.stop().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -142,10 +142,10 @@ public class DebugTestRun extends BaseYarnTest {
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
-    Assert.assertTrue(running.await(30, TimeUnit.SECONDS));
+    Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
     Assert.assertTrue(waitForDebugPort(controller, "r1", 30));
     Assert.assertTrue(waitForDebugPort(controller, "r2", 30));
-    controller.stop().get(30, TimeUnit.SECONDS);
+    controller.stop().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
