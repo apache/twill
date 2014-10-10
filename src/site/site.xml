@@ -17,6 +17,13 @@
  limitations under the License.
 -->
 <project name="Apache Twill">
+
+    <bannerLeft>
+        <name>Apache Twill</name>
+        <src>images/ApacheTwill_logo.png</src>
+        <href>http://twill.incubator.apache.org/</href>
+        <alt>Apache Twill</alt>
+    </bannerLeft>
     <bannerRight>
         <src>http://incubator.apache.org/images/egg-logo.png</src>
         <href>http://incubator.apache.org/</href>
@@ -51,6 +58,7 @@
         </menu>
 
         <menu name="Get Involved">
+            <item name="How to Contribute" href="HowToContribute.html"/>
             <item name="Mailing Lists" href="mail-lists.html"/>
             <item name="Sources" href="source-repository.html"/>
             <item name="Issues" href="issue-tracking.html"/>
