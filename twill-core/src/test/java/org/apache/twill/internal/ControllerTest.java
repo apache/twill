@@ -17,11 +17,8 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Service;
-import com.google.gson.JsonObject;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
@@ -30,7 +27,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
-import org.apache.twill.internal.state.StateNode;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
@@ -126,7 +122,7 @@ public class ControllerTest {
 
       service.stop();
 
-      Assert.assertTrue(stopLatch.await(2, TimeUnit.SECONDS));
+      Assert.assertTrue(stopLatch.await(20000, TimeUnit.SECONDS));
 
     } finally {
       zkServer.stopAndWait();
@@ -168,19 +164,30 @@ public class ControllerTest {
   }
 
   private Service createService(ZKClient zkClient, RunId runId) {
-    return new ZKServiceDecorator(
-      zkClient, runId, Suppliers.ofInstance(new JsonObject()), new AbstractIdleService() {
+    return new AbstractTwillService(zkClient, runId) {
+
+      private final CountDownLatch stopLatch = new CountDownLatch(1);
 
       @Override
-      protected void startUp() throws Exception {
+      protected void doStart() throws Exception {
         LOG.info("Start");
       }
 
       @Override
-      protected void shutDown() throws Exception {
+      protected void doRun() throws Exception {
+        stopLatch.await();
+      }
+
+      @Override
+      protected void doStop() throws Exception {
         LOG.info("Stop");
       }
-    });
+
+      @Override
+      protected void triggerShutdown() {
+        stopLatch.countDown();
+      }
+    };
   }
 
   private TwillController getController(ZKClient zkClient, RunId runId) {
@@ -202,11 +209,6 @@ public class ControllerTest {
         if (cause instanceof KeeperException.NoNodeException) {
           forceShutDown();
         }
-      }
-
-      @Override
-      protected void stateNodeUpdated(StateNode stateNode) {
-        // No-op
       }
 
       @Override

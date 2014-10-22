@@ -339,7 +339,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.14.1</version>
                 <configuration>
-                    <argLine>-Xmx512m -Djava.awt.headless=true</argLine>
+                    <argLine>-Xmx1024m -XX:MaxPermSize=256m -Djava.awt.headless=true</argLine>
                     <redirectTestOutputToFile>${surefire.redirectTestOutputToFile}</redirectTestOutputToFile>
                     <systemPropertyVariables>
                         <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
@@ -579,9 +579,6 @@
             <properties>
                 <hadoop.version>2.4.1</hadoop.version>
             </properties>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
             <build>
                 <plugins>
                     <plugin>
@@ -624,9 +621,6 @@
             <properties>
                 <hadoop.version>2.5.1</hadoop.version>
             </properties>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
             <build>
                 <plugins>
                     <plugin>
