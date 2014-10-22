@@ -33,14 +33,10 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.google.common.io.InputSupplier;
 import com.google.common.reflect.TypeToken;
-import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Service;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -60,7 +56,6 @@ import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
-import org.apache.twill.internal.AbstractTwillService;
 import org.apache.twill.internal.Configs;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerInfo;
@@ -69,16 +64,15 @@ import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.JvmOptions;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.TwillContainerLauncher;
-import org.apache.twill.internal.ZKServiceDecorator;
 import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
 import org.apache.twill.internal.json.TwillSpecificationAdapter;
 import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
 import org.apache.twill.internal.logging.Loggings;
 import org.apache.twill.internal.state.Message;
-import org.apache.twill.internal.state.MessageCallback;
 import org.apache.twill.internal.utils.Instances;
 import org.apache.twill.internal.utils.Networks;
+import org.apache.twill.internal.yarn.AbstractYarnTwillService;
 import org.apache.twill.internal.yarn.YarnAMClient;
 import org.apache.twill.internal.yarn.YarnAMClientFactory;
 import org.apache.twill.internal.yarn.YarnContainerInfo;
@@ -109,7 +103,7 @@ import java.util.concurrent.TimeUnit;
 /**
  *
  */
-public final class ApplicationMasterService extends AbstractTwillService {
+public final class ApplicationMasterService extends AbstractYarnTwillService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApplicationMasterService.class);
 
@@ -120,7 +114,6 @@ public final class ApplicationMasterService extends AbstractTwillService {
   private final ZKClient zkClient;
   private final TwillSpecification twillSpec;
   private final ApplicationMasterLiveNodeData amLiveNode;
-  private final ZKServiceDecorator serviceDelegate;
   private final RunningContainers runningContainers;
   private final ExpectedContainers expectedContainers;
   private final TrackerService trackerService;
@@ -131,13 +124,14 @@ public final class ApplicationMasterService extends AbstractTwillService {
   private final Location applicationLocation;
   private final PlacementPolicyManager placementPolicyManager;
 
+  private volatile boolean stopped;
   private EmbeddedKafkaServer kafkaServer;
   private Queue<RunnableContainerRequest> runnableContainerRequests;
   private ExecutorService instanceChangeExecutor;
 
   public ApplicationMasterService(RunId runId, ZKClient zkClient, File twillSpecFile,
                                   YarnAMClientFactory amClientFactory, Location applicationLocation) throws Exception {
-    super(applicationLocation);
+    super(zkClient, runId, applicationLocation);
 
     this.runId = runId;
     this.twillSpec = TwillSpecificationAdapter.create().fromJson(twillSpecFile);
@@ -149,17 +143,10 @@ public final class ApplicationMasterService extends AbstractTwillService {
     this.reservedMemory = getReservedMemory();
     this.placementPolicyManager = new PlacementPolicyManager(twillSpec.getPlacementPolicies());
 
-    amLiveNode = new ApplicationMasterLiveNodeData(Integer.parseInt(System.getenv(EnvKeys.YARN_APP_ID)),
-                                                   Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
-                                                   amClient.getContainerId().toString());
+    this.amLiveNode = new ApplicationMasterLiveNodeData(Integer.parseInt(System.getenv(EnvKeys.YARN_APP_ID)),
+                                                        Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
+                                                        amClient.getContainerId().toString());
 
-    serviceDelegate = new ZKServiceDecorator(zkClient, runId, createLiveNodeDataSupplier(),
-                                             new ServiceDelegate(), new Runnable() {
-      @Override
-      public void run() {
-        amClient.stopAndWait();
-      }
-    });
     expectedContainers = initExpectedContainers(twillSpec);
     runningContainers = initRunningContainers(amClient.getContainerId(), amClient.getHost());
     trackerService = new TrackerService(new Supplier<ResourceReport>() {
@@ -211,15 +198,6 @@ public final class ApplicationMasterService extends AbstractTwillService {
     }
   }
 
-  private Supplier<? extends JsonElement> createLiveNodeDataSupplier() {
-    return new Supplier<JsonElement>() {
-      @Override
-      public JsonElement get() {
-        return new Gson().toJsonTree(amLiveNode);
-      }
-    };
-  }
-
   private RunningContainers initRunningContainers(ContainerId appMasterContainerId,
                                                   String appMasterHost) throws Exception {
     TwillRunResources appMasterResources = new DefaultTwillRunResources(
@@ -240,7 +218,8 @@ public final class ApplicationMasterService extends AbstractTwillService {
     return new ExpectedContainers(expectedCounts);
   }
 
-  private void doStart() throws Exception {
+  @Override
+  protected void doStart() throws Exception {
     LOG.info("Start application master with spec: " + TwillSpecificationAdapter.create().toJson(twillSpec));
 
     // initialize the event handler, if it fails, it will fail the application.
@@ -276,7 +255,8 @@ public final class ApplicationMasterService extends AbstractTwillService {
     runnableContainerRequests = initContainerRequests();
   }
 
-  private void doStop() throws Exception {
+  @Override
+  protected void doStop() throws Exception {
     Thread.interrupted();     // This is just to clear the interrupt flag
 
     LOG.info("Stop application master with spec: {}", TwillSpecificationAdapter.create().toJson(twillSpec));
@@ -323,16 +303,63 @@ public final class ApplicationMasterService extends AbstractTwillService {
       LOG.error("Failed to stop tracker service.", e);
     } finally {
       try {
-        // App location cleanup
-        cleanupDir();
-        Loggings.forceFlush();
-        // Sleep a short while to let kafka clients to have chance to fetch the log
-        TimeUnit.SECONDS.sleep(1);
+        try {
+          // App location cleanup
+          cleanupDir();
+          Loggings.forceFlush();
+          // Sleep a short while to let kafka clients to have chance to fetch the log
+          TimeUnit.SECONDS.sleep(1);
+        } finally {
+          kafkaServer.stopAndWait();
+          LOG.info("Kafka server stopped");
+        }
       } finally {
-        kafkaServer.stopAndWait();
-        LOG.info("Kafka server stopped");
+        // Stops the AMClient
+        amClient.stopAndWait();
       }
     }
+  }
+
+  @Override
+  protected Object getLiveNodeData() {
+    return amLiveNode;
+  }
+
+  @Override
+  public ListenableFuture<String> onReceived(String messageId, Message message) {
+    LOG.debug("Message received: {} {}.", messageId, message);
+
+    SettableFuture<String> result = SettableFuture.create();
+    Runnable completion = getMessageCompletion(messageId, result);
+
+    if (handleSecureStoreUpdate(message)) {
+      runningContainers.sendToAll(message, completion);
+      return result;
+    }
+
+    if (handleSetInstances(message, completion)) {
+      return result;
+    }
+
+    // Replicate messages to all runnables
+    if (message.getScope() == Message.Scope.ALL_RUNNABLE) {
+      runningContainers.sendToAll(message, completion);
+      return result;
+    }
+
+    // Replicate message to a particular runnable.
+    if (message.getScope() == Message.Scope.RUNNABLE) {
+      runningContainers.sendToRunnable(message.getRunnableName(), message, completion);
+      return result;
+    }
+
+    LOG.info("Message ignored. {}", message);
+    return Futures.immediateFuture(messageId);
+  }
+
+  @Override
+  protected void triggerShutdown() {
+    stopped = true;
   }
 
   private void cleanupDir() {
@@ -347,8 +374,8 @@ public final class ApplicationMasterService extends AbstractTwillService {
     }
   }
 
-
-  private void doRun() throws Exception {
+  @Override
+  protected void doRun() throws Exception {
     // The main loop
     Map.Entry<AllocationSpecification, ? extends Collection<RuntimeSpecification>> currentRequest = null;
     final Queue<ProvisionRequest> provisioning = Lists.newLinkedList();
@@ -368,7 +395,7 @@ public final class ApplicationMasterService extends AbstractTwillService {
     long requestStartTime = 0;
     boolean isRequestRelaxed = false;
     long nextTimeoutCheck = System.currentTimeMillis() + Constants.PROVISION_TIMEOUT;
-    while (isRunning()) {
+    while (!stopped) {
       // Call allocate. It has to be made at first in order to be able to get cluster resource availability.
       amClient.allocate(0.0f, allocateHandler);
 
@@ -730,37 +757,6 @@ public final class ApplicationMasterService extends AbstractTwillService {
     return prop;
   }
 
-  private ListenableFuture<String> processMessage(final String messageId, Message message) {
-    LOG.debug("Message received: {} {}.", messageId, message);
-
-    SettableFuture<String> result = SettableFuture.create();
-    Runnable completion = getMessageCompletion(messageId, result);
-
-    if (handleSecureStoreUpdate(message)) {
-      runningContainers.sendToAll(message, completion);
-      return result;
-    }
-
-    if (handleSetInstances(message, completion)) {
-      return result;
-    }
-
-    // Replicate messages to all runnables
-    if (message.getScope() == Message.Scope.ALL_RUNNABLE) {
-      runningContainers.sendToAll(message, completion);
-      return result;
-    }
-
-    // Replicate message to a particular runnable.
-    if (message.getScope() == Message.Scope.RUNNABLE) {
-      runningContainers.sendToRunnable(message.getRunnableName(), message, completion);
-      return result;
-    }
-
-    LOG.info("Message ignored. {}", message);
-    return Futures.immediateFuture(messageId);
-  }
-
   /**
    * Attempts to change the number of running instances.
    * @return {@code true} if the message does requests for changes in number of running instances of a runnable,
@@ -887,53 +883,5 @@ public final class ApplicationMasterService extends AbstractTwillService {
 
     capability.setMemory(resourceSpec.getMemorySize());
     return capability;
-  }
-
-  @Override
-  protected Service getServiceDelegate() {
-    return serviceDelegate;
-  }
-
-  /**
-   * A private class for service lifecycle. It's done this way so that we can have {@link ZKServiceDecorator} to
-   * wrap around this to reflect status in ZK.
-   */
-  private final class ServiceDelegate extends AbstractExecutionThreadService implements MessageCallback {
-
-    private volatile Thread runThread;
-
-    @Override
-    protected void run() throws Exception {
-      runThread = Thread.currentThread();
-      try {
-        doRun();
-      } catch (InterruptedException e) {
-        // It's ok to get interrupted exception, as it's a signal to stop
-        Thread.currentThread().interrupt();
-      }
-    }
-
-    @Override
-    protected void startUp() throws Exception {
-      doStart();
-    }
-
-    @Override
-    protected void shutDown() throws Exception {
-      doStop();
-    }
-
-    @Override
-    protected void triggerShutdown() {
-      Thread runThread = this.runThread;
-      if (runThread != null) {
-        runThread.interrupt();
-      }
-    }
-
-    @Override
-    public ListenableFuture<String> onReceived(String messageId, Message message) {
-      return processMessage(messageId, message);
-    }
   }
 }

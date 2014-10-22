@@ -17,21 +17,16 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.gson.GsonBuilder;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.ServiceController;
 import org.apache.twill.common.Threads;
-import org.apache.twill.internal.json.StackTraceElementCodec;
-import org.apache.twill.internal.json.StateNodeCodec;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.state.Messages;
-import org.apache.twill.internal.state.StateNode;
 import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
@@ -47,7 +42,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * An abstract base class for implementing a {@link ServiceController} using ZooKeeper as a means for
- * communicating with the remote service. This is designed to work in pair with the {@link ZKServiceDecorator}.
+ * communicating with the remote service. This is designed to work in pair with the {@link AbstractTwillService}.
  */
 public abstract class AbstractZKServiceController extends AbstractExecutionServiceController {
 
@@ -55,7 +50,6 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
 
   protected final ZKClient zkClient;
   private final InstanceNodeDataCallback instanceNodeDataCallback;
-  private final StateNodeDataCallback stateNodeDataCallback;
   private final List<ListenableFuture<?>> messageFutures;
   private ListenableFuture<State> stopMessageFuture;
 
@@ -63,7 +57,6 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
     super(runId);
     this.zkClient = zkClient;
     this.instanceNodeDataCallback = new InstanceNodeDataCallback();
-    this.stateNodeDataCallback = new StateNodeDataCallback();
     this.messageFutures = Lists.newLinkedList();
   }
 
@@ -86,14 +79,6 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
       @Override
       public void run() {
         watchInstanceNode();
-      }
-    });
-
-    // Watch for state node data
-    actOnExists(getZKPath("state"), new Runnable() {
-      @Override
-      public void run() {
-        watchStateNode();
       }
     });
   }
@@ -170,12 +155,6 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
    */
   protected abstract void instanceNodeFailed(Throwable cause);
 
-  /**
-   * Called when an update on the state node is detected.
-   * @param stateNode The update state node data or {@code null} if there is an error when fetching the node data.
-   */
-  protected abstract void stateNodeUpdated(StateNode stateNode);
-
   protected synchronized void forceShutDown() {
     if (stopMessageFuture == null) {
       // In force shutdown, don't send message.
@@ -240,27 +219,6 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
     }), instanceNodeDataCallback, Threads.SAME_THREAD_EXECUTOR);
   }
 
-  private void watchStateNode() {
-    if (!shouldProcessZKEvent()) {
-      return;
-    }
-    Futures.addCallback(zkClient.getData(getZKPath("state"), new Watcher() {
-      @Override
-      public void process(WatchedEvent event) {
-        if (!shouldProcessZKEvent()) {
-          return;
-        }
-        switch (event.getType()) {
-          case NodeDataChanged:
-            watchStateNode();
-            break;
-          default:
-            LOG.debug("Ignore ZK event for state node: {}", event);
-        }
-      }
-    }), stateNodeDataCallback, Threads.SAME_THREAD_EXECUTOR);
-  }
-
   /**
    * Returns true if ZK events needs to be processed.
    */
@@ -301,34 +259,6 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
       LOG.error("Failed in fetching instance node data.", t);
       if (shouldProcessZKEvent()) {
         instanceNodeFailed(t);
-      }
-    }
-  }
-
-  private final class StateNodeDataCallback implements FutureCallback<NodeData> {
-
-    @Override
-    public void onSuccess(NodeData result) {
-      if (shouldProcessZKEvent()) {
-        byte[] data = result.getData();
-        if (data == null) {
-          stateNodeUpdated(null);
-          return;
-        }
-        StateNode stateNode = new GsonBuilder().registerTypeAdapter(StateNode.class, new StateNodeCodec())
-          .registerTypeAdapter(StackTraceElement.class, new StackTraceElementCodec())
-          .create()
-          .fromJson(new String(data, Charsets.UTF_8), StateNode.class);
-
-        stateNodeUpdated(stateNode);
-      }
-    }
-
-    @Override
-    public void onFailure(Throwable t) {
-      if (shouldProcessZKEvent()) {
-        LOG.error("Failed in fetching state node data.", t);
-        stateNodeUpdated(null);
       }
     }
   }

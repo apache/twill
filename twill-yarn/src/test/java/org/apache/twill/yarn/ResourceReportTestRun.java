@@ -188,7 +188,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       count++;
       TimeUnit.SECONDS.sleep(1);
     }
-    Assert.assertTrue("Still has 2 contains running after 20 seconds", count < 20);
+    Assert.assertTrue("Still has 2 contains running after 100 seconds", count < 100);
 
     controller.stop().get(100, TimeUnit.SECONDS);
     // Sleep a bit before exiting.

@@ -17,6 +17,7 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
@@ -91,7 +92,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
     LogThrowable t = throwables.poll();
     Assert.assertEquals(RuntimeException.class.getName(), t.getClassName());
     Assert.assertNotNull(t.getCause());
-    Assert.assertEquals(4, t.getStackTraces().length);
+    Assert.assertEquals(5, t.getStackTraces().length);
 
     t = t.getCause();
     Assert.assertEquals(Exception.class.getName(), t.getClassName());
@@ -120,11 +121,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
         LOG.error("Got exception", t);
       }
 
-      try {
-        stopLatch.await();
-      } catch (InterruptedException e) {
-        LOG.error("Interrupted", e);
-      }
+      Uninterruptibles.awaitUninterruptibly(stopLatch);
     }
 
     @Override

@@ -447,7 +447,10 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
 
       @Override
       public Iterator<LiveInfo> iterator() {
-        Map<String, Map<RunId, YarnTwillController>> controllerMap = ImmutableTable.copyOf(controllers).rowMap();
+        Map<String, Map<RunId, YarnTwillController>> controllerMap;
+        synchronized (YarnTwillRunnerService.this) {
+          controllerMap = ImmutableTable.copyOf(controllers).rowMap();
+        }
         return Iterators.transform(controllerMap.entrySet().iterator(),
                                    new Function<Map.Entry<String, Map<RunId, YarnTwillController>>, LiveInfo>() {
           @Override
