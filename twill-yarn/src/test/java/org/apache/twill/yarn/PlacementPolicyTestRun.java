@@ -108,7 +108,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
     Set<Integer> nmPorts = Sets.newHashSet();
     Collection<TwillRunResources> distributedResource;
 
-    Assert.assertEquals(getProvisionedNodeManagerCount(), 0);
+    Assert.assertEquals(0, getProvisionedNodeManagerCount());
     TwillRunner runner = YarnTestUtils.getTwillRunner();
     TwillController controller = runner.prepare(new PlacementPolicyApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
@@ -170,7 +170,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
     Collection<TwillRunResources> aliceResources;
     Collection<TwillRunResources> bobResources;
 
-    Assert.assertEquals(getProvisionedNodeManagerCount(), 0);
+    Assert.assertEquals(0, getProvisionedNodeManagerCount());
     TwillRunner runner = YarnTestUtils.getTwillRunner();
     TwillController controller = runner.prepare(new DistributedApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
