@@ -343,13 +343,15 @@ public final class ApplicationBundler {
     String prefix = path.endsWith(".jar") ? SUBDIR_LIB : SUBDIR_RESOURCES;
     path = prefix + path.substring(path.lastIndexOf('/') + 1);
 
-    saveDirEntry(prefix, entries, jarOut);
-    jarOut.putNextEntry(new JarEntry(path));
-    InputStream is = url.openStream();
-    try {
-      ByteStreams.copy(is, jarOut);
-    } finally {
-      is.close();
+    if (entries.add(path)) {
+      saveDirEntry(prefix, entries, jarOut);
+      jarOut.putNextEntry(new JarEntry(path));
+      InputStream is = url.openStream();
+      try {
+        ByteStreams.copy(is, jarOut);
+      } finally {
+        is.close();
+      }
     }
   }
 
