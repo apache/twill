@@ -307,7 +307,7 @@ public abstract class DiscoveryServiceTestBase {
     }, Threads.SAME_THREAD_EXECUTOR);
 
     try {
-      return latch.await(5, TimeUnit.SECONDS);
+      return latch.await(60, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       throw Throwables.propagate(e);
     }

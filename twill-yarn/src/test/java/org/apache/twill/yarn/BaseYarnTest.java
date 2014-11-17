@@ -17,9 +17,14 @@
  */
 package org.apache.twill.yarn;
 
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunner;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -27,11 +32,29 @@ import java.io.IOException;
  * Base class for all YARN tests.
  */
 public abstract class BaseYarnTest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BaseYarnTest.class);
+
   @ClassRule
   public static TemporaryFolder tmpFolder = new TemporaryFolder();
 
   @BeforeClass
-  public static final void init() throws IOException {
+  public static void init() throws IOException {
     YarnTestUtils.initOnce();
+  }
+
+  @After
+  public final void cleanupTest() {
+    // Make sure all applications are stopped after a test case is executed, even it failed.
+    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
+    for (TwillRunner.LiveInfo liveInfo : twillRunner.lookupLive()) {
+      for (TwillController controller : liveInfo.getControllers()) {
+        try {
+          controller.stopAndWait();
+        } catch (Throwable t) {
+          LOG.error("Failed to stop application {}", liveInfo.getApplicationName(), t);
+        }
+      }
+    }
   }
 }

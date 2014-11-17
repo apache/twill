@@ -33,7 +33,6 @@ import org.apache.twill.internal.AbstractTwillController;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.appmaster.TrackerService;
-import org.apache.twill.internal.state.StateNode;
 import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
 import org.apache.twill.zookeeper.NodeData;
@@ -213,11 +212,6 @@ final class YarnTwillController extends AbstractTwillController implements Twill
              appName, report.getApplicationId(), cause == null ? "Unknown" : cause.getMessage());
 
     startPollStatus(report.getApplicationId());
-  }
-
-  @Override
-  protected void stateNodeUpdated(StateNode stateNode) {
-
   }
 
   private synchronized void startPollStatus(ApplicationId appId) {

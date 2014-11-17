@@ -59,7 +59,7 @@ public final class FailureRestartTestRun extends BaseYarnTest {
       .start();
 
     Iterable<Discoverable> discoverables = controller.discoverService("failure");
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 120));
 
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));
@@ -68,10 +68,10 @@ public final class FailureRestartTestRun extends BaseYarnTest {
     controller.sendCommand(FailureRunnable.class.getSimpleName(), Command.Builder.of("kill0").build());
 
     // Make sure the runnable is killed.
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 1, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 1, 120));
 
     // Wait for the restart
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 60));
+    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 120));
 
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));

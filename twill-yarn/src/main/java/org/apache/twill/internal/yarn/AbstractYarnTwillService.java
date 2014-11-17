@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,40 +15,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.internal;
+package org.apache.twill.internal.yarn;
 
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.twill.api.RunId;
 import org.apache.twill.filesystem.Location;
+import org.apache.twill.internal.AbstractTwillService;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.state.SystemMessages;
+import org.apache.twill.zookeeper.ZKClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.concurrent.Executor;
 
 /**
- * A base implementation of {@link Service} handle secure token update.
+ * Abstract class for implementing {@link com.google.common.util.concurrent.Service} that runs in
+ * YARN container which provides methods to handle secure token updates.
  */
-public abstract class AbstractTwillService implements Service {
+public abstract class AbstractYarnTwillService extends AbstractTwillService {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AbstractTwillService.class);
-
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractYarnTwillService.class);
   protected final Location applicationLocation;
-
   protected volatile Credentials credentials;
 
-  protected AbstractTwillService(Location applicationLocation) {
+  protected AbstractYarnTwillService(ZKClient zkClient, RunId runId, Location applicationLocation) {
+    super(zkClient, runId);
     this.applicationLocation = applicationLocation;
   }
-
-  protected abstract Service getServiceDelegate();
 
   /**
    * Returns the location of the secure store, or {@code null} if either not running in secure mode or an error
@@ -102,40 +100,5 @@ public abstract class AbstractTwillService implements Service {
     }
 
     return true;
-  }
-
-  @Override
-  public final ListenableFuture<State> start() {
-    return getServiceDelegate().start();
-  }
-
-  @Override
-  public final State startAndWait() {
-    return Futures.getUnchecked(start());
-  }
-
-  @Override
-  public final boolean isRunning() {
-    return getServiceDelegate().isRunning();
-  }
-
-  @Override
-  public final State state() {
-    return getServiceDelegate().state();
-  }
-
-  @Override
-  public final ListenableFuture<State> stop() {
-    return getServiceDelegate().stop();
-  }
-
-  @Override
-  public final State stopAndWait() {
-    return Futures.getUnchecked(stop());
-  }
-
-  @Override
-  public final void addListener(Listener listener, Executor executor) {
-    getServiceDelegate().addListener(listener, executor);
   }
 }

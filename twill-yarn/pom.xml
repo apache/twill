@@ -22,7 +22,7 @@
     <parent>
         <artifactId>twill-parent</artifactId>
         <groupId>org.apache.twill</groupId>
-        <version>0.4.0-incubating-SNAPSHOT</version>
+        <version>0.5.0-incubating-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -125,6 +125,32 @@
         </profile>
         <profile>
             <id>hadoop-2.3</id>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>${hadoop20.output.dir}</directory>
+                    </resource>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+        <profile>
+            <id>hadoop-2.4</id>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>${hadoop20.output.dir}</directory>
+                    </resource>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+        <profile>
+            <id>hadoop-2.5</id>
             <build>
                 <resources>
                     <resource>

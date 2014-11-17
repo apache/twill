@@ -28,7 +28,6 @@ import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.state.Message;
-import org.apache.twill.internal.state.StateNode;
 import org.apache.twill.launcher.FindFreePort;
 import org.apache.twill.launcher.TwillLauncher;
 import org.apache.twill.zookeeper.NodeData;
@@ -217,20 +216,12 @@ public final class TwillContainerLauncher {
     }
 
     @Override
-    protected void stateNodeUpdated(StateNode stateNode) {
-      // No-op
-    }
-
-    @Override
     public ListenableFuture<Message> sendMessage(Message message) {
       return sendMessage(message, message);
     }
 
     @Override
     public synchronized void completed(int exitStatus) {
-      if (exitStatus != 0) {  // If a container terminated with exit code != 0, treat it as error
-//        fireStateChange(new StateNode(State.FAILED, new StackTraceElement[0]));
-      }
       forceShutDown();
     }
 
