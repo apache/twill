@@ -57,6 +57,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 
@@ -371,6 +372,9 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
 
   private final class ServiceDelegate extends AbstractService implements Watcher {
 
+    private final AtomicBoolean stopNotified = new AtomicBoolean(false);
+    private volatile boolean executorStopped;
+
     @Override
     protected void doStart() {
       // A single thread executor
@@ -379,7 +383,12 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
         @Override
         protected void terminated() {
           super.terminated();
-          notifyStopped();
+
+          // Only call notifyStopped if the executor.shutdown() returned, otherwise deadlock (TWILL-110) can occur.
+          // Also, notifyStopped() should only be called once.
+          if (executorStopped && stopNotified.compareAndSet(false, true)) {
+            notifyStopped();
+          }
         }
       };
 
@@ -400,6 +409,13 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
           notifyFailed(e);
         } finally {
           eventExecutor.shutdown();
+          executorStopped = true;
+
+          // If the executor state is terminated, meaning the terminate() method is triggered,
+          // call notifyStopped() if it hasn't been called yet.
+          if (eventExecutor.isTerminated() && stopNotified.compareAndSet(false, true)) {
+            notifyStopped();
+          }
         }
       }
     }
@@ -408,7 +424,7 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
     public void process(WatchedEvent event) {
       try {
         if (event.getState() == Event.KeeperState.SyncConnected && state() == State.STARTING) {
-          LOG.info("Connected to ZooKeeper: " + zkStr);
+          LOG.debug("Connected to ZooKeeper: " + zkStr);
           notifyStarted();
           return;
         }
