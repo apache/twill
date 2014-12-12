@@ -22,18 +22,30 @@ import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.core.joran.spi.JoranException;
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.AbstractIdleService;
+import com.google.common.util.concurrent.AbstractService;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.twill.api.RunId;
+import org.apache.twill.common.CompositeService;
 import org.apache.twill.common.Services;
 import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.LocalLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.logging.KafkaAppender;
+import org.apache.twill.internal.logging.Loggings;
+import org.apache.twill.zookeeper.RetryStrategies;
+import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClientService;
+import org.apache.twill.zookeeper.ZKClientServices;
+import org.apache.twill.zookeeper.ZKClients;
+import org.apache.twill.zookeeper.ZKOperations;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +55,7 @@ import java.io.File;
 import java.io.StringReader;
 import java.net.URI;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Class for main method that starts a service.
@@ -58,44 +71,53 @@ public abstract class ServiceMain {
     }
   }
 
-  protected final void doMain(final ZKClientService zkClientService,
-                              final Service service) throws ExecutionException, InterruptedException {
+  protected final void doMain(final Service mainService,
+                              Service...prerequisites) throws ExecutionException, InterruptedException {
     configureLogger();
 
-    final String serviceName = service.toString();
+    Service requiredServices = new CompositeService(prerequisites);
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
-        Services.chainStop(service, zkClientService);
+        mainService.stopAndWait();
       }
     });
 
     // Listener for state changes of the service
-    ListenableFuture<Service.State> completion = Services.getCompletionFuture(service);
+    ListenableFuture<Service.State> completion = Services.getCompletionFuture(mainService);
+    Throwable initFailure = null;
 
     try {
       try {
         // Starts the service
-        LOG.info("Starting service {}.", serviceName);
-        Futures.allAsList(Services.chainStart(zkClientService, service).get()).get();
-        LOG.info("Service {} started.", serviceName);
+        LOG.info("Starting service {}.", mainService);
+        Futures.allAsList(Services.chainStart(requiredServices, mainService).get()).get();
+        LOG.info("Service {} started.", mainService);
       } catch (Throwable t) {
-        LOG.error("Exception when starting service {}.", serviceName, t);
-        // Exit with the init fail exit code.
-        System.exit(ContainerExitCodes.INIT_FAILED);
+        LOG.error("Exception when starting service {}.", mainService, t);
+        initFailure = t;
       }
 
       try {
-        completion.get();
-        LOG.info("Service {} completed.", serviceName);
+        if (initFailure == null) {
+          completion.get();
+          LOG.info("Service {} completed.", mainService);
+        }
       } catch (Throwable t) {
-        LOG.error("Exception thrown from service {}.", serviceName, t);
+        LOG.error("Exception thrown from service {}.", mainService, t);
         throw Throwables.propagate(t);
       }
     } finally {
+      requiredServices.stopAndWait();
+
       ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
       if (loggerFactory instanceof LoggerContext) {
         ((LoggerContext) loggerFactory).stop();
+      }
+
+      if (initFailure != null) {
+        // Exit with the init fail exit code.
+        System.exit(ContainerExitCodes.INIT_FAILED);
       }
     }
   }
@@ -137,6 +159,17 @@ public abstract class ServiceMain {
       LOG.error("Failed to create application location for {}.", appDir);
       throw Throwables.propagate(e);
     }
+  }
+
+  /**
+   * Creates a {@link ZKClientService}.
+   */
+  protected static ZKClientService createZKClient(String zkConnectStr) {
+    return ZKClientServices.delegate(
+      ZKClients.reWatchOnExpire(
+        ZKClients.retryOnFailure(
+          ZKClientService.Builder.of(zkConnectStr).build(),
+          RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
   }
 
   private void configureLogger() {
@@ -219,5 +252,35 @@ public abstract class ServiceMain {
       return "ERROR";
     }
     return "OFF";
+  }
+
+  /**
+   * A simple service for creating/remove ZK paths needed for {@link AbstractTwillService}.
+   */
+  protected static final class TwillZKPathService extends AbstractIdleService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TwillZKPathService.class);
+    private static final long TIMEOUT_SECONDS = 5L;
+
+    private final ZKClient zkClient;
+    private final String path;
+
+    public TwillZKPathService(ZKClient zkClient, RunId runId) {
+      this.zkClient = zkClient;
+      this.path = "/" + runId.getId();
+    }
+
+    @Override
+    protected void startUp() throws Exception {
+      LOG.info("Creating container ZK path: {}{}", zkClient.getConnectString(), path);
+      ZKOperations.ignoreError(zkClient.create(path, null, CreateMode.PERSISTENT),
+                               KeeperException.NodeExistsException.class, null).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    @Override
+    protected void shutDown() throws Exception {
+      LOG.info("Removing container ZK path: {}{}", zkClient.getConnectString(), path);
+      ZKOperations.recursiveDelete(zkClient, path).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
   }
 }

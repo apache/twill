@@ -238,4 +238,9 @@ final class HDFSLocation implements Location {
   public int hashCode() {
     return path.hashCode();
   }
+
+  @Override
+  public String toString() {
+    return path.toString();
+  }
 }

@@ -93,7 +93,7 @@ public abstract class AbstractYarnTwillService extends AbstractTwillService {
       UserGroupInformation.getCurrentUser().addCredentials(credentials);
       this.credentials = credentials;
 
-      LOG.info("Secure store updated from {}.", location.toURI());
+      LOG.info("Secure store updated from {}.", location);
 
     } catch (Throwable t) {
       LOG.error("Failed to update secure store.", t);

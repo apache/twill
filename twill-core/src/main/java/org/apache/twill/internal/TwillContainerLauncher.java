@@ -98,7 +98,7 @@ public final class TwillContainerLauncher {
                                                                  secureStoreLocation.length(), false, null));
       }
     } catch (IOException e) {
-      LOG.warn("Failed to launch container with secure store {}.", secureStoreLocation.toURI());
+      LOG.warn("Failed to launch container with secure store {}.", secureStoreLocation);
     }
 
     if (afterResources == null) {

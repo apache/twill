@@ -30,7 +30,6 @@ import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.BasicTwillContext;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.ContainerLiveNodeData;
-import org.apache.twill.internal.logging.Loggings;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.utils.Instances;
 import org.apache.twill.internal.yarn.AbstractYarnTwillService;
@@ -134,9 +133,15 @@ public final class TwillContainerService extends AbstractYarnTwillService {
   @Override
   protected void doStop() throws Exception {
     commandExecutor.shutdownNow();
-    runnable.destroy();
-    context.stop();
-    Loggings.forceFlush();
+    try {
+      runnable.destroy();
+    } catch (Throwable t) {
+      // Just catch the exception, not propagate it since it's already in shutdown sequence and
+      // we want all twill services properly shutdown.
+      LOG.warn("Exception when calling runnable.destroy.", t);
+    } finally {
+      context.stop();
+    }
   }
 
   @Override

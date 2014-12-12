@@ -21,11 +21,16 @@ import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillContext;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.logging.LogEntry;
+import org.apache.twill.api.logging.LogHandler;
+import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.Services;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.PrintWriter;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -38,11 +43,33 @@ public class InitializeFailTestRun extends BaseYarnTest {
   @Test
   public void testInitFail() throws InterruptedException, ExecutionException, TimeoutException {
     TwillRunner runner = YarnTestUtils.getTwillRunner();
-    TwillController controller = runner.prepare(new InitFailRunnable())
-                                       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
-                                       .start();
+    final CountDownLatch logLatch = new CountDownLatch(1);
+
+    // Verify that it receives the exception log entry that thrown when runnable initialize
+    LogHandler logVerifyHandler = new LogHandler() {
+      @Override
+      public void onLog(LogEntry logEntry) {
+        LogThrowable logThrowable = logEntry.getThrowable();
+        if (logThrowable != null) {
+          while (logThrowable.getCause() != null) {
+            logThrowable = logThrowable.getCause();
+          }
+          if (IllegalStateException.class.getName().equals(logThrowable.getClassName())
+            && logThrowable.getMessage().contains("Fail to init")) {
+            logLatch.countDown();
+          }
+        }
+      }
+    };
+
+    TwillController controller = runner
+      .prepare(new InitFailRunnable())
+      .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
+      .addLogHandler(logVerifyHandler)
+      .start();
 
     Services.getCompletionFuture(controller).get(2, TimeUnit.MINUTES);
+    Assert.assertTrue(logLatch.await(10, TimeUnit.SECONDS));
   }
 
   /**

@@ -251,4 +251,9 @@ final class LocalLocation implements Location {
   public int hashCode() {
     return file.hashCode();
   }
+
+  @Override
+  public String toString() {
+    return file.toString();
+  }
 }

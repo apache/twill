@@ -329,7 +329,7 @@ final class YarnTwillPreparer implements TwillPreparer {
 
       List<Token<?>> tokens = YarnUtils.addDelegationTokens(yarnConfig, locationFactory, credentials);
       for (Token<?> token : tokens) {
-        LOG.debug("Delegation token acquired for {}, {}", locationFactory.getHomeLocation().toURI(), token);
+        LOG.debug("Delegation token acquired for {}, {}", locationFactory.getHomeLocation(), token);
       }
     } catch (IOException e) {
       LOG.warn("Failed to check for secure login type. Not gathering any delegation token.", e);

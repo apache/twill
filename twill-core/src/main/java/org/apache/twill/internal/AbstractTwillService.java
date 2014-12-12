@@ -18,7 +18,6 @@
 package org.apache.twill.internal;
 
 import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.common.util.concurrent.FutureCallback;
@@ -145,13 +144,6 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
                                                      Threads.createDaemonThreadFactory("message-callback"),
                                                      new ThreadPoolExecutor.DiscardPolicy());
 
-    // Create the live node, if succeeded, start the service, otherwise fail out.
-    createLiveNode().get();
-
-    // Create node for messaging
-    ZKOperations.ignoreError(zkClient.create(getZKPath("messages"), null, CreateMode.PERSISTENT),
-                             KeeperException.NodeExistsException.class, null).get();
-
     // Watch for session expiration, recreate the live node if reconnected after expiration.
     zkClient.addConnectionWatcher(new Watcher() {
       private boolean expired = false;
@@ -168,6 +160,13 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
         }
       }
     });
+
+    // Create the live node, if succeeded, start the service, otherwise fail out.
+    createLiveNode().get();
+
+    // Create node for messaging
+    ZKOperations.ignoreError(zkClient.create(getZKPath("messages"), null, CreateMode.PERSISTENT),
+                             KeeperException.NodeExistsException.class, null).get();
 
     doStart();
 
@@ -186,10 +185,8 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
     try {
       doStop();
     } finally {
-      ListenableFuture<List<String>> removeCompletion = Futures.successfulAsList(ImmutableList.of(removeServiceNode(),
-                                                                                                  removeLiveNode()));
       // Given at most 5 seconds to cleanup ZK nodes
-      removeCompletion.get(5, TimeUnit.SECONDS);
+      removeLiveNode().get(5, TimeUnit.SECONDS);
       LOG.info("Service {} with runId {} shutdown completed", getServiceName(), runId.getId());
     }
   }
@@ -211,12 +208,6 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
     String liveNode = getLiveNodePath();
     LOG.info("Remove live node {}{}", zkClient.getConnectString(), liveNode);
     return ZKOperations.ignoreError(zkClient.delete(liveNode), KeeperException.NoNodeException.class, liveNode);
-  }
-
-  private OperationFuture<String> removeServiceNode() {
-    String serviceNode = String.format("/%s", runId.getId());
-    LOG.info("Remove service node {}{}", zkClient.getConnectString(), serviceNode);
-    return ZKOperations.recursiveDelete(zkClient, serviceNode);
   }
 
   /**

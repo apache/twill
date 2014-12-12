@@ -185,9 +185,9 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
 
   public void forceFlush() {
     try {
-      publishLogs(2, TimeUnit.SECONDS);
+      scheduler.submit(flushTask).get(2, TimeUnit.SECONDS);
     } catch (Exception e) {
-      LOG.error("Failed to publish last batch of log.", e);
+      LOG.error("Failed to force log flush in 2 seconds.", e);
     }
   }
 
@@ -279,7 +279,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
         try {
           int published = publishLogs(2L, TimeUnit.SECONDS);
           if (LOG.isDebugEnabled()) {
-            LOG.info("Published {} log messages to Kafka.", published);
+            LOG.debug("Published {} log messages to Kafka.", published);
           }
         } catch (Exception e) {
           LOG.error("Failed to push logs to Kafka. Log entries dropped.", e);
