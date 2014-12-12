@@ -23,7 +23,6 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.HashMultiset;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -67,14 +66,10 @@ import org.apache.twill.internal.TwillContainerLauncher;
 import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
 import org.apache.twill.internal.json.TwillSpecificationAdapter;
-import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
-import org.apache.twill.internal.logging.Loggings;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.utils.Instances;
-import org.apache.twill.internal.utils.Networks;
 import org.apache.twill.internal.yarn.AbstractYarnTwillService;
 import org.apache.twill.internal.yarn.YarnAMClient;
-import org.apache.twill.internal.yarn.YarnAMClientFactory;
 import org.apache.twill.internal.yarn.YarnContainerInfo;
 import org.apache.twill.internal.yarn.YarnContainerStatus;
 import org.apache.twill.internal.yarn.YarnUtils;
@@ -88,12 +83,10 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.net.URL;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -103,7 +96,7 @@ import java.util.concurrent.TimeUnit;
 /**
  *
  */
-public final class ApplicationMasterService extends AbstractYarnTwillService {
+public final class ApplicationMasterService extends AbstractYarnTwillService implements Supplier<ResourceReport> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApplicationMasterService.class);
 
@@ -116,7 +109,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
   private final ApplicationMasterLiveNodeData amLiveNode;
   private final RunningContainers runningContainers;
   private final ExpectedContainers expectedContainers;
-  private final TrackerService trackerService;
   private final YarnAMClient amClient;
   private final JvmOptions jvmOpts;
   private final int reservedMemory;
@@ -125,19 +117,18 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
   private final PlacementPolicyManager placementPolicyManager;
 
   private volatile boolean stopped;
-  private EmbeddedKafkaServer kafkaServer;
   private Queue<RunnableContainerRequest> runnableContainerRequests;
   private ExecutorService instanceChangeExecutor;
 
   public ApplicationMasterService(RunId runId, ZKClient zkClient, File twillSpecFile,
-                                  YarnAMClientFactory amClientFactory, Location applicationLocation) throws Exception {
+                                  YarnAMClient amClient, Location applicationLocation) throws Exception {
     super(zkClient, runId, applicationLocation);
 
     this.runId = runId;
     this.twillSpec = TwillSpecificationAdapter.create().fromJson(twillSpecFile);
     this.zkClient = zkClient;
     this.applicationLocation = applicationLocation;
-    this.amClient = amClientFactory.create();
+    this.amClient = amClient;
     this.credentials = createCredentials();
     this.jvmOpts = loadJvmOptions();
     this.reservedMemory = getReservedMemory();
@@ -149,12 +140,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
 
     expectedContainers = initExpectedContainers(twillSpec);
     runningContainers = initRunningContainers(amClient.getContainerId(), amClient.getHost());
-    trackerService = new TrackerService(new Supplier<ResourceReport>() {
-      @Override
-      public ResourceReport get() {
-        return runningContainers.getResourceReport();
-      }
-    }, amClient.getHost());
     eventHandler = createEventHandler(twillSpec);
   }
 
@@ -183,6 +168,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
     }
   }
 
+  @SuppressWarnings("unchecked")
   private EventHandler createEventHandler(TwillSpecification twillSpec) {
     try {
       // Should be able to load by this class ClassLoader, as they packaged in the same jar.
@@ -219,6 +205,11 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
   }
 
   @Override
+  public ResourceReport get() {
+    return runningContainers.getResourceReport();
+  }
+
+  @Override
   protected void doStart() throws Exception {
     LOG.info("Start application master with spec: " + TwillSpecificationAdapter.create().toJson(twillSpec));
 
@@ -227,31 +218,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
 
     instanceChangeExecutor = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("instanceChanger"));
 
-    kafkaServer = new EmbeddedKafkaServer(generateKafkaConfig());
-
-    // Must start tracker before start AMClient
-    LOG.info("Starting application master tracker server");
-    trackerService.startAndWait();
-    URL trackerUrl = trackerService.getUrl();
-    LOG.info("Started application master tracker server on " + trackerUrl);
-
-    amClient.setTracker(trackerService.getBindAddress(), trackerUrl);
-    amClient.startAndWait();
-
-    // Creates ZK path for runnable and kafka logging service
-    Futures.allAsList(ImmutableList.of(
-      zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT),
-      zkClient.create("/" + runId.getId() + "/kafka", null, CreateMode.PERSISTENT))
-    ).get();
-
+    // Creates ZK path for runnable
+    zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT).get();
     runningContainers.addWatcher("/discoverable");
-
-    // Starts kafka server
-    LOG.info("Starting kafka server");
-
-    kafkaServer.startAndWait();
-    LOG.info("Kafka server started");
-
     runnableContainerRequests = initContainerRequests();
   }
 
@@ -295,29 +264,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
       TimeUnit.SECONDS.sleep(1);
     }
 
-    LOG.info("Stopping application master tracker server");
-    try {
-      trackerService.stopAndWait();
-      LOG.info("Stopped application master tracker server");
-    } catch (Exception e) {
-      LOG.error("Failed to stop tracker service.", e);
-    } finally {
-      try {
-        try {
-          // App location cleanup
-          cleanupDir();
-          Loggings.forceFlush();
-          // Sleep a short while to let kafka clients to have chance to fetch the log
-          TimeUnit.SECONDS.sleep(1);
-        } finally {
-          kafkaServer.stopAndWait();
-          LOG.info("Kafka server stopped");
-        }
-      } finally {
-        // Stops the AMClient
-        amClient.stopAndWait();
-      }
-    }
+    cleanupDir();
   }
 
   @Override
@@ -431,7 +378,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
         (System.currentTimeMillis() - requestStartTime) > Constants.CONSTRAINED_PROVISION_REQUEST_TIMEOUT) {
         LOG.info("Relaxing provisioning constraints for request {}", provisioning.peek().getRequestId());
         // Clear the blacklist for the pending provision request(s).
-        clearBlacklist();
+        amClient.clearBlacklist();
         isRequestRelaxed = true;
       }
 
@@ -447,7 +394,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
    * Manage Blacklist for a given request.
    */
   private void manageBlacklist(Map.Entry<AllocationSpecification, ? extends Collection<RuntimeSpecification>> request) {
-    clearBlacklist();
+    amClient.clearBlacklist();
 
     //Check the allocation strategy
     AllocationSpecification currentAllocationSpecification = request.getKey();
@@ -466,8 +413,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
             // Yarn Resource Manager may include port in the node name depending on the setting
             // YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME. It is safe to add both
             // the names (with and without port) to the blacklist.
-            addToBlacklist(containerInfo.getHost().getHostName());
-            addToBlacklist(containerInfo.getHost().getHostName() + ":" + containerInfo.getPort());
+            amClient.addToBlacklist(containerInfo.getHost().getHostName());
+            amClient.addToBlacklist(containerInfo.getHost().getHostName() + ":" + containerInfo.getPort());
           }
         }
       }
@@ -642,27 +589,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
   }
 
   /**
-   * Add a resource to the blacklist.
-   */
-  private void addToBlacklist(String resource) {
-    amClient.addToBlacklist(resource);
-  }
-
-  /**
-   * Remove a resource from the blacklist.
-   */
-  private void removeFromBlacklist(String resource) {
-    amClient.removeFromBlacklist(resource);
-  }
-
-  /**
-   * Clears the resource blacklist.
-   */
-  private void clearBlacklist() {
-    amClient.clearBlacklist();
-  }
-
-  /**
    * Launches runnables in the provisioned containers.
    */
   private void launchRunnable(List<? extends ProcessLauncher<YarnContainerInfo>> launchers,
@@ -733,28 +659,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService {
 
   private String getKafkaZKConnect() {
     return String.format("%s/%s/kafka", zkClient.getConnectString(), runId.getId());
-  }
-
-  private Properties generateKafkaConfig() {
-    int port = Networks.getRandomPort();
-    Preconditions.checkState(port > 0, "Failed to get random port.");
-
-    Properties prop = new Properties();
-    prop.setProperty("log.dir", new File("kafka-logs").getAbsolutePath());
-    prop.setProperty("port", Integer.toString(port));
-    prop.setProperty("broker.id", "1");
-    prop.setProperty("socket.send.buffer.bytes", "1048576");
-    prop.setProperty("socket.receive.buffer.bytes", "1048576");
-    prop.setProperty("socket.request.max.bytes", "104857600");
-    prop.setProperty("num.partitions", "1");
-    prop.setProperty("log.retention.hours", "24");
-    prop.setProperty("log.flush.interval.messages", "10000");
-    prop.setProperty("log.flush.interval.ms", "1000");
-    prop.setProperty("log.segment.bytes", "536870912");
-    prop.setProperty("zookeeper.connect", getKafkaZKConnect());
-    prop.setProperty("zookeeper.connection.timeout.ms", "1000000");
-    prop.setProperty("default.replication.factor", "1");
-    return prop;
   }
 
   /**

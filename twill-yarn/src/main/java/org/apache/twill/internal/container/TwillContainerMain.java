@@ -20,6 +20,7 @@ package org.apache.twill.internal.container;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.AbstractService;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -43,10 +44,9 @@ import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.ServiceMain;
 import org.apache.twill.internal.json.ArgumentsCodec;
 import org.apache.twill.internal.json.TwillSpecificationAdapter;
-import org.apache.twill.zookeeper.RetryStrategies;
+import org.apache.twill.internal.logging.Loggings;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClientService;
-import org.apache.twill.zookeeper.ZKClientServices;
 import org.apache.twill.zookeeper.ZKClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +56,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -81,11 +80,7 @@ public final class TwillContainerMain extends ServiceMain {
     int instanceId = Integer.parseInt(System.getenv(EnvKeys.TWILL_INSTANCE_ID));
     int instanceCount = Integer.parseInt(System.getenv(EnvKeys.TWILL_INSTANCE_COUNT));
 
-    ZKClientService zkClientService = ZKClientServices.delegate(
-      ZKClients.reWatchOnExpire(
-        ZKClients.retryOnFailure(ZKClientService.Builder.of(zkConnectStr).build(),
-                                 RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
-
+    ZKClientService zkClientService = createZKClient(zkConnectStr);
     ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
     ZKClient electionZKClient = getAppRunZKClient(zkClientService, appRunId);
@@ -111,7 +106,11 @@ public final class TwillContainerMain extends ServiceMain {
     Service service = new TwillContainerService(context, containerInfo, containerZKClient,
                                                 runId, runnableSpec, getClassLoader(),
                                                 createAppLocation(conf));
-    new TwillContainerMain().doMain(zkClientService, service);
+    new TwillContainerMain().doMain(
+      service,
+      new LogFlushService(),
+      zkClientService,
+      new TwillZKPathService(containerZKClient, runId));
   }
 
   private static void loadSecureStore() throws IOException {
@@ -191,5 +190,24 @@ public final class TwillContainerMain extends ServiceMain {
   @Override
   protected String getRunnableName() {
     return System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
+  }
+
+
+  /**
+   * Simple service that force flushing logs on stop.
+   */
+  private static final class LogFlushService extends AbstractService {
+
+    @Override
+    protected void doStart() {
+      // No-op
+      notifyStarted();
+    }
+
+    @Override
+    protected void doStop() {
+      Loggings.forceFlush();
+      notifyStopped();
+    }
   }
 }

@@ -21,6 +21,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
@@ -94,7 +95,7 @@ public class SessionExpireTestRun extends BaseYarnTest {
     QueryExp query = Query.isInstanceOf(new StringValueExp(ConnectionMXBean.class.getName()));
 
     Stopwatch stopwatch = new Stopwatch();
-
+    stopwatch.start();
     do {
       // Find the AM session and expire it
       Set<ObjectName> connectionBeans = mbeanServer.queryNames(ObjectName.WILDCARD, query);
@@ -111,6 +112,7 @@ public class SessionExpireTestRun extends BaseYarnTest {
           }
         }
       }
+      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
     } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
 
     return false;

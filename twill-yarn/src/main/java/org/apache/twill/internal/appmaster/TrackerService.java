@@ -64,6 +64,7 @@ import java.net.URL;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.GET;
 
 /**
  * Webservice that the Application Master will register back to the resource manager
@@ -80,36 +81,43 @@ public final class TrackerService extends AbstractIdleService {
   private static final int CLOSE_CHANNEL_TIMEOUT = 5;
   private static final int MAX_INPUT_SIZE = 100 * 1024 * 1024;
 
-  private final String host;
+  private final Supplier<ResourceReport> resourceReport;
+  private final ChannelGroup channelGroup;
+
+  private String host;
   private ServerBootstrap bootstrap;
   private InetSocketAddress bindAddress;
   private URL url;
-  private final ChannelGroup channelGroup;
-  private final Supplier<ResourceReport> resourceReport;
 
   /**
    * Initialize the service.
    *
    * @param resourceReport live report that the service will return to clients.
-   * @param appMasterHost the application master host.
    */
-  public TrackerService(Supplier<ResourceReport> resourceReport, String appMasterHost) {
+  TrackerService(Supplier<ResourceReport> resourceReport) {
     this.channelGroup = new DefaultChannelGroup("appMasterTracker");
     this.resourceReport = resourceReport;
-    this.host = appMasterHost;
+  }
+
+  /**
+   * Sets the hostname which the tracker service will bind to. This method must be called before starting this
+   * tracker service.
+   */
+  void setHost(String host) {
+    this.host = host;
   }
 
   /**
    * Returns the address this tracker service is bounded to.
    */
-  public InetSocketAddress getBindAddress() {
+  InetSocketAddress getBindAddress() {
     return bindAddress;
   }
 
   /**
    * @return tracker url.
    */
-  public URL getUrl() {
+  URL getUrl() {
     return url;
   }
 
@@ -138,7 +146,7 @@ public final class TrackerService extends AbstractIdleService {
         pipeline.addLast("aggregator", new HttpChunkAggregator(MAX_INPUT_SIZE));
         pipeline.addLast("encoder", new HttpResponseEncoder());
         pipeline.addLast("compressor", new HttpContentCompressor());
-        pipeline.addLast("handler", new ReportHandler(resourceReport));
+        pipeline.addLast("handler", new ReportHandler());
 
         return pipeline;
       }
@@ -148,6 +156,8 @@ public final class TrackerService extends AbstractIdleService {
     bindAddress = (InetSocketAddress) channel.getLocalAddress();
     url = URI.create(String.format("http://%s:%d", host, bindAddress.getPort())).toURL();
     channelGroup.add(channel);
+
+    LOG.info("Tracker service started at {}", url);
   }
 
   @Override
@@ -159,18 +169,17 @@ public final class TrackerService extends AbstractIdleService {
     } finally {
       bootstrap.releaseExternalResources();
     }
+    LOG.info("Tracker service stopped at {}", url);
   }
 
   /**
    * Handler to return resources used by this application master, which will be available through
    * the host and port set when this application master registered itself to the resource manager.
    */
-  public class ReportHandler extends SimpleChannelUpstreamHandler {
-    private final Supplier<ResourceReport> report;
+  final class ReportHandler extends SimpleChannelUpstreamHandler {
     private final ResourceReportAdapter reportAdapter;
 
-    public ReportHandler(Supplier<ResourceReport> report) {
-      this.report = report;
+    public ReportHandler() {
       this.reportAdapter = ResourceReportAdapter.create();
     }
 
@@ -202,7 +211,7 @@ public final class TrackerService extends AbstractIdleService {
 
       ChannelBuffer content = ChannelBuffers.dynamicBuffer();
       Writer writer = new OutputStreamWriter(new ChannelBufferOutputStream(content), CharsetUtil.UTF_8);
-      reportAdapter.toJson(report.get(), writer);
+      reportAdapter.toJson(resourceReport.get(), writer);
       try {
         writer.close();
       } catch (IOException e1) {

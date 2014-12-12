@@ -142,20 +142,19 @@ public final class ApplicationBundler {
       } finally {
         jarOut.close();
       }
-      LOG.debug("copying temporary bundle to destination {} ({} bytes)", target.toURI(), tmpJar.length());
+      LOG.debug("copying temporary bundle to destination {} ({} bytes)", target, tmpJar.length());
       // Copy the tmp jar into destination.
-      OutputStream os = null; 
       try {
-        os = new BufferedOutputStream(target.getOutputStream());
-        Files.copy(tmpJar, os);
-      } catch (IOException e) {
-        throw new IOException("failed to copy bundle from " + tmpJar.toURI() + " to " + target.toURI(), e);
-      } finally {
-        if (os != null) {
+        OutputStream os = new BufferedOutputStream(target.getOutputStream());
+        try {
+          Files.copy(tmpJar, os);
+        } finally {
           os.close();
         }
+      } catch (IOException e) {
+        throw new IOException("failed to copy bundle from " + tmpJar.toURI() + " to " + target, e);
       }
-      LOG.debug("finished creating bundle at {}", target.toURI());
+      LOG.debug("finished creating bundle at {}", target);
     } finally {
       tmpJar.delete();
       LOG.debug("cleaned up local temporary for bundle {}", tmpJar.toURI());

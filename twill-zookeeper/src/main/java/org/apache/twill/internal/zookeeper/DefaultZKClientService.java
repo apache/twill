@@ -424,18 +424,19 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
     public void process(WatchedEvent event) {
       try {
         if (event.getState() == Event.KeeperState.SyncConnected && state() == State.STARTING) {
-          LOG.debug("Connected to ZooKeeper: " + zkStr);
+          LOG.debug("Connected to ZooKeeper: {}", zkStr);
           notifyStarted();
           return;
         }
         if (event.getState() == Event.KeeperState.Expired) {
-          LOG.info("ZooKeeper session expired: " + zkStr);
+          LOG.info("ZooKeeper session expired: {}", zkStr);
 
           // When connection expired, simply reconnect again
           Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
               try {
+                LOG.info("Reconnect to ZooKeeper due to expiration: {}", zkStr);
                 zooKeeper.set(createZooKeeper());
               } catch (IOException e) {
                 zooKeeper.set(null);

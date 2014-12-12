@@ -601,7 +601,7 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
     // Rename the tmp file into the credentials location
     tmpLocation.renameTo(credentialsLocation);
 
-    LOG.debug("Secure store for {} {} saved to {}.", application, runId, credentialsLocation.toURI());
+    LOG.debug("Secure store for {} {} saved to {}.", application, runId, credentialsLocation);
   }
 
   private static LocationFactory createDefaultLocationFactory(Configuration configuration) {
