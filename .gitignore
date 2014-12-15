@@ -16,6 +16,11 @@ out/
 lib/
 .idea
 
+# Eclipse Files and Dir #
+.project
+.classpath
+.settings
+
 # Gradle Files & Dir #
 build/
 .stickyStorage
@@ -26,3 +31,4 @@ target/
 logs/
 zookeeper.out
 
+/bin

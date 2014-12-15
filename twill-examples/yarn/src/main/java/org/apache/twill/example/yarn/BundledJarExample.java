@@ -79,8 +79,8 @@ public class BundledJarExample {
     }
 
     String zkStr = args[0];
-    BundledJarRunner.Arguments arguments = BundledJarRunner.Arguments.fromArray(
-      Arrays.copyOfRange(args, 1, args.length));
+    BundledJarRunner.Arguments arguments = new BundledJarRunner.Arguments(
+            args[1], "/lib", args[2], Arrays.copyOfRange(args, 3, args.length));
 
     File jarFile = new File(arguments.getJarFileName());
     Preconditions.checkState(jarFile.exists());
