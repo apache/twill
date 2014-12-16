@@ -35,6 +35,8 @@ import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,6 +55,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  */
 public class ZKClientTest {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ZKClientTest.class);
 
   @ClassRule
   public static TemporaryFolder tmpFolder = new TemporaryFolder();
@@ -315,6 +319,30 @@ public class ZKClientTest {
 
       noAuthClient.stopAndWait();
       zkClient.stopAndWait();
+
+    } finally {
+      zkServer.stopAndWait();
+    }
+  }
+
+  @Test (timeout = 120000L)
+  public void testDeadlock() throws IOException, InterruptedException {
+    // This is to test deadlock bug as described in (TWILL-110)
+    // This test has very high chance to get deadlock before the bug fix, hence failed with timeout.
+    InMemoryZKServer zkServer = InMemoryZKServer.builder().setDataDir(tmpFolder.newFolder()).build();
+    zkServer.startAndWait();
+    try {
+      for (int i = 0; i < 5000; i++) {
+        final ZKClientService zkClient = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
+        zkClient.addConnectionWatcher(new Watcher() {
+          @Override
+          public void process(WatchedEvent event) {
+            LOG.debug("Connection event: {}", event);
+          }
+        });
+        zkClient.startAndWait();
+        zkClient.stopAndWait();
+      }
 
     } finally {
       zkServer.stopAndWait();

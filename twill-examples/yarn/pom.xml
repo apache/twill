@@ -30,24 +30,26 @@ limitations under the License.
     <name>Apache Twill examples: YARN</name>
     <description>Examples demonstrating usage of twill-yarn</description>
     <artifactId>twill-examples-yarn</artifactId>
+    
+    <properties>
+        <guava.version>13.0.1</guava.version>
+    </properties>
 
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>twill-yarn</artifactId>
             <version>${project.version}</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>twill-ext</artifactId>
             <version>${project.version}</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <scope>provided</scope>
+            <version>${guava.version}</version>
         </dependency>
     </dependencies>
 

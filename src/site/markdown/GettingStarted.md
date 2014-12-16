@@ -147,3 +147,68 @@ controller.stop().get();
 ```
 
 This will shut down the application master and all the containers.
+
+### Hello World
+
+To see Twill in action, you can run the "hello world" example applications located in the twill-examples module.
+
+#### Prerequisites
+
+* Single Node or Cluster installation of Hadoop with YARN (Hadoop >= 2.2.0) set-up and running.
+* Single Node or Cluster installation of ZooKeeper set-up and running.
+* Build of Twill Library Code (minimum, build of twill-examples module)
+
+#### Running the Examples
+
+There are two example applications you can run: HelloWorld and BundledJarExample.
+
+##### HelloWorld Application
+
+The HelloWorld application creates a simple YARN application that prints a line to the log.
+
+You can run the HelloWorld application from any node of the Hadoop cluster using the below command
+(be sure to add your ZooKeeper Host and Port):
+
+```sh
+$ CP=twill-examples-yarn-0.5.0-incubating-SNAPSHOT.jar:`hadoop classpath`; java -cp $CP org.apache.twill.example.yarn.HelloWorld {zookeeper_host:port}
+```
+
+If successful, you should see logs output to the terminal with details of the running application.  Once the application
+is finished running, check the YARN logs and you should see output like the following:
+
+```
+14:49:45.944 [TwillContainerService] INFO  o.a.twill.example.yarn.HelloWorld - Hello World. My first distributed application.
+```
+
+##### BundledJarExample Application
+
+The BundledJarExample application demonstrates the Twill functionality that allows you to run any Java application
+in Twill without worrying about library version conflicts between your application and Hadoop.  The example
+calls the main class in a sample application `Echo`, which simply logs the command line argument(s) passed to it.
+The `Echo` application uses a different version of Guava from Twill and Hadoop distributions.  BundledJarExample
+looks for the dependency in a `lib` folder packaged at the root of the `Echo` jar.
+
+You can run the BundleJarExample application from any node of the Hadoop cluster using the below command
+(be sure to add your ZooKeeper Host and Port):
+
+```sh
+$ CP=twill-examples-yarn-0.5.0-incubating-SNAPSHOT.jar:`hadoop classpath`; 
+     java -cp $CP org.apache.twill.example.yarn.BundledJarExample {zookeeper_host:port} twill-examples-echo-0.5.0-incubating-SNAPSHOT.jar echo.EchoMain arg1
+```
+
+Like with the HelloWorld example, you should see logs output to the terminal.  Once the application is complete, check
+the YARN logs as before and you should see output like the following:
+
+```
+[TwillContainerService] INFO echo.EchoMain - Hello from EchoMain: 6
+err HELLO from scatch
+[TwillContainerService] INFO echo.EchoMain - Got args: [arg1]
+
+...
+
+out HELLO from scatch
+Got args: [arg1]
+
+```
+
+Congratulations!  You have run your first Twill applications.
