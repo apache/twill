@@ -118,7 +118,7 @@ public abstract class ServiceMain {
         return new LocalLocationFactory().create(appDir);
       }
 
-      if ("hdfs".equals(appDir.getScheme())) {
+      if ("hdfs".equals(appDir.getScheme()) || "maprfs".equals(appDir.getScheme())) {
         if (UserGroupInformation.isSecurityEnabled()) {
           return new HDFSLocationFactory(FileSystem.get(appDir, conf)).create(appDir);
         }

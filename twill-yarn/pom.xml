@@ -162,5 +162,32 @@
                 </resources>
             </build>
         </profile>
+        <profile>
+            <id>mapr-hadoop-2.4</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.mapr.hadoop</groupId>
+                    <artifactId>maprfs</artifactId>
+                    <version>${mapr.fs.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.mapr.fs</groupId>
+                    <artifactId>libprotodefs</artifactId>
+                    <version>${mapr.fs.version}</version>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>2.14.1</version>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 </project>
