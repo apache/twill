@@ -50,4 +50,17 @@ limitations under the License.
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>mapr-hadoop-2.4</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.mapr.hadoop</groupId>
+                    <artifactId>maprfs</artifactId>
+                    <version>${mapr.fs.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
 </project>

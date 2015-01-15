@@ -625,6 +625,62 @@
             </build>
         </profile>
         <profile>
+            <id>mapr-hadoop-2.4</id>
+            <properties>
+                <hadoop.version>2.4.1-mapr-1408</hadoop.version>
+                <zookeeper.version>3.4.5-mapr-1406</zookeeper.version>
+                <mapr.fs.version>4.0.1-mapr</mapr.fs.version>
+            </properties>
+            <repositories>
+                <repository>
+                    <id>mapr-releases</id>
+                    <url>http://repository.mapr.com/maven/</url>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                </repository>
+            </repositories>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>1.8</version>
+                        <executions>
+                            <execution>
+                                <id>add-source</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/main/hadoop21</source>
+                                        <source>src/main/hadoop22</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>add-source-2.0</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/main/hadoop20</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>hadoop-2.5</id>
             <properties>
                 <hadoop.version>2.5.1</hadoop.version>
