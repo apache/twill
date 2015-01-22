@@ -373,6 +373,14 @@
                             </formats>
                         </configuration>
                     </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-remote-resources-plugin</artifactId>
+                        <configuration>
+                            <!-- Disable this plugin so that it won't generate a DEPENDENCIES file in the source tar -->
+                            <skip>true</skip>
+                        </configuration>
+                    </plugin>
                 </plugins>
             </build>
         </profile>
