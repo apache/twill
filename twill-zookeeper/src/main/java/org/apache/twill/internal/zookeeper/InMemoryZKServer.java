@@ -104,8 +104,14 @@ public final class InMemoryZKServer implements Service {
 
   private InetSocketAddress getAddress(int port) {
     try {
-//      return new InetSocketAddress(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}), port < 0 ? 0 : port);
-      return new InetSocketAddress(InetAddress.getLocalHost(), port < 0 ? 0 : port);
+      int socketPort = port < 0 ? 0 : port;
+      // This property is needed so that in certain CI environment (e.g. Travis-CI) it can only works properly if
+      // it is binded to the wildcard (0.0.0.0) address
+      if (Boolean.parseBoolean(System.getProperties().getProperty("twill.zk.server.localhost", "true"))) {
+        return new InetSocketAddress(InetAddress.getLocalHost(), socketPort);
+      } else {
+        return new InetSocketAddress(socketPort);
+      }
     } catch (UnknownHostException e) {
       throw Throwables.propagate(e);
     }
