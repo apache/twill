@@ -124,6 +124,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final Credentials credentials;
   private final int reservedMemory;
   private String user;
+  private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
 
@@ -154,6 +155,12 @@ final class YarnTwillPreparer implements TwillPreparer {
   @Override
   public TwillPreparer setUser(String user) {
     this.user = user;
+    return this;
+  }
+
+  @Override
+  public TwillPreparer setSchedulerQueue(String name) {
+    this.schedulerQueue = name;
     return this;
   }
 
@@ -246,7 +253,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   @Override
   public TwillController start() {
     try {
-      final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(user, twillSpec);
+      final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(user, twillSpec, schedulerQueue);
       final ApplicationId appId = launcher.getContainerInfo();
 
       Callable<ProcessController<YarnApplicationReport>> submitTask =
@@ -291,10 +298,7 @@ final class YarnTwillPreparer implements TwillPreparer {
                         .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS))
                         .build(),
             localFiles.values(), credentials
-          )
-            .noResources()
-            .noEnvironment()
-            .withCommands().add(
+          ).addCommand(
               "$JAVA_HOME/bin/java",
               "-Djava.io.tmpdir=tmp",
               "-Dyarn.appId=$" + EnvKeys.YARN_APP_ID_STR,
@@ -306,8 +310,6 @@ final class YarnTwillPreparer implements TwillPreparer {
               Constants.Files.APP_MASTER_JAR,
               ApplicationMasterMain.class.getName(),
               Boolean.FALSE.toString())
-            .redirectOutput(Constants.STDOUT)
-            .redirectError(Constants.STDERR)
             .launch();
         }
       };

@@ -30,6 +30,7 @@ import org.apache.twill.internal.utils.Paths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -113,108 +114,57 @@ public abstract class AbstractYarnProcessLauncher<T> implements ProcessLauncher<
     }
 
     @Override
-    public ResourcesAdder withResources() {
-      return new MoreResourcesImpl();
+    public PrepareLaunchContext addResources(LocalFile... localFiles) {
+      return addResources(Arrays.asList(localFiles));
     }
 
     @Override
-    public AfterResources noResources() {
-      return new MoreResourcesImpl();
-    }
-
-    private final class MoreResourcesImpl implements MoreResources {
-
-      @Override
-      public MoreResources add(LocalFile localFile) {
+    public PrepareLaunchContext addResources(Iterable<LocalFile> localFiles) {
+      for (LocalFile localFile : localFiles) {
         addLocalFile(localFile);
-        return this;
       }
-
-      @Override
-      public EnvironmentAdder withEnvironment() {
-        return finish();
-      }
-
-      @Override
-      public AfterEnvironment noEnvironment() {
-        return finish();
-      }
-
-      private MoreEnvironmentImpl finish() {
-        launchContext.setLocalResources(localResources);
-        return new MoreEnvironmentImpl();
-      }
+      return this;
     }
 
-    private final class MoreEnvironmentImpl implements MoreEnvironment {
-
-      @Override
-      public CommandAdder withCommands() {
-        launchContext.setEnvironment(environment);
-        return new MoreCommandImpl();
-      }
-
-      @Override
-      public <V> MoreEnvironment add(String key, V value) {
-        environment.put(key, value.toString());
-        return this;
-      }
+    @Override
+    public <V> PrepareLaunchContext addEnvironment(String key, V value) {
+      environment.put(key, value.toString());
+      return this;
     }
 
-    private final class MoreCommandImpl implements MoreCommand, StdOutSetter, StdErrSetter {
+    @Override
+    public PrepareLaunchContext addCommand(String cmd, String... args) {
+      StringBuilder builder = new StringBuilder(cmd);
+      for (String arg : args) {
+        builder.append(' ').append(arg);
+      }
 
-      private final StringBuilder commandBuilder = new StringBuilder();
+      // Redirect stdout and stderr
+      redirect(1, ApplicationConstants.STDOUT, builder);
+      redirect(2, ApplicationConstants.STDERR, builder);
 
-      @Override
-      public StdOutSetter add(String cmd, String... args) {
-        commandBuilder.append(cmd);
-        for (String arg : args) {
-          commandBuilder.append(' ').append(arg);
+      commands.add(builder.toString());
+      return this;
+    }
+
+    @Override
+    public <R> ProcessController<R> launch() {
+      launchContext.setLocalResources(localResources);
+      launchContext.setEnvironment(environment);
+      if (credentials != null && !credentials.getAllTokens().isEmpty()) {
+        for (Token<?> token : credentials.getAllTokens()) {
+          LOG.info("Launch with delegation token {}", token);
         }
-        return this;
+        launchContext.setCredentials(credentials);
       }
+      launchContext.setCommands(commands);
+      return doLaunch(launchContext);
+    }
 
-      @Override
-      public <R> ProcessController<R> launch() {
-        if (credentials != null && !credentials.getAllTokens().isEmpty()) {
-          for (Token<?> token : credentials.getAllTokens()) {
-            LOG.info("Launch with delegation token {}", token);
-          }
-          launchContext.setCredentials(credentials);
-        }
-        launchContext.setCommands(commands);
-        return doLaunch(launchContext);
-      }
-
-      @Override
-      public MoreCommand redirectError(String stderr) {
-        redirect(2, stderr);
-        return noError();
-      }
-
-      @Override
-      public MoreCommand noError() {
-        commands.add(commandBuilder.toString());
-        commandBuilder.setLength(0);
-        return this;
-      }
-
-      @Override
-      public StdErrSetter redirectOutput(String stdout) {
-        redirect(1, stdout);
-        return this;
-      }
-
-      @Override
-      public StdErrSetter noOutput() {
-        return this;
-      }
-
-      private void redirect(int type, String out) {
-        commandBuilder.append(' ')
-                      .append(type).append('>')
-                      .append(ApplicationConstants.LOG_DIR_EXPANSION_VAR).append('/').append(out);
-      }
+    private void redirect(int type, String out, StringBuilder commandBuilder) {
+      commandBuilder.append(' ')
+        .append(type).append('>')
+        .append(ApplicationConstants.LOG_DIR_EXPANSION_VAR).append('/').append(out);
     }
   }
 }

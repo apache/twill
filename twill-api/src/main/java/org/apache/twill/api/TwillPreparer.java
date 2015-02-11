@@ -45,6 +45,14 @@ public interface TwillPreparer {
   TwillPreparer setUser(String user);
 
   /**
+   * Sets the name of the scheduler queue to use.
+   *
+   * @param name Name of the scheduler queue
+   * @return This {@link TwillPreparer}.
+   */
+  TwillPreparer setSchedulerQueue(String name);
+
+  /**
    * This methods sets the extra JVM options that will be passed to the java command line for every runnable
    * of the application started through this {@link org.apache.twill.api.TwillPreparer} instance.
    *

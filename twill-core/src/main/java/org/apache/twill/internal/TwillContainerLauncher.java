@@ -23,7 +23,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
-import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.filesystem.Location;
@@ -70,39 +69,23 @@ public final class TwillContainerLauncher {
   }
 
   public TwillContainerController start(RunId runId, int instanceId, Class<?> mainClass, String classPath) {
-    ProcessLauncher.PrepareLaunchContext.AfterResources afterResources = null;
-    ProcessLauncher.PrepareLaunchContext.ResourcesAdder resourcesAdder = null;
-
     // Clean up zookeeper path in case this is a retry and there are old messages and state there.
     Futures.getUnchecked(ZKOperations.ignoreError(
       ZKOperations.recursiveDelete(zkClient, "/" + runId), KeeperException.NoNodeException.class, null));
 
     // Adds all file to be localized to container
-    if (!runtimeSpec.getLocalFiles().isEmpty()) {
-      resourcesAdder = launchContext.withResources();
-
-      for (LocalFile localFile : runtimeSpec.getLocalFiles()) {
-        afterResources = resourcesAdder.add(localFile);
-      }
-    }
+    launchContext.addResources(runtimeSpec.getLocalFiles());
 
     // Optionally localize secure store.
     try {
       if (secureStoreLocation != null && secureStoreLocation.exists()) {
-        if (resourcesAdder == null) {
-          resourcesAdder = launchContext.withResources();
-        }
-        afterResources = resourcesAdder.add(new DefaultLocalFile(Constants.Files.CREDENTIALS,
-                                                                 secureStoreLocation.toURI(),
-                                                                 secureStoreLocation.lastModified(),
-                                                                 secureStoreLocation.length(), false, null));
+        launchContext.addResources(new DefaultLocalFile(Constants.Files.CREDENTIALS,
+                                                        secureStoreLocation.toURI(),
+                                                        secureStoreLocation.lastModified(),
+                                                        secureStoreLocation.length(), false, null));
       }
     } catch (IOException e) {
       LOG.warn("Failed to launch container with secure store {}.", secureStoreLocation);
-    }
-
-    if (afterResources == null) {
-      afterResources = launchContext.noResources();
     }
 
     int memory = runtimeSpec.getResourceSpecification().getMemorySize();
@@ -115,12 +98,11 @@ public final class TwillContainerLauncher {
     }
 
     // Currently no reporting is supported for runnable containers
-    ProcessLauncher.PrepareLaunchContext.MoreEnvironment afterEnvironment = afterResources
-      .withEnvironment()
-      .add(EnvKeys.TWILL_RUN_ID, runId.getId())
-      .add(EnvKeys.TWILL_RUNNABLE_NAME, runtimeSpec.getName())
-      .add(EnvKeys.TWILL_INSTANCE_ID, Integer.toString(instanceId))
-      .add(EnvKeys.TWILL_INSTANCE_COUNT, Integer.toString(instanceCount));
+    launchContext
+      .addEnvironment(EnvKeys.TWILL_RUN_ID, runId.getId())
+      .addEnvironment(EnvKeys.TWILL_RUNNABLE_NAME, runtimeSpec.getName())
+      .addEnvironment(EnvKeys.TWILL_INSTANCE_ID, Integer.toString(instanceId))
+      .addEnvironment(EnvKeys.TWILL_INSTANCE_COUNT, Integer.toString(instanceCount));
 
     // assemble the command based on jvm options
     ImmutableList.Builder<String> commandBuilder = ImmutableList.builder();
@@ -157,9 +139,8 @@ public final class TwillContainerLauncher {
                        Boolean.TRUE.toString());
     List<String> command = commandBuilder.build();
 
-    ProcessController<Void> processController = afterEnvironment
-      .withCommands().add(firstCommand, command.toArray(new String[command.size()]))
-      .redirectOutput(Constants.STDOUT).redirectError(Constants.STDERR)
+    ProcessController<Void> processController = launchContext
+      .addCommand(firstCommand, command.toArray(new String[command.size()]))
       .launch();
 
     TwillContainerControllerImpl controller = new TwillContainerControllerImpl(zkClient, runId, processController);
