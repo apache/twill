@@ -58,7 +58,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Verify the cluster configuration (number and capability of node managers) required for the tests.
    */
   @BeforeClass
-  public static void verifyClusterCapability() {
+  public static void verifyClusterCapability() throws InterruptedException {
     // Ignore verifications if it is running against older Hadoop versions which does not support blacklists.
     Assume.assumeTrue(YarnUtils.getHadoopVersion().equals(YarnUtils.HadoopVersions.HADOOP_22));
 
@@ -73,14 +73,20 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
       .setInstances(2)
       .build();
 
-    try {
-      nodeReports = YarnTestUtils.getNodeReports();
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
     // The tests need exactly three NodeManagers in the cluster.
-    Assert.assertNotNull(nodeReports);
-    Assert.assertEquals(nodeReports.size(), 3);
+    int trials = 0;
+    while (trials++ < 20) {
+      try {
+        nodeReports = YarnTestUtils.getNodeReports();
+        if (nodeReports != null && nodeReports.size() == 3) {
+          break;
+        }
+      } catch (Exception e) {
+        LOG.error("Failed to get node reports", e);
+      }
+      LOG.warn("NodeManagers != 3. {}", nodeReports);
+      TimeUnit.SECONDS.sleep(1);
+    }
 
     // All NodeManagers should have enough capacity available to accommodate at least two runnables.
     for (NodeReport nodeReport : nodeReports) {
