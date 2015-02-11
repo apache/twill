@@ -100,21 +100,21 @@ public abstract class DiscoveryServiceTestBase {
     }, Threads.SAME_THREAD_EXECUTOR);
 
     // An empty list will be received first, as no endpoint has been registered.
-    List<Discoverable> discoverables = events.poll(5, TimeUnit.SECONDS);
+    List<Discoverable> discoverables = events.poll(20, TimeUnit.SECONDS);
     Assert.assertNotNull(discoverables);
     Assert.assertTrue(discoverables.isEmpty());
 
     // Register a service
     Cancellable cancellable = register(discoveryService, serviceName, "localhost", 10000);
 
-    discoverables = events.poll(5, TimeUnit.SECONDS);
+    discoverables = events.poll(20, TimeUnit.SECONDS);
     Assert.assertNotNull(discoverables);
     Assert.assertEquals(1, discoverables.size());
 
     // Register another service endpoint
     Cancellable cancellable2 = register(discoveryService, serviceName, "localhost", 10001);
 
-    discoverables = events.poll(5, TimeUnit.SECONDS);
+    discoverables = events.poll(20, TimeUnit.SECONDS);
     Assert.assertNotNull(discoverables);
     Assert.assertEquals(2, discoverables.size());
 
@@ -123,10 +123,10 @@ public abstract class DiscoveryServiceTestBase {
     cancellable2.cancel();
 
     // There could be more than one event triggered, but the last event should be an empty list.
-    discoverables = events.poll(5, TimeUnit.SECONDS);
+    discoverables = events.poll(20, TimeUnit.SECONDS);
     Assert.assertNotNull(discoverables);
     if (!discoverables.isEmpty()) {
-      discoverables = events.poll(5, TimeUnit.SECONDS);
+      discoverables = events.poll(20, TimeUnit.SECONDS);
     }
 
     Assert.assertTrue(discoverables.isEmpty());
