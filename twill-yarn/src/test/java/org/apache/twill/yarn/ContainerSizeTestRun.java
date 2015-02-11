@@ -49,7 +49,7 @@ public class ContainerSizeTestRun extends BaseYarnTest {
 
     try {
       ServiceDiscovered discovered = controller.discoverService("sleep");
-      Assert.assertTrue(YarnTestUtils.waitForSize(discovered, 2, 60));
+      Assert.assertTrue(YarnTestUtils.waitForSize(discovered, 2, 120));
     } finally {
       controller.stopAndWait();
     }
@@ -87,7 +87,7 @@ public class ContainerSizeTestRun extends BaseYarnTest {
 
 
   /**
-   * A runnable that sleep for 30 seconds.
+   * A runnable that sleep for 120 seconds.
    */
   public static final class SleepRunnable extends AbstractTwillRunnable {
 
@@ -100,10 +100,9 @@ public class ContainerSizeTestRun extends BaseYarnTest {
     @Override
     public void run() {
       runThread = Thread.currentThread();
-      Random random = new Random();
       getContext().announce("sleep", Integer.parseInt(getContext().getSpecification().getConfigs().get("port")));
       try {
-        TimeUnit.SECONDS.sleep(30);
+        TimeUnit.SECONDS.sleep(120);
       } catch (InterruptedException e) {
         // Ignore.
       }
