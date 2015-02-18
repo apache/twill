@@ -28,6 +28,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.zookeeper.ACLData;
 import org.apache.twill.zookeeper.AbstractZKClient;
@@ -110,10 +111,24 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
   }
 
   @Override
-  public void addConnectionWatcher(Watcher watcher) {
-    if (watcher != null) {
-      connectionWatchers.add(wrapWatcher(watcher));
+  public Cancellable addConnectionWatcher(Watcher watcher) {
+    if (watcher == null) {
+      return new Cancellable() {
+        @Override
+        public void cancel() {
+          // No-op
+        }
+      };
     }
+
+    final Watcher wrappedWatcher = wrapWatcher(watcher);
+    connectionWatchers.add(wrappedWatcher);
+    return new Cancellable() {
+      @Override
+      public void cancel() {
+        connectionWatchers.remove(wrappedWatcher);
+      }
+    };
   }
 
   @Override

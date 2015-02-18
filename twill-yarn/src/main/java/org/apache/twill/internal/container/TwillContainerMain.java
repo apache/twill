@@ -37,7 +37,6 @@ import org.apache.twill.internal.Arguments;
 import org.apache.twill.internal.BasicTwillContext;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerInfo;
-import org.apache.twill.internal.ElectionRegistry;
 import org.apache.twill.internal.EnvContainerInfo;
 import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.RunIds;
@@ -83,9 +82,7 @@ public final class TwillContainerMain extends ServiceMain {
     ZKClientService zkClientService = createZKClient(zkConnectStr);
     ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
-    ZKClient electionZKClient = getAppRunZKClient(zkClientService, appRunId);
-    // leader elections are namespaced by the application
-    ElectionRegistry electionRegistry = new ElectionRegistry(electionZKClient);
+    ZKClient appRunZkClient = getAppRunZKClient(zkClientService, appRunId);
 
     TwillSpecification twillSpec = loadTwillSpec(twillSpecFile);
     renameLocalFiles(twillSpec.getRunnables().get(runnableName));
@@ -97,7 +94,7 @@ public final class TwillContainerMain extends ServiceMain {
       runId, appRunId, containerInfo.getHost(),
       arguments.getRunnableArguments().get(runnableName).toArray(new String[0]),
       arguments.getArguments().toArray(new String[0]),
-      runnableSpec, instanceId, discoveryService, discoveryService, electionRegistry,
+      runnableSpec, instanceId, discoveryService, discoveryService, appRunZkClient,
       instanceCount, containerInfo.getMemoryMB(), containerInfo.getVirtualCores()
     );
 
@@ -145,6 +142,9 @@ public final class TwillContainerMain extends ServiceMain {
     }
   }
 
+  /**
+   * Returns a {@link ZKClient} that namespaced under the given run id.
+   */
   private static ZKClient getAppRunZKClient(ZKClient zkClient, RunId appRunId) {
     return ZKClients.namespace(zkClient, String.format("/%s", appRunId));
   }

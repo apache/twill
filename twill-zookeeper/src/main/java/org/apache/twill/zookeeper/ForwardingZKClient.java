@@ -17,6 +17,7 @@
  */
 package org.apache.twill.zookeeper;
 
+import org.apache.twill.common.Cancellable;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.data.ACL;
@@ -50,8 +51,8 @@ public abstract class ForwardingZKClient extends AbstractZKClient {
   }
 
   @Override
-  public void addConnectionWatcher(Watcher watcher) {
-    delegate.addConnectionWatcher(watcher);
+  public Cancellable addConnectionWatcher(Watcher watcher) {
+    return delegate.addConnectionWatcher(watcher);
   }
 
   @Override

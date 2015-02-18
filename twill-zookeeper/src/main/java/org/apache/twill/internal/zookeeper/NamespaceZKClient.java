@@ -19,6 +19,7 @@ package org.apache.twill.internal.zookeeper;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.zookeeper.ACLData;
 import org.apache.twill.zookeeper.ForwardingZKClient;
@@ -62,8 +63,8 @@ public final class NamespaceZKClient extends ForwardingZKClient {
   }
 
   @Override
-  public void addConnectionWatcher(Watcher watcher) {
-    delegate.addConnectionWatcher(watcher);
+  public Cancellable addConnectionWatcher(Watcher watcher) {
+    return delegate.addConnectionWatcher(watcher);
   }
 
   @Override

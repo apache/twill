@@ -17,6 +17,7 @@
  */
 package org.apache.twill.zookeeper;
 
+import org.apache.twill.common.Cancellable;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.data.ACL;
@@ -74,8 +75,8 @@ public final class ZKClientServices {
       }
 
       @Override
-      public void addConnectionWatcher(Watcher watcher) {
-        client.addConnectionWatcher(watcher);
+      public Cancellable addConnectionWatcher(Watcher watcher) {
+        return client.addConnectionWatcher(watcher);
       }
 
       public OperationFuture<String> create(String path, @Nullable byte[] data,
