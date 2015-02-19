@@ -25,7 +25,7 @@ limitations under the License.
     <parent>
         <artifactId>twill-examples</artifactId>
         <groupId>org.apache.twill</groupId>
-        <version>0.5.0-incubating</version>
+        <version>0.6.0-incubating-SNAPSHOT</version>
     </parent>
 
     <name>Apache Twill examples: Echo</name>
