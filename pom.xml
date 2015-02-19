@@ -367,7 +367,7 @@
                         <artifactId>maven-assembly-plugin</artifactId>
                         <version>2.4</version>
                         <configuration>
-                            <finalName>twill-${project.version}</finalName>
+                            <finalName>apache-twill-${project.version}</finalName>
                             <formats>
                                 <format>tar.gz</format>
                             </formats>
