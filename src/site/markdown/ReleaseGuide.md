@@ -102,6 +102,15 @@ shasum -a 512 apache-twill-[RELEASE_VERSION]-incubating-source-release.tar.gz > 
    to `dist.apache.org/repos/dist/dev/incubator/twill/[RELEASE_VERSION]-incubating-rc1/CHANGES.txt`
 1. Go to [https://repository.apache.org](https://repository.apache.org) and close the staging repository.
 
+#### Increase the version in master
+```
+git checkout master
+git merge --no-ff branch-[RELEASE_VERSION]
+mvn versions:set -DgenerateBackupPom=false -DnewVersion=[NEXT_RELEASE_VERSION]-incubating-SNAPSHOT
+git commit . -m "Bump version to [NEXT_RELEASE_VERSION]-incubating-SNAPSHOT"
+git push origin master
+```
+
 #### Vote for release in dev mailing list
 Create a vote in the `dev@twill` mailing list and wait for 72 hours for the vote result.
 Here is a template for the email:
