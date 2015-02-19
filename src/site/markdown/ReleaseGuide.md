@@ -55,7 +55,7 @@ The `[RELEASE_VERSION]` is something such as `0.5.0`.
 
 #### Update the version to the non-snapshot version
 ```
-mvn versions:set -DgenerateBackupPom=false -DnewVersion=[RELEASE_VERSION]-incubating
+mvn versions:set -DgenerateBackupPoms=false -DnewVersion=[RELEASE_VERSION]-incubating
 git commit . -m "Prepare for releasing [RELEASE_VERSION]-incubating"
 ```
 
@@ -83,7 +83,7 @@ git push origin v[RELEASE_VERSION]
 ```
 mvn clean prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.0 &&
 mvn prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 &&
-mvn deploy -DskipTests -Dremoteresources.skip=true -P hadoopp-2.3 -P apache-release
+mvn deploy -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 -P apache-release
 ```
 The source tarball can be found in `target/apache-twill-[RELEASE_VERSION]-incubating-source-release.tar.gz`
 after the above command has successfully completed.
@@ -106,7 +106,7 @@ shasum -a 512 apache-twill-[RELEASE_VERSION]-incubating-source-release.tar.gz > 
 ```
 git checkout master
 git merge --no-ff branch-[RELEASE_VERSION]
-mvn versions:set -DgenerateBackupPom=false -DnewVersion=[NEXT_RELEASE_VERSION]-incubating-SNAPSHOT
+mvn versions:set -DgenerateBackupPoms=false -DnewVersion=[NEXT_RELEASE_VERSION]-incubating-SNAPSHOT
 git commit . -m "Bump version to [NEXT_RELEASE_VERSION]-incubating-SNAPSHOT"
 git push origin master
 ```
