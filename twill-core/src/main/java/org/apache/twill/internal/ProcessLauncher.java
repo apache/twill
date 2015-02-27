@@ -44,51 +44,29 @@ public interface ProcessLauncher<T> {
    */
   interface PrepareLaunchContext {
 
-    ResourcesAdder withResources();
+    /**
+     * Adds list of files to be localized for the container
+     */
+    PrepareLaunchContext addResources(LocalFile...localFiles);
 
-    AfterResources noResources();
+    /**
+     * Adds list of files to be localized for the container.
+     */
+    PrepareLaunchContext addResources(Iterable<LocalFile> localFiles);
 
-    interface ResourcesAdder {
-      MoreResources add(LocalFile localFile);
-    }
+    /**
+     * Adds a key value pair to the container environment.
+     */
+    <V> PrepareLaunchContext addEnvironment(String key, V value);
 
-    interface AfterResources {
-      EnvironmentAdder withEnvironment();
+    /**
+     * Adds a command line to run in the container process.
+     */
+    PrepareLaunchContext addCommand(String cmd, String...args);
 
-      AfterEnvironment noEnvironment();
-    }
-
-    interface EnvironmentAdder {
-      <V> MoreEnvironment add(String key, V value);
-    }
-
-    interface MoreEnvironment extends EnvironmentAdder, AfterEnvironment {
-    }
-
-    interface AfterEnvironment {
-      CommandAdder withCommands();
-    }
-
-    interface MoreResources extends ResourcesAdder, AfterResources { }
-
-    interface CommandAdder {
-      StdOutSetter add(String cmd, String...args);
-    }
-
-    interface StdOutSetter {
-      StdErrSetter redirectOutput(String stdout);
-
-      StdErrSetter noOutput();
-    }
-
-    interface StdErrSetter {
-      MoreCommand redirectError(String stderr);
-
-      MoreCommand noError();
-    }
-
-    interface MoreCommand extends CommandAdder {
-      <R> ProcessController<R> launch();
-    }
+    /**
+     * Launches the container process.
+     */
+    <R> ProcessController<R> launch();
   }
 }

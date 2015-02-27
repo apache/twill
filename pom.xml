@@ -29,7 +29,7 @@
 
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-parent</artifactId>
-    <version>0.5.0-incubating-SNAPSHOT</version>
+    <version>0.6.0-incubating-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Apache Twill</name>
     <url>http://twill.incubator.apache.org</url>
@@ -367,7 +367,7 @@
                         <artifactId>maven-assembly-plugin</artifactId>
                         <version>2.4</version>
                         <configuration>
-                            <finalName>twill-${project.version}</finalName>
+                            <finalName>apache-twill-${project.version}</finalName>
                             <formats>
                                 <format>tar.gz</format>
                             </formats>

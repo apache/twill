@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  *
@@ -58,7 +59,8 @@ public final class Hadoop21YarnAppClient extends AbstractIdleService implements 
   }
 
   @Override
-  public ProcessLauncher<ApplicationId> createLauncher(TwillSpecification twillSpec) throws Exception {
+  public ProcessLauncher<ApplicationId> createLauncher(TwillSpecification twillSpec,
+                                                       @Nullable String schedulerQueue) throws Exception {
     // Request for new application
     YarnClientApplication application = yarnClient.createApplication();
     final GetNewApplicationResponse response = application.getNewApplicationResponse();
@@ -68,6 +70,10 @@ public final class Hadoop21YarnAppClient extends AbstractIdleService implements 
     final ApplicationSubmissionContext appSubmissionContext = application.getApplicationSubmissionContext();
     appSubmissionContext.setApplicationId(appId);
     appSubmissionContext.setApplicationName(twillSpec.getName());
+
+    if (schedulerQueue != null) {
+      appSubmissionContext.setQueue(schedulerQueue);
+    }
 
     ApplicationSubmitter submitter = new ApplicationSubmitter() {
       @Override
@@ -128,9 +134,11 @@ public final class Hadoop21YarnAppClient extends AbstractIdleService implements 
   }
 
   @Override
-  public ProcessLauncher<ApplicationId> createLauncher(String user, TwillSpecification twillSpec) throws Exception {
+  public ProcessLauncher<ApplicationId> createLauncher(String user,
+                                                       TwillSpecification twillSpec,
+                                                       @Nullable String schedulerQueue) throws Exception {
     // Ignore user
-    return createLauncher(twillSpec);
+    return createLauncher(twillSpec, schedulerQueue);
   }
 
   @Override

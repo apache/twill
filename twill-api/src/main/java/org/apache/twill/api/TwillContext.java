@@ -22,6 +22,7 @@ import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.apache.twill.discovery.ServiceDiscovered;
 
 import java.net.InetAddress;
+import java.util.concurrent.locks.Lock;
 
 /**
  * Represents the runtime context of a {@link TwillRunnable}.
@@ -94,4 +95,13 @@ public interface TwillContext extends ServiceAnnouncer, DiscoveryServiceClient {
    * @return A {@link org.apache.twill.common.Cancellable} object representing this candidate's participation.
    */
   Cancellable electLeader(String name, ElectionHandler participantHandler);
+
+  /**
+   * Creates a {@link Lock} for performing locking mechanism within the same {@link TwillApplication}.
+   * The lock created is a reentrant such that if the lock is owned by the current thread, it will return immediately.
+   *
+   * @param name Unique name for the lock
+   * @return A {@link Lock} object
+   */
+  Lock createLock(String name);
 }

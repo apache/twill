@@ -25,7 +25,7 @@ limitations under the License.
     <parent>
         <groupId>org.apache.twill</groupId>
         <artifactId>twill-parent</artifactId>
-        <version>0.5.0-incubating-SNAPSHOT</version>
+        <version>0.6.0-incubating-SNAPSHOT</version>
     </parent>
 
     <artifactId>twill-examples</artifactId>

@@ -17,6 +17,7 @@
  */
 package org.apache.twill.zookeeper;
 
+import org.apache.twill.common.Cancellable;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.data.ACL;
@@ -43,8 +44,9 @@ public interface ZKClient {
   /**
    * Adds a {@link Watcher} that will be called whenever connection state change.
    * @param watcher The watcher to set.
+   * @return A {@link Cancellable} for removing the watcher
    */
-  void addConnectionWatcher(Watcher watcher);
+  Cancellable addConnectionWatcher(Watcher watcher);
 
   /**
    * Creates a path in zookeeper. Same as calling
