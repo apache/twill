@@ -77,7 +77,7 @@ public final class TwillLauncher {
     URLClassLoader classLoader = createClassLoader(targetDir, Boolean.parseBoolean(args[2]));
     Thread.currentThread().setContextClassLoader(classLoader);
 
-    System.out.println("Launch class with classpath: " + Arrays.toString(classLoader.getURLs()));
+    System.out.println("Launch class (" + args[1] + ") with classpath: " + Arrays.toString(classLoader.getURLs()));
 
     Class<?> mainClass = classLoader.loadClass(args[1]);
     Method mainMethod = mainClass.getMethod("main", String[].class);
