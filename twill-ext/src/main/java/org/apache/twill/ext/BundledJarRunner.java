@@ -57,7 +57,6 @@ public class BundledJarRunner {
 
   private final File jarFile;
   private final Arguments arguments;
-  private Object mainObject;
   private Method mainMethod;
 
   public BundledJarRunner(File jarFile, Arguments arguments) {
@@ -108,18 +107,16 @@ public class BundledJarRunner {
     LOG.debug("Instantiating instance of " + mainClassName);
     Class<?> cls = classLoader.loadClass(mainClassName);
     mainMethod = cls.getMethod("main", String[].class);
-    mainObject = cls.newInstance();
   }
 
   public void run() throws Throwable {
     Preconditions.checkNotNull(mainMethod, "Must call load() first");
-    Preconditions.checkNotNull(mainObject, "Must call load() first");
     String mainClassName = arguments.getMainClassName();
     String[] args = arguments.getMainArgs();
 
     try {
       LOG.info("Invoking " + mainClassName + ".main(" + Arrays.toString(args) + ")");
-      mainMethod.invoke(mainObject, new Object[] { args });
+      mainMethod.invoke(null, new Object[] { args });
     } catch (Throwable t) {
       LOG.error("Error while trying to run " + mainClassName + " within " + jarFile.getAbsolutePath(), t);
       throw t;
