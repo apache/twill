@@ -30,6 +30,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.TypePath;
 import org.objectweb.asm.signature.SignatureReader;
 import org.objectweb.asm.signature.SignatureVisitor;
 
@@ -158,25 +159,14 @@ public final class Dependencies {
   private static final class DependencyClassVisitor extends ClassVisitor {
 
     private final SignatureVisitor signatureVisitor;
+    private final AnnotationVisitor annotationVisitor;
     private final DependencyAcceptor acceptor;
 
     public DependencyClassVisitor(DependencyAcceptor acceptor) {
-      super(Opcodes.ASM4);
+      super(Opcodes.ASM5);
       this.acceptor = acceptor;
-      this.signatureVisitor = new SignatureVisitor(Opcodes.ASM4) {
-        private String currentClass;
-
-        @Override
-        public void visitClassType(String name) {
-          currentClass = name;
-          addClass(name);
-        }
-
-        @Override
-        public void visitInnerClassType(String name) {
-          addClass(currentClass + "$" + name);
-        }
-      };
+      this.signatureVisitor = createSignatureVisitor();
+      this.annotationVisitor = createAnnotationVisitor();
     }
 
     @Override
@@ -198,8 +188,11 @@ public final class Dependencies {
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+      if (!visible) {
+        return null;
+      }
       addType(Type.getType(desc));
-      return null;
+      return annotationVisitor;
     }
 
     @Override
@@ -215,11 +208,14 @@ public final class Dependencies {
         addType(Type.getType(desc));
       }
 
-      return new FieldVisitor(Opcodes.ASM4) {
+      return new FieldVisitor(Opcodes.ASM5) {
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+          if (!visible) {
+            return null;
+          }
           addType(Type.getType(desc));
-          return null;
+          return annotationVisitor;
         }
       };
     }
@@ -233,17 +229,24 @@ public final class Dependencies {
       }
       addClasses(exceptions);
 
-      return new MethodVisitor(Opcodes.ASM4) {
+      return new MethodVisitor(Opcodes.ASM5) {
+
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+          if (!visible) {
+            return null;
+          }
           addType(Type.getType(desc));
-          return null;
+          return annotationVisitor;
         }
 
         @Override
         public AnnotationVisitor visitParameterAnnotation(int parameter, String desc, boolean visible) {
+          if (!visible) {
+            return null;
+          }
           addType(Type.getType(desc));
-          return null;
+          return annotationVisitor;
         }
 
         @Override
@@ -258,7 +261,7 @@ public final class Dependencies {
         }
 
         @Override
-        public void visitMethodInsn(int opcode, String owner, String name, String desc) {
+        public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
           addType(Type.getObjectType(owner));
           addMethod(desc);
         }
@@ -268,6 +271,16 @@ public final class Dependencies {
           if (cst instanceof Type) {
             addType((Type) cst);
           }
+        }
+
+        @Override
+        public AnnotationVisitor visitLocalVariableAnnotation(int typeRef, TypePath typePath, Label[] start,
+                                                              Label[] end, int[] index, String desc, boolean visible) {
+          if (!visible) {
+            return null;
+          }
+          addType(Type.getType(desc));
+          return annotationVisitor;
         }
 
         @Override
@@ -315,6 +328,56 @@ public final class Dependencies {
       for (Type type : Type.getArgumentTypes(desc)) {
         addType(type);
       }
+    }
+
+    /**
+     * Creates a {@link SignatureVisitor} for gathering dependency information from class signature.
+     */
+    private SignatureVisitor createSignatureVisitor() {
+      return new SignatureVisitor(Opcodes.ASM5) {
+        private String currentClass;
+
+        @Override
+        public void visitClassType(String name) {
+          currentClass = name;
+          addClass(name);
+        }
+
+        @Override
+        public void visitInnerClassType(String name) {
+          addClass(currentClass + "$" + name);
+        }
+      };
+    }
+
+    /**
+     * Creates an {@link AnnotationVisitor} for gathering dependency information from annotations.
+     */
+    private AnnotationVisitor createAnnotationVisitor() {
+      return new AnnotationVisitor(Opcodes.ASM5) {
+        @Override
+        public void visit(String name, Object value) {
+          if (value instanceof Type) {
+            addType((Type) value);
+          }
+        }
+
+        @Override
+        public AnnotationVisitor visitAnnotation(String name, String desc) {
+          addType(Type.getType(desc));
+          return this;
+        }
+
+        @Override
+        public AnnotationVisitor visitArray(String name) {
+          return this;
+        }
+
+        @Override
+        public void visitEnum(String name, String desc, String value) {
+          addType(Type.getType(desc));
+        }
+      };
     }
   }
 
