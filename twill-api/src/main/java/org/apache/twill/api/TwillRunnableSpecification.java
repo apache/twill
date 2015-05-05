@@ -17,9 +17,9 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.collect.ImmutableMap;
 import org.apache.twill.internal.DefaultTwillRunnableSpecification;
 
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -36,7 +36,7 @@ public interface TwillRunnableSpecification {
   /**
    * Builder for constructing {@link TwillRunnableSpecification}.
    */
-  static final class Builder {
+  final class Builder {
 
     private String name;
     private Map<String, String> args;
@@ -59,7 +59,7 @@ public interface TwillRunnableSpecification {
       }
 
       public AfterConfigs noConfigs() {
-        Builder.this.args = ImmutableMap.of();
+        Builder.this.args = Collections.emptyMap();
         return new AfterConfigs();
       }
     }

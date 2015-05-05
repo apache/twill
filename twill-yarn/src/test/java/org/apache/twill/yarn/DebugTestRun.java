@@ -24,7 +24,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.junit.Assert;
 import org.junit.Test;
@@ -104,23 +103,23 @@ public class DebugTestRun extends BaseYarnTest {
   @Test
   public void testDebugPortOneRunnable() throws Exception {
     YarnTwillRunnerService runner = (YarnTwillRunnerService) YarnTestUtils.getTwillRunner();
-    runner.startAndWait();
+    runner.start();
 
     TwillController controller = runner.prepare(new DummyApplication())
                                        .enableDebugging("r1")
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
                                        .start();
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
     Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
     Assert.assertTrue(waitForDebugPort(controller, "r1", 30));
-    controller.stop().get(120, TimeUnit.SECONDS);
+    controller.terminate().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -128,16 +127,16 @@ public class DebugTestRun extends BaseYarnTest {
   @Test
   public void testDebugPortAllRunnables() throws Exception {
     YarnTwillRunnerService runner = (YarnTwillRunnerService) YarnTestUtils.getTwillRunner();
-    runner.startAndWait();
+    runner.start();
 
     TwillController controller = runner.prepare(new DummyApplication())
                                        .enableDebugging()
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
                                        .start();
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -145,7 +144,7 @@ public class DebugTestRun extends BaseYarnTest {
     Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
     Assert.assertTrue(waitForDebugPort(controller, "r1", 30));
     Assert.assertTrue(waitForDebugPort(controller, "r2", 30));
-    controller.stop().get(120, TimeUnit.SECONDS);
+    controller.terminate().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }

@@ -17,13 +17,25 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.util.concurrent.Service;
-
 /**
- * A {@link TwillRunner} that extends {@link Service} to provide lifecycle management functions.
+ * A {@link TwillRunner} that provides lifecycle management functions.
  * The {@link #start()} method needs to be called before calling any other method of this interface.
  * When done with this service, call {@link #stop()} to release any resources that it holds.
  */
-public interface TwillRunnerService extends TwillRunner, Service {
+public interface TwillRunnerService extends TwillRunner {
 
+  /**
+   * Starts the service. Calling this method on a already started instance has no effect.
+   * A service that is stopped cannot be started again.
+   *
+   * @throws RuntimeException if the service failed to start.
+   */
+  void start();
+
+  /**
+   * Stops the service. Calling this method on a already stopped instance has no effect.
+   *
+   * @throws RuntimeException if the service failed to start.
+   */
+  void stop();
 }

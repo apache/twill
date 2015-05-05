@@ -17,15 +17,16 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Service;
-
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This interface is for controlling a remote running service.
  */
-public interface ServiceController extends Service {
+public interface ServiceController {
 
   /**
    * Returns the {@link RunId} of the running application.
@@ -35,19 +36,30 @@ public interface ServiceController extends Service {
   /**
    * Sends a user command to the running application.
    * @param command The command to send.
-   * @return A {@link ListenableFuture} that will be completed when the command is successfully processed
+   * @return A {@link Future} that will be completed when the command is successfully processed
    *         by the target application.
    */
-  ListenableFuture<Command> sendCommand(Command command);
+  Future<Command> sendCommand(Command command);
 
   /**
    * Sends a user command to the given runnable of the running application.
    * @param runnableName Name of the {@link TwillRunnable}.
    * @param command The command to send.
-   * @return A {@link ListenableFuture} that will be completed when the command is successfully processed
+   * @return A {@link Future} that will be completed when the command is successfully processed
    *         by the target runnable.
    */
-  ListenableFuture<Command> sendCommand(String runnableName, Command command);
+  Future<Command> sendCommand(String runnableName, Command command);
+
+  /**
+   * Requests to terminate the running service. The service will be given chance to shutdown gracefully.
+   * This method returns immediately and caller can get the termination state through the future returned.
+   * Calling this method multiple times is allowed and a {@link Future} representing the termination state
+   * will be returned.
+   *
+   * @return a {@link Future} that represents the termination of the service. The future result will be
+   * this {@link ServiceController}. If the service terminated due to exception, the future will carry the exception.
+   */
+  Future<? extends ServiceController> terminate();
 
   /**
    * Requests to forcefully kill a running service.
@@ -55,16 +67,35 @@ public interface ServiceController extends Service {
   void kill();
 
   /**
-   * Registers a {@link Listener} to be {@linkplain Executor#execute executed} on the given
-   * executor.  The listener will have the corresponding transition method called whenever the
-   * service changes state. When added, the current state of the service will be reflected through
-   * callback to the listener. Methods on the listener is guaranteed to be called no more than once.
+   * Attaches a {@link Runnable} that will get executed when the service is running.
    *
-   * @param listener the listener to run when the service changes state is complete
-   * @param executor the executor in which the the listeners callback methods will be run. For fast,
-   *     lightweight listeners that would be safe to execute in any thread, consider
-   *     {@link com.google.common.util.concurrent.MoreExecutors#sameThreadExecutor}.
+   * @param runnable the {@link Runnable} to be executed when the service is running.
+   * @param executor the executor in which the runnable will be executed with.
    */
-  @Override
-  void addListener(Listener listener, Executor executor);
+  void onRunning(Runnable runnable, Executor executor);
+
+  /**
+   * Attaches a {@link Runnable} that will get executed when the serivce is terminated.
+   *
+   * @param runnable the {@link Runnable} to be executed when the service is terminated.
+   * @param executor the executor in which the runnable will be executed with.
+   */
+  void onTerminated(Runnable runnable, Executor executor);
+
+  /**
+   * Waits for termination of the remote service.
+   *
+   * @throws ExecutionException if the service terminated due to exception.
+   */
+  void awaitTerminated() throws ExecutionException;
+
+  /**
+   * Waits for termination of the remote service for no more than the given timeout limit.
+   *
+   * @param timeout the maximum time to wait
+   * @param timeoutUnit the time unit of the timeout
+   * @throws TimeoutException if the service is not terminated within the given time.
+   * @throws ExecutionException if the service terminated due to exception.
+   */
+  void awaitTerminated(long timeout, TimeUnit timeoutUnit) throws TimeoutException, ExecutionException;
 }

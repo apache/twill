@@ -197,14 +197,14 @@ public class ZKClientTest {
         });
 
         client.create("/expireRewatch", null, CreateMode.PERSISTENT);
-        Assert.assertEquals(Watcher.Event.EventType.NodeCreated, events.poll(20, TimeUnit.SECONDS));
+        Assert.assertEquals(Watcher.Event.EventType.NodeCreated, events.poll(60, TimeUnit.SECONDS));
 
         KillZKSession.kill(client.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 10000);
 
-        Assert.assertTrue(expireReconnectLatch.await(20, TimeUnit.SECONDS));
+        Assert.assertTrue(expireReconnectLatch.await(60, TimeUnit.SECONDS));
 
         client.delete("/expireRewatch");
-        Assert.assertEquals(Watcher.Event.EventType.NodeDeleted, events.poll(20, TimeUnit.SECONDS));
+        Assert.assertEquals(Watcher.Event.EventType.NodeDeleted, events.poll(60, TimeUnit.SECONDS));
       } finally {
         client.stopAndWait();
       }

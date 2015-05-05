@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.common;
+package org.apache.twill.internal;
 
 import com.google.common.util.concurrent.Service;
 

@@ -18,9 +18,7 @@
 package org.apache.twill.discovery;
 
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.Futures;
 import org.apache.twill.common.Cancellable;
-import org.apache.twill.common.Services;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.internal.zookeeper.KillZKSession;
 import org.apache.twill.zookeeper.RetryStrategies;
@@ -61,7 +59,8 @@ public class ZKDiscoveryServiceTest extends DiscoveryServiceTestBase {
 
   @AfterClass
   public static void afterClass() {
-    Futures.getUnchecked(Services.chainStop(zkClient, zkServer));
+    zkClient.stopAndWait();
+    zkServer.stopAndWait();
   }
 
   @Test (timeout = 10000)

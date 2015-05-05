@@ -278,6 +278,7 @@
                             <exclude>**/README</exclude>
                             <exclude>src/test/resources/header.txt</exclude>
                             <exclude>**/zookeeper.out</exclude>
+                            <exclude>twill-java8-test/target/**</exclude>
                         </excludes>
                     </configuration>
                     <executions>
@@ -748,6 +749,7 @@
                 <groupId>com.google.code.findbugs</groupId>
                 <artifactId>jsr305</artifactId>
                 <version>${findbugs.jsr305.version}</version>
+                <optional>true</optional>
             </dependency>
             <dependency>
                 <groupId>com.google.code.gson</groupId>

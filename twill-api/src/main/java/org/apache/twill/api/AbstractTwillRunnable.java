@@ -17,8 +17,8 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.collect.ImmutableMap;
-
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -30,11 +30,11 @@ public abstract class AbstractTwillRunnable implements TwillRunnable {
   private TwillContext context;
 
   protected AbstractTwillRunnable() {
-    this.args = ImmutableMap.of();
+    this(Collections.<String, String>emptyMap());
   }
 
   protected AbstractTwillRunnable(Map<String, String> args) {
-    this.args = ImmutableMap.copyOf(args);
+    this.args = Collections.unmodifiableMap(new HashMap<String, String>(args));
   }
 
   @Override

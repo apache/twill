@@ -29,7 +29,6 @@ import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.internal.EnvKeys;
@@ -96,9 +95,9 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -128,7 +127,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       }
     }
 
-    controller.stop().get(120, TimeUnit.SECONDS);
+    controller.terminate().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -150,9 +149,9 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -190,7 +189,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     }
     Assert.assertTrue("Still has 2 contains running after 100 seconds", count < 100);
 
-    controller.stop().get(100, TimeUnit.SECONDS);
+    controller.terminate().get(100, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -208,9 +207,9 @@ public final class ResourceReportTestRun extends BaseYarnTest {
                                         .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -280,7 +279,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       Assert.assertEquals(512, resources.getMemoryMB());
     }
 
-    controller.stop().get(120, TimeUnit.SECONDS);
+    controller.terminate().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }

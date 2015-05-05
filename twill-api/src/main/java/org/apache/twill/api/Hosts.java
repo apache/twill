@@ -17,9 +17,9 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.collect.ImmutableSet;
-
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -30,14 +30,15 @@ public class Hosts {
   private final Set<String> hosts;
 
   public Hosts(Set<String> hosts) {
-    this.hosts = ImmutableSet.copyOf(hosts);
+    this.hosts = Collections.unmodifiableSet(new HashSet<String>(hosts));
   }
 
   public Hosts(String host, String...moreHosts) {
-    this.hosts = ImmutableSet.<String>builder()
-      .add(host)
-      .addAll(Arrays.asList(moreHosts))
-      .build();
+    Set<String> hosts = new HashSet<String>();
+    hosts.add(host);
+    hosts.addAll(Arrays.asList(moreHosts));
+
+    this.hosts = Collections.unmodifiableSet(hosts);
   }
 
   /**

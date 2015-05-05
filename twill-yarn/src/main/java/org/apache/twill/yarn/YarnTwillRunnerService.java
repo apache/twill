@@ -37,6 +37,7 @@ import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Callables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.Service;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -59,7 +60,6 @@ import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.common.Cancellable;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.Location;
@@ -104,7 +104,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * An implementation of {@link org.apache.twill.api.TwillRunnerService} that runs application on a YARN cluster.
  */
-public final class YarnTwillRunnerService extends AbstractIdleService implements TwillRunnerService {
+public final class YarnTwillRunnerService implements TwillRunnerService {
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnTwillRunnerService.class);
 
@@ -128,6 +128,8 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
   private final ZKClientService zkClientService;
   private final LocationFactory locationFactory;
   private final Table<String, RunId, YarnTwillController> controllers;
+  // A Guava service to help the state transition.
+  private final Service serviceDelegate;
   private ScheduledExecutorService secureStoreScheduler;
 
   private Iterable<LiveInfo> liveInfos;
@@ -159,6 +161,27 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
     this.locationFactory = locationFactory;
     this.zkClientService = getZKClientService(zkConnect);
     this.controllers = HashBasedTable.create();
+    this.serviceDelegate = new AbstractIdleService() {
+      @Override
+      protected void startUp() throws Exception {
+        YarnTwillRunnerService.this.startUp();
+      }
+
+      @Override
+      protected void shutDown() throws Exception {
+        YarnTwillRunnerService.this.shutDown();
+      }
+    };
+  }
+
+  @Override
+  public void start() {
+    serviceDelegate.startAndWait();
+  }
+
+  @Override
+  public void stop() {
+    serviceDelegate.stopAndWait();
   }
 
   /**
@@ -249,7 +272,7 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
 
   @Override
   public TwillPreparer prepare(TwillApplication application) {
-    Preconditions.checkState(isRunning(), "Service not start. Please call start() first.");
+    Preconditions.checkState(serviceDelegate.isRunning(), "Service not start. Please call start() first.");
     final TwillSpecification twillSpec = application.configure();
     final String appName = twillSpec.getName();
 
@@ -294,8 +317,7 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
     return liveInfos;
   }
 
-  @Override
-  protected void startUp() throws Exception {
+  private void startUp() throws Exception {
     yarnAppClient.startAndWait();
     zkClientService.startAndWait();
 
@@ -322,8 +344,7 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
     }
   }
 
-  @Override
-  protected void shutDown() throws Exception {
+  private void shutDown() throws Exception {
     // Shutdown shouldn't stop any controllers, as stopping this client service should let the remote containers
     // running. However, this assumes that this TwillRunnerService is a long running service and you only stop it
     // when the JVM process is about to exit. Hence it is important that threads created in the controllers are
@@ -408,26 +429,16 @@ public final class YarnTwillRunnerService extends AbstractIdleService implements
   }
 
   private YarnTwillController listenController(final YarnTwillController controller) {
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onTerminated(new Runnable() {
       @Override
-      public void terminated(State from) {
-        removeController();
-      }
-
-      @Override
-      public void failed(State from, Throwable failure) {
-        removeController();
-      }
-
-      private void removeController() {
+      public void run() {
         synchronized (YarnTwillRunnerService.this) {
-          Iterables.removeIf(controllers.values(),
-                             new Predicate<TwillController>() {
-             @Override
-             public boolean apply(TwillController input) {
-               return input == controller;
-             }
-           });
+          Iterables.removeIf(controllers.values(), new Predicate<YarnTwillController>() {
+            @Override
+            public boolean apply(YarnTwillController input) {
+              return input == controller;
+            }
+          });
         }
       }
     }, Threads.SAME_THREAD_EXECUTOR);

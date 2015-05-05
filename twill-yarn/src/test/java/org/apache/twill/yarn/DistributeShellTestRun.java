@@ -17,11 +17,9 @@
  */
 package org.apache.twill.yarn;
 
-import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -46,15 +44,9 @@ public final class DistributeShellTestRun extends BaseYarnTest {
                                             .start();
 
     final CountDownLatch stopLatch = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
-
+    controller.onTerminated(new Runnable() {
       @Override
-      public void terminated(Service.State from) {
-        stopLatch.countDown();
-      }
-
-      @Override
-      public void failed(Service.State from, Throwable failure) {
+      public void run() {
         stopLatch.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);

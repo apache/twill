@@ -19,15 +19,11 @@ package org.apache.twill.yarn;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Service;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
-import org.apache.twill.common.Services;
 import org.apache.twill.common.Threads;
 import org.apache.zookeeper.jmx.MBeanRegistry;
 import org.apache.zookeeper.server.ConnectionMXBean;
@@ -57,16 +53,16 @@ public class SessionExpireTestRun extends BaseYarnTest {
   private static final Logger LOG = LoggerFactory.getLogger(SessionExpireTestRun.class);
 
   @Test
-  public void testAppSessionExpire() throws InterruptedException, ExecutionException {
+  public void testAppSessionExpire() throws InterruptedException, ExecutionException, TimeoutException {
     TwillRunner runner = YarnTestUtils.getTwillRunner();
     TwillController controller = runner.prepare(new SleepRunnable(600))
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                        .start();
 
     final CountDownLatch runLatch = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         runLatch.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -78,16 +74,15 @@ public class SessionExpireTestRun extends BaseYarnTest {
     for (int i = 0; i < 2; i++) {
       Assert.assertTrue(expireAppMasterZKSession(controller, 10, TimeUnit.SECONDS));
 
-      ListenableFuture<Service.State> completion = Services.getCompletionFuture(controller);
       try {
-        completion.get(10, TimeUnit.SECONDS);
+        controller.awaitTerminated(10, TimeUnit.SECONDS);
         Assert.fail("Unexpected application termination.");
       } catch (TimeoutException e) {
         // OK, expected.
       }
     }
 
-    controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   private boolean expireAppMasterZKSession(TwillController controller, long timeout, TimeUnit timeoutUnit) {

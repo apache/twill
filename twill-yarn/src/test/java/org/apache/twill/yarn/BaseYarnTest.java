@@ -50,7 +50,7 @@ public abstract class BaseYarnTest {
     for (TwillRunner.LiveInfo liveInfo : twillRunner.lookupLive()) {
       for (TwillController controller : liveInfo.getControllers()) {
         try {
-          controller.stopAndWait();
+          controller.terminate().get();
         } catch (Throwable t) {
           LOG.error("Failed to stop application {}", liveInfo.getApplicationName(), t);
         }

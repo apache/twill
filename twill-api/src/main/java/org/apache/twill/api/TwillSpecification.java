@@ -17,12 +17,6 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import org.apache.twill.internal.DefaultLocalFile;
 import org.apache.twill.internal.DefaultRuntimeSpecification;
 import org.apache.twill.internal.DefaultTwillRunnableSpecification;
@@ -30,7 +24,11 @@ import org.apache.twill.internal.DefaultTwillSpecification;
 
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -129,12 +127,12 @@ public interface TwillSpecification {
   /**
    * Builder for constructing instance of {@link TwillSpecification}.
    */
-  static final class Builder {
+  final class Builder {
 
     private String name;
-    private Map<String, RuntimeSpecification> runnables = Maps.newHashMap();
-    private List<Order> orders = Lists.newArrayList();
-    private List<PlacementPolicy> placementPolicies = Lists.newArrayList();
+    private Map<String, RuntimeSpecification> runnables = new HashMap<String, RuntimeSpecification>();
+    private List<Order> orders = new ArrayList<Order>();
+    private List<PlacementPolicy> placementPolicies = new ArrayList<PlacementPolicy>();
     private EventHandlerSpecification eventHandler;
 
     public static NameSetter with() {
@@ -200,9 +198,9 @@ public interface TwillSpecification {
                                            final ResourceSpecification resourceSpec) {
         final TwillRunnableSpecification spec = new DefaultTwillRunnableSpecification(
                                             runnable.getClass().getName(), name, runnable.configure().getConfigs());
-        return new RuntimeSpecificationAdder(new Function<Collection<LocalFile>, RunnableSetter>() {
+        return new RuntimeSpecificationAdder(new LocalFileCompleter() {
           @Override
-          public RunnableSetter apply(Collection<LocalFile> files) {
+          public RunnableSetter complete(Collection<LocalFile> files) {
             runnables.put(spec.getName(), new DefaultRuntimeSpecification(spec.getName(), spec, resourceSpec, files));
             return RunnableSetter.this;
           }
@@ -226,13 +224,20 @@ public interface TwillSpecification {
     }
 
     /**
+     * Internal interface for completing addition of {@link LocalFile} to a runnable.
+     */
+    private interface LocalFileCompleter {
+      RunnableSetter complete(Collection<LocalFile> files);
+    }
+
+    /**
      * For setting runtime specific settings.
      */
     public final class RuntimeSpecificationAdder {
 
-      private final Function<Collection<LocalFile>, RunnableSetter> completer;
+      private final LocalFileCompleter completer;
 
-      RuntimeSpecificationAdder(Function<Collection<LocalFile>, RunnableSetter> completer) {
+      RuntimeSpecificationAdder(LocalFileCompleter completer) {
         this.completer = completer;
       }
 
@@ -241,7 +246,7 @@ public interface TwillSpecification {
       }
 
       public RunnableSetter noLocalFiles() {
-        return completer.apply(ImmutableList.<LocalFile>of());
+        return completer.complete(Collections.<LocalFile>emptyList());
       }
     }
 
@@ -261,10 +266,10 @@ public interface TwillSpecification {
 
     public final class MoreFile implements LocalFileAdder {
 
-      private final Function<Collection<LocalFile>, RunnableSetter> completer;
-      private final List<LocalFile> files = Lists.newArrayList();
+      private final LocalFileCompleter completer;
+      private final List<LocalFile> files = new ArrayList<LocalFile>();
 
-      public MoreFile(Function<Collection<LocalFile>, RunnableSetter> completer) {
+      public MoreFile(LocalFileCompleter completer) {
         this.completer = completer;
       }
 
@@ -301,7 +306,7 @@ public interface TwillSpecification {
       }
 
       public RunnableSetter apply() {
-        return completer.apply(files);
+        return completer.complete(files);
       }
     }
 
@@ -387,16 +392,16 @@ public interface TwillSpecification {
 
       private PlacementPolicySetter addPlacementPolicy(PlacementPolicy.Type type, Hosts hosts, Racks racks,
                                                        String runnableName, String...runnableNames) {
-        Preconditions.checkArgument(runnableName != null, "Name cannot be null.");
-        Preconditions.checkArgument(runnables.containsKey(runnableName), "Runnable not exists.");
-        Preconditions.checkArgument(!contains(runnableName),
-                                    "Runnable (" + runnableName + ") cannot belong to more than one Placement Policy");
-        Set<String> runnableNamesSet = Sets.newHashSet(runnableName);
+        checkArgument(runnableName != null, "Name cannot be null.");
+        checkArgument(runnables.containsKey(runnableName), "Runnable not exists.");
+        checkArgument(!contains(runnableName),
+                      "Runnable (" + runnableName + ") cannot belong to more than one Placement Policy");
+        Set<String> runnableNamesSet = new HashSet<String>(Collections.singleton(runnableName));
         for (String name : runnableNames) {
-          Preconditions.checkArgument(name != null, "Name cannot be null.");
-          Preconditions.checkArgument(runnables.containsKey(name), "Runnable not exists.");
-          Preconditions.checkArgument(!contains(name),
-                                      "Runnable (" + name + ") cannot belong to more than one Placement Policy");
+          checkArgument(name != null, "Name cannot be null.");
+          checkArgument(runnables.containsKey(name), "Runnable not exists.");
+          checkArgument(!contains(name),
+                        "Runnable (" + name + ") cannot belong to more than one Placement Policy");
           runnableNamesSet.add(name);
         }
         placementPolicies.add(
@@ -468,7 +473,7 @@ public interface TwillSpecification {
       @Override
       public TwillSpecification build() {
         // Set to track with runnable hasn't been assigned an order.
-        Set<String> runnableNames = Sets.newHashSet(runnables.keySet());
+        Set<String> runnableNames = new HashSet<String>(runnables.keySet());
         for (Order order : orders) {
           runnableNames.removeAll(order.getNames());
         }
@@ -479,17 +484,23 @@ public interface TwillSpecification {
       }
 
       private void addOrder(final Order.Type type, String name, String...names) {
-        Preconditions.checkArgument(name != null, "Name cannot be null.");
-        Preconditions.checkArgument(runnables.containsKey(name), "Runnable not exists.");
+        checkArgument(name != null, "Name cannot be null.");
+        checkArgument(runnables.containsKey(name), "Runnable not exists.");
 
-        Set<String> runnableNames = Sets.newHashSet(name);
+        Set<String> runnableNames = new HashSet<String>(Collections.singleton(name));
         for (String runnableName : names) {
-          Preconditions.checkArgument(name != null, "Name cannot be null.");
-          Preconditions.checkArgument(runnables.containsKey(name), "Runnable not exists.");
+          checkArgument(name != null, "Name cannot be null.");
+          checkArgument(runnables.containsKey(name), "Runnable not exists.");
           runnableNames.add(runnableName);
         }
 
         orders.add(new DefaultTwillSpecification.DefaultOrder(runnableNames, type));
+      }
+    }
+
+    private void checkArgument(boolean condition, String msgFormat, Object...args) {
+      if (!condition) {
+        throw new IllegalArgumentException(String.format(msgFormat, args));
       }
     }
 

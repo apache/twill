@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -128,7 +129,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
       // DISTRIBUTED runnables should be provisioned on different nodes.
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 2);
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
 
     // Sleep a bit before exiting.
@@ -202,7 +203,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
       Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 6, 60));
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 3);
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
 
     // Sleep a bit before exiting.
@@ -250,7 +251,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Test to verify changing instances during application run works for DISTRIBUTED runnables.
    */
   @Test
-  public void testChangeInstance() throws InterruptedException {
+  public void testChangeInstance() throws InterruptedException, TimeoutException, ExecutionException {
     // Ignore test if it is running against older Hadoop versions which does not support blacklists.
     Assume.assumeTrue(YarnUtils.getHadoopVersion().equals(YarnUtils.HadoopVersions.HADOOP_22));
 
@@ -290,7 +291,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 7, 60));
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
 
     // Sleep a bit before exiting.
@@ -321,12 +322,12 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Test to verify exception is thrown in case a non-existent runnable is specified in a placement policy.
    */
   @Test(expected = IllegalArgumentException.class)
-  public void testNonExistentRunnable() {
+  public void testNonExistentRunnable() throws InterruptedException, ExecutionException, TimeoutException {
     TwillRunner runner = YarnTestUtils.getTwillRunner();
     TwillController controller = runner.prepare(new FaultyApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
-      controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   /**
@@ -354,12 +355,12 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Test to verify exception is thrown in case a runnable is mentioned in more than one placement policy.
    */
   @Test(expected = IllegalArgumentException.class)
-  public void testPlacementPolicySpecification() {
+  public void testPlacementPolicySpecification() throws InterruptedException, ExecutionException, TimeoutException {
     TwillRunner runner = YarnTestUtils.getTwillRunner();
     TwillController controller = runner.prepare(new BadApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
-      controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   /**

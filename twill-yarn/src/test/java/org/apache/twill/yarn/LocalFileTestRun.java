@@ -82,7 +82,7 @@ public final class LocalFileTestRun extends BaseYarnTest {
       socket.close();
     }
 
-    controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
 
     Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 0, 60));
 

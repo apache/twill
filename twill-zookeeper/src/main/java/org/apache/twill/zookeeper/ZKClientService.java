@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.Service;
 import org.apache.twill.internal.zookeeper.DefaultZKClientService;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.server.ZooKeeperServer;
 
 /**
  * A {@link ZKClient} that extends from {@link Service} to provide lifecycle management functions.
@@ -44,10 +45,10 @@ public interface ZKClientService extends ZKClient, Service {
    * Builder for creating an implementation of {@link ZKClientService}.
    * The default client timeout is 10000ms.
    */
-  public static final class Builder {
+  final class Builder {
 
     private final String connectStr;
-    private int timeout = 10000;
+    private int timeout = ZooKeeperServer.DEFAULT_TICK_TIME * 20;
     private Watcher connectionWatcher;
     private Multimap<String, byte[]> auths = ArrayListMultimap.create();
 

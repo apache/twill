@@ -18,13 +18,13 @@
 package org.apache.twill.example.yarn;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Futures;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
 import org.apache.twill.ext.BundledJarRunnable;
 import org.apache.twill.ext.BundledJarRunner;
 import org.apache.twill.yarn.YarnTwillRunnerService;
@@ -87,7 +87,7 @@ public class BundledJarExample {
     Preconditions.checkState(jarFile.canRead());
 
     final TwillRunnerService twillRunner = new YarnTwillRunnerService(new YarnConfiguration(), zkStr);
-    twillRunner.startAndWait();
+    twillRunner.start();
 
 
     final TwillController controller = twillRunner.prepare(
@@ -99,15 +99,16 @@ public class BundledJarExample {
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
-        controller.stopAndWait();
-        twillRunner.stopAndWait();
+        try {
+          Futures.getUnchecked(controller.terminate());
+        } finally {
+          twillRunner.stop();
+        }
       }
     });
 
     try {
-      Services.getCompletionFuture(controller).get();
-    } catch (InterruptedException e) {
-      LOG.error("Error", e);
+      controller.awaitTerminated();
     } catch (ExecutionException e) {
       LOG.error("Error", e);
     }

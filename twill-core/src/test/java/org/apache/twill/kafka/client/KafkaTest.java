@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Queues;
 import com.google.common.util.concurrent.Futures;
 import org.apache.twill.common.Cancellable;
-import org.apache.twill.common.Services;
+import org.apache.twill.internal.Services;
 import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
 import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
 import org.apache.twill.internal.utils.Networks;

@@ -17,8 +17,6 @@
  */
 package org.apache.twill.yarn;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillContext;
@@ -26,7 +24,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.ServiceDiscovered;
@@ -55,12 +52,8 @@ public final class ServiceDiscoveryTestRun extends BaseYarnTest {
       .withArguments("r2", "45678")
       .start();
 
-    ListenableFuture<Service.State> completion = Services.getCompletionFuture(controller);
-    try {
-      completion.get(120, TimeUnit.SECONDS);
-    } finally {
-      controller.stopAndWait();
-    }
+
+    controller.awaitTerminated(120, TimeUnit.SECONDS);
   }
 
   /**

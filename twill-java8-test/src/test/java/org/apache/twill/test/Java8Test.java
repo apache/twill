@@ -34,6 +34,7 @@ import java.io.PrintWriter;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Unit test for running twill under Java8.
@@ -41,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 public class Java8Test extends BaseYarnTest {
 
   @Test
-  public void test() throws ExecutionException, InterruptedException {
+  public void test() throws ExecutionException, InterruptedException, TimeoutException {
     TwillRunner runner = YarnTestUtils.getTwillRunner();
 
     // Start the TestRunnable and make sure it is executed with the log message emitted.
@@ -56,7 +57,7 @@ public class Java8Test extends BaseYarnTest {
       .start();
 
     Assert.assertTrue(logLatch.await(120, TimeUnit.SECONDS));
-    controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   /**

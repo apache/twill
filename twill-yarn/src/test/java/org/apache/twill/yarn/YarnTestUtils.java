@@ -55,7 +55,7 @@ public final class YarnTestUtils {
 
   private static final AtomicBoolean once = new AtomicBoolean(false);
 
-  public static final boolean initOnce() throws IOException {
+  public static boolean initOnce() throws IOException {
     if (once.compareAndSet(false, true)) {
       final TemporaryFolder tmpFolder = new TemporaryFolder();
       tmpFolder.create();
@@ -77,7 +77,7 @@ public final class YarnTestUtils {
     return false;
   }
 
-  private static final void init(File folder) throws IOException {
+  private static void init(File folder) throws IOException {
     // Starts Zookeeper
     zkServer = InMemoryZKServer.builder().build();
     zkServer.startAndWait();
@@ -112,15 +112,15 @@ public final class YarnTestUtils {
     config = new YarnConfiguration(cluster.getConfig());
 
     runnerService = createTwillRunnerService();
-    runnerService.startAndWait();
+    runnerService.start();
 
     yarnAppClient = new VersionDetectYarnAppClientFactory().create(conf);
     yarnAppClient.start();
   }
 
-  public static final boolean finish() {
+  public static boolean finish() {
     if (once.compareAndSet(true, false)) {
-      runnerService.stopAndWait();
+      runnerService.stop();
       cluster.stop();
       dfsCluster.shutdown();
       zkServer.stopAndWait();
@@ -132,18 +132,18 @@ public final class YarnTestUtils {
     return false;
   }
 
-  public static final TwillRunner getTwillRunner() {
+  public static TwillRunner getTwillRunner() {
     return runnerService;
   }
 
-  public static final InMemoryZKServer getZkServer() {
+  public static InMemoryZKServer getZkServer() {
     return zkServer;
   }
 
   /**
    * Creates an unstarted instance of {@link org.apache.twill.api.TwillRunnerService}.
    */
-  public static final TwillRunnerService createTwillRunnerService() throws IOException {
+  public static TwillRunnerService createTwillRunnerService() throws IOException {
     YarnTwillRunnerService runner = new YarnTwillRunnerService(config, zkServer.getConnectionStr() + "/twill");
     // disable tests stealing focus
     runner.setJVMOptions("-Djava.awt.headless=true");
@@ -155,11 +155,11 @@ public final class YarnTestUtils {
    * @return a list of {@link org.apache.hadoop.yarn.api.records.NodeReport} for the nodes in the cluster.
    * @throws Exception Propagates exceptions thrown by {@link org.apache.hadoop.yarn.client.api.YarnClient}.
    */
-  public static final List<NodeReport> getNodeReports() throws Exception {
+  public static List<NodeReport> getNodeReports() throws Exception {
     return yarnAppClient.getNodeReports();
   }
 
-  public static final <T> boolean waitForSize(Iterable<T> iterable, int count, int limit) throws InterruptedException {
+  public static <T> boolean waitForSize(Iterable<T> iterable, int count, int limit) throws InterruptedException {
     int trial = 0;
     int size = Iterables.size(iterable);
     while (size != count && trial < limit) {

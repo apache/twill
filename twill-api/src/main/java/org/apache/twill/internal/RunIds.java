@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.base.Preconditions;
 import org.apache.twill.api.RunId;
 
 import java.util.UUID;
@@ -43,7 +42,9 @@ public final class RunIds {
     final String id;
 
     private RunIdImpl(String id) {
-      Preconditions.checkArgument(id != null, "RunId cannot be null.");
+      if (id == null) {
+        throw new IllegalArgumentException("RunId cannot be null.");
+      }
       this.id = id;
     }
 

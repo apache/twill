@@ -17,12 +17,12 @@
  */
 package org.apache.twill.example.yarn;
 
+import com.google.common.util.concurrent.Futures;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
 import org.apache.twill.yarn.YarnTwillRunnerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +61,7 @@ public class HelloWorld {
     final TwillRunnerService twillRunner =
       new YarnTwillRunnerService(
         new YarnConfiguration(), zkStr);
-    twillRunner.startAndWait();
+    twillRunner.start();
 
     final TwillController controller =
       twillRunner.prepare(new HelloWorldRunnable())
@@ -71,15 +71,16 @@ public class HelloWorld {
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
-        controller.stopAndWait();
-        twillRunner.stopAndWait();
+        try {
+          Futures.getUnchecked(controller.terminate());
+        } finally {
+          twillRunner.stop();
+        }
       }
     });
 
     try {
-      Services.getCompletionFuture(controller).get();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
+      controller.awaitTerminated();
     } catch (ExecutionException e) {
       e.printStackTrace();
     }

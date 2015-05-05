@@ -24,7 +24,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
 import org.junit.Assert;
@@ -68,9 +67,9 @@ public final class EchoServerTestRun extends BaseYarnTest {
                                         .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -116,7 +115,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
     // Creates a new runner service to check it can regain control over running app.
     TwillRunnerService runnerService = YarnTestUtils.createTwillRunnerService();
-    runnerService.startAndWait();
+    runnerService.start();
 
     try {
       Iterable <TwillController> controllers = runnerService.lookup("EchoServer");
@@ -124,12 +123,12 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
       for (TwillController c : controllers) {
         LOG.info("Stopping application: " + c.getRunId());
-        c.stop().get(30, TimeUnit.SECONDS);
+        c.terminate().get(30, TimeUnit.SECONDS);
       }
 
       Assert.assertTrue(YarnTestUtils.waitForSize(apps, 0, 120));
     } finally {
-      runnerService.stopAndWait();
+      runnerService.stop();
     }
 
     // Sleep a bit before exiting.

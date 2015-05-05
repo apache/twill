@@ -37,6 +37,7 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -76,7 +77,7 @@ public final class FailureRestartTestRun extends BaseYarnTest {
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));
 
-    controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   private Set<Integer> getInstances(Iterable<Discoverable> discoverables) throws IOException {
