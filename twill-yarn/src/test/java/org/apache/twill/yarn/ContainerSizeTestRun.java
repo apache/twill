@@ -43,14 +43,14 @@ public class ContainerSizeTestRun extends BaseYarnTest {
 
   @Test
   public void testContainerSize() throws InterruptedException, TimeoutException, ExecutionException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new SleepApp())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
 
     try {
       ServiceDiscovered discovered = controller.discoverService("sleep");
-      Assert.assertTrue(YarnTestUtils.waitForSize(discovered, 2, 120));
+      Assert.assertTrue(waitForSize(discovered, 2, 120));
     } finally {
       controller.terminate().get(120, TimeUnit.SECONDS);
     }

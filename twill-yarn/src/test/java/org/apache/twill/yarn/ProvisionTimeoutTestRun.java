@@ -44,7 +44,7 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
 
   @Test
   public void testProvisionTimeout() throws InterruptedException, ExecutionException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     TwillController controller = runner.prepare(new TimeoutApplication())
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))

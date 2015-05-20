@@ -47,7 +47,7 @@ public final class ServiceDiscoveryTestRun extends BaseYarnTest {
 
   @Test
   public void testServiceDiscovery() throws InterruptedException, ExecutionException, TimeoutException {
-    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
+    TwillRunner twillRunner = getTwillRunner();
     TwillController controller = twillRunner
       .prepare(new ServiceApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
@@ -56,7 +56,7 @@ public final class ServiceDiscoveryTestRun extends BaseYarnTest {
       .start();
 
     ServiceDiscovered completed = controller.discoverService("completed");
-    Assert.assertTrue(YarnTestUtils.waitForSize(completed, 2, 120));
+    Assert.assertTrue(waitForSize(completed, 2, 120));
     controller.sendCommand(Command.Builder.of("done").build());
     controller.awaitTerminated(120, TimeUnit.SECONDS);
   }

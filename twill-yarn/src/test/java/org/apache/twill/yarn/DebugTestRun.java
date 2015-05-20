@@ -102,7 +102,7 @@ public class DebugTestRun extends BaseYarnTest {
 
   @Test
   public void testDebugPortOneRunnable() throws Exception {
-    YarnTwillRunnerService runner = (YarnTwillRunnerService) YarnTestUtils.getTwillRunner();
+    YarnTwillRunnerService runner = getTwillRunner();
     runner.start();
 
     TwillController controller = runner.prepare(new DummyApplication())
@@ -126,7 +126,7 @@ public class DebugTestRun extends BaseYarnTest {
 
   @Test
   public void testDebugPortAllRunnables() throws Exception {
-    YarnTwillRunnerService runner = (YarnTwillRunnerService) YarnTestUtils.getTwillRunner();
+    YarnTwillRunnerService runner = getTwillRunner();
     runner.start();
 
     TwillController controller = runner.prepare(new DummyApplication())

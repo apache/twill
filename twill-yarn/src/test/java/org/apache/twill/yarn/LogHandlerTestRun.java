@@ -71,7 +71,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
       }
     };
 
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new LogRunnable())
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                        .addLogHandler(logHandler)

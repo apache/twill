@@ -24,7 +24,6 @@ import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.yarn.BaseYarnTest;
-import org.apache.twill.yarn.YarnTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -43,7 +42,7 @@ public class Java8Test extends BaseYarnTest {
 
   @Test
   public void test() throws ExecutionException, InterruptedException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     // Start the TestRunnable and make sure it is executed with the log message emitted.
     CountDownLatch logLatch = new CountDownLatch(1);

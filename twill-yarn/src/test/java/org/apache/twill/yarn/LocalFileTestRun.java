@@ -56,7 +56,7 @@ public final class LocalFileTestRun extends BaseYarnTest {
     String header = Files.readFirstLine(new File(getClass().getClassLoader().getResource("header.txt").toURI()),
                                         Charsets.UTF_8);
 
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     TwillController controller = runner.prepare(new LocalFileApplication())
       .addJVMOptions(" -verbose:gc -Xloggc:gc.log -XX:+PrintGCDetails")
@@ -66,7 +66,7 @@ public final class LocalFileTestRun extends BaseYarnTest {
       .start();
 
     Iterable<Discoverable> discoverables = controller.discoverService("local");
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 1, 60));
+    Assert.assertTrue(waitForSize(discoverables, 1, 60));
 
     InetSocketAddress socketAddress = discoverables.iterator().next().getSocketAddress();
     Socket socket = new Socket(socketAddress.getAddress(), socketAddress.getPort());
@@ -84,7 +84,7 @@ public final class LocalFileTestRun extends BaseYarnTest {
 
     controller.terminate().get(120, TimeUnit.SECONDS);
 
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 0, 60));
+    Assert.assertTrue(waitForSize(discoverables, 0, 60));
 
     TimeUnit.SECONDS.sleep(2);
   }

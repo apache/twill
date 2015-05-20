@@ -37,7 +37,7 @@ public final class DistributeShellTestRun extends BaseYarnTest {
   @Ignore
   @Test
   public void testDistributedShell() throws InterruptedException {
-    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
+    TwillRunner twillRunner = getTwillRunner();
 
     TwillController controller = twillRunner.prepare(new DistributedShell("pwd", "ls -al"))
                                             .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))

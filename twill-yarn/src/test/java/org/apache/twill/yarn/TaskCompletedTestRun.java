@@ -63,7 +63,7 @@ public final class TaskCompletedTestRun extends BaseYarnTest {
 
   @Test
   public void testTaskCompleted() throws InterruptedException, TimeoutException, ExecutionException {
-    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
+    TwillRunner twillRunner = getTwillRunner();
     TwillController controller = twillRunner.prepare(new SleepTask(),
                                                 ResourceSpecification.Builder.with()
                                                   .setVirtualCores(1)

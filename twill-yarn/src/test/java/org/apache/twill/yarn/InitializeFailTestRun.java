@@ -41,7 +41,7 @@ public class InitializeFailTestRun extends BaseYarnTest {
 
   @Test
   public void testInitFail() throws InterruptedException, ExecutionException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     final CountDownLatch logLatch = new CountDownLatch(1);
 
     // Verify that it receives the exception log entry that thrown when runnable initialize

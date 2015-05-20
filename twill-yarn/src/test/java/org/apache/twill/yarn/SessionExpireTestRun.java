@@ -54,7 +54,7 @@ public class SessionExpireTestRun extends BaseYarnTest {
 
   @Test
   public void testAppSessionExpire() throws InterruptedException, ExecutionException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new SleepRunnable(600))
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                        .start();

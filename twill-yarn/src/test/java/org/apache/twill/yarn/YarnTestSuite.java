@@ -40,6 +40,6 @@ import org.junit.runners.Suite;
                       ContainerSizeTestRun.class,
                       InitializeFailTestRun.class
                     })
-public final class YarnTestSuite {
+public final class YarnTestSuite extends BaseYarnTest {
 
 }
