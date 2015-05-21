@@ -18,15 +18,18 @@
 package org.apache.twill.yarn;
 
 import org.apache.twill.api.AbstractTwillRunnable;
+import org.apache.twill.api.Command;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillContext;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.ServiceDiscovered;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +55,9 @@ public final class ServiceDiscoveryTestRun extends BaseYarnTest {
       .withArguments("r2", "45678")
       .start();
 
-
+    ServiceDiscovered completed = controller.discoverService("completed");
+    Assert.assertTrue(YarnTestUtils.waitForSize(completed, 2, 120));
+    controller.sendCommand(Command.Builder.of("done").build());
     controller.awaitTerminated(120, TimeUnit.SECONDS);
   }
 
@@ -80,13 +85,12 @@ public final class ServiceDiscoveryTestRun extends BaseYarnTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(ServiceRunnable.class);
     private static final String SERVICE_NAME = "service";
-    private volatile Thread runThread;
+    private final CountDownLatch stopLatch = new CountDownLatch(1);
 
     @Override
     public void run() {
-      this.runThread = Thread.currentThread();
       final int port = Integer.parseInt(getContext().getArguments()[0]);
-      getContext().announce(SERVICE_NAME, port);
+      Cancellable cancelService = getContext().announce(SERVICE_NAME, port);
 
       final CountDownLatch discoveredLatch = new CountDownLatch(1);
 
@@ -110,12 +114,22 @@ public final class ServiceDiscoveryTestRun extends BaseYarnTest {
       } catch (InterruptedException e) {
         LOG.warn("Interrupted.", e);
       }
+
+      // Announce the "complete" service so that the driver knows this runnable has discovered the other
+      Cancellable cancelCompleted = getContext().announce("completed", port);
+      try {
+        stopLatch.await();
+        cancelService.cancel();
+        cancelCompleted.cancel();
+      } catch (InterruptedException e) {
+        LOG.warn("Interrupted.", e);
+      }
     }
 
     @Override
-    public void stop() {
-      if (runThread != null) {
-        runThread.interrupt();
+    public void handleCommand(Command command) throws Exception {
+      if ("done".equals(command.getCommand())) {
+        stopLatch.countDown();
       }
     }
   }
