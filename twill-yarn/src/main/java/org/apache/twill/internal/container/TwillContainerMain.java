@@ -118,11 +118,8 @@ public final class TwillContainerMain extends ServiceMain {
     File file = new File(Constants.Files.CREDENTIALS);
     if (file.exists()) {
       Credentials credentials = new Credentials();
-      DataInputStream input = new DataInputStream(new FileInputStream(file));
-      try {
+      try (DataInputStream input = new DataInputStream(new FileInputStream(file))) {
         credentials.readTokenStorageStream(input);
-      } finally {
-        input.close();
       }
 
       UserGroupInformation.getCurrentUser().addCredentials(credentials);
@@ -165,11 +162,8 @@ public final class TwillContainerMain extends ServiceMain {
   }
 
   private static TwillSpecification loadTwillSpec(File specFile) throws IOException {
-    Reader reader = Files.newReader(specFile, Charsets.UTF_8);
-    try {
+    try (Reader reader = Files.newReader(specFile, Charsets.UTF_8)) {
       return TwillSpecificationAdapter.create().fromJson(reader);
-    } finally {
-      reader.close();
     }
   }
 

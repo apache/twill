@@ -112,8 +112,7 @@ public final class TwillLauncher {
   }
 
   private static void unJar(File jarFile, File targetDir) throws IOException {
-    JarInputStream jarInput = new JarInputStream(new FileInputStream(jarFile));
-    try {
+    try (JarInputStream jarInput = new JarInputStream(new FileInputStream(jarFile))) {
       JarEntry jarEntry = jarInput.getNextJarEntry();
       while (jarEntry != null) {
         File target = new File(targetDir, jarEntry.getName());
@@ -125,22 +124,17 @@ public final class TwillLauncher {
         }
         jarEntry = jarInput.getNextJarEntry();
       }
-    } finally {
-      jarInput.close();
     }
   }
 
   private static void copy(InputStream is, File file) throws IOException {
     byte[] buf = new byte[8192];
-    OutputStream os = new BufferedOutputStream(new FileOutputStream(file));
-    try {
+    try (OutputStream os = new BufferedOutputStream(new FileOutputStream(file))) {
       int len = is.read(buf);
       while (len != -1) {
         os.write(buf, 0, len);
         len = is.read(buf);
       }
-    } finally {
-      os.close();
     }
   }
 

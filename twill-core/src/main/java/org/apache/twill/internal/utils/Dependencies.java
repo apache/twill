@@ -97,8 +97,7 @@ public final class Dependencies {
         continue;
       }
 
-      InputStream is = classUrl.openStream();
-      try {
+      try (InputStream is = classUrl.openStream()) {
         // Visit the bytecode to lookup classes that the visiting class is depended on.
         new ClassReader(ByteStreams.toByteArray(is)).accept(new DependencyClassVisitor(new DependencyAcceptor() {
           @Override
@@ -109,8 +108,6 @@ public final class Dependencies {
             }
           }
         }), ClassReader.SKIP_DEBUG + ClassReader.SKIP_FRAMES);
-      } finally {
-        is.close();
       }
     }
   }

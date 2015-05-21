@@ -134,16 +134,11 @@ public class BundledJarRunner {
       } else {
         output.getParentFile().mkdirs();
 
-        OutputStream os = new FileOutputStream(output);
-        try {
-          InputStream is = jarFile.getInputStream(entry);
-          try {
-            ByteStreams.copy(is, os);
-          } finally {
-            is.close();
-          }
-        } finally {
-          os.close();
+        try (
+          OutputStream os = new FileOutputStream(output);
+          InputStream is = jarFile.getInputStream(entry)
+        ) {
+          ByteStreams.copy(is, os);
         }
       }
     }

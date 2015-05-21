@@ -114,15 +114,14 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     // check environment of the runnable.
     Discoverable discoverable = envEchoServices.iterator().next();
     for (Map.Entry<String, String> expected : expectedValues.entrySet()) {
-      Socket socket = new Socket(discoverable.getSocketAddress().getHostName(),
-                                 discoverable.getSocketAddress().getPort());
-      try {
+      try (
+        Socket socket = new Socket(discoverable.getSocketAddress().getHostName(),
+                                   discoverable.getSocketAddress().getPort())
+      ) {
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8), true);
         LineReader reader = new LineReader(new InputStreamReader(socket.getInputStream(), Charsets.UTF_8));
         writer.println(expected.getKey());
         Assert.assertEquals(expected.getValue(), reader.readLine());
-      } finally {
-        socket.close();
       }
     }
 
@@ -165,13 +164,12 @@ public final class ResourceReportTestRun extends BaseYarnTest {
 
     // cause a divide by 0 in one server
     Discoverable discoverable = echoServices.iterator().next();
-    Socket socket = new Socket(discoverable.getSocketAddress().getAddress(),
-                               discoverable.getSocketAddress().getPort());
-    try {
+    try (
+      Socket socket = new Socket(discoverable.getSocketAddress().getAddress(),
+                                 discoverable.getSocketAddress().getPort())
+    ) {
       PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8), true);
       writer.println("0");
-    } finally {
-      socket.close();
     }
 
     // takes some time for app master to find out the container completed...

@@ -83,11 +83,8 @@ public abstract class AbstractYarnTwillService extends AbstractTwillService {
     try {
       Credentials credentials = new Credentials();
       Location location = getSecureStoreLocation();
-      DataInputStream input = new DataInputStream(new BufferedInputStream(location.getInputStream()));
-      try {
+      try (DataInputStream input = new DataInputStream(new BufferedInputStream(location.getInputStream()))) {
         credentials.readTokenStorageStream(input);
-      } finally {
-        input.close();
       }
 
       UserGroupInformation.getCurrentUser().addCredentials(credentials);

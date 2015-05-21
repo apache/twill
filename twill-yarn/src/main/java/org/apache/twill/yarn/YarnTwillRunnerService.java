@@ -587,11 +587,8 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     // Try to read the old credentials.
     Credentials credentials = new Credentials();
     if (credentialsLocation.exists()) {
-      DataInputStream is = new DataInputStream(new BufferedInputStream(credentialsLocation.getInputStream()));
-      try {
+      try (DataInputStream is = new DataInputStream(new BufferedInputStream(credentialsLocation.getInputStream()))) {
         credentials.readTokenStorageStream(is);
-      } finally {
-        is.close();
       }
     }
 
@@ -602,11 +599,8 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     Location tmpLocation = credentialsLocation.getTempFile(Constants.Files.CREDENTIALS);
 
     // Save the credentials store with user-only permission.
-    DataOutputStream os = new DataOutputStream(new BufferedOutputStream(tmpLocation.getOutputStream("600")));
-    try {
+    try (DataOutputStream os = new DataOutputStream(new BufferedOutputStream(tmpLocation.getOutputStream("600")))) {
       credentials.writeTokenStorageToStream(os);
-    } finally {
-      os.close();
     }
 
     // Rename the tmp file into the credentials location

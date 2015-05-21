@@ -449,8 +449,7 @@ final class YarnTwillPreparer implements TwillPreparer {
     // Serialize into a local temp file.
     LOG.debug("Create and copy {}", Constants.Files.TWILL_SPEC);
     Location location = createTempLocation(Constants.Files.TWILL_SPEC);
-    Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8);
-    try {
+    try (Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8)) {
       EventHandlerSpecification eventHandler = spec.getEventHandler();
       if (eventHandler == null) {
         eventHandler = new LogOnlyEventHandler().configure();
@@ -459,8 +458,6 @@ final class YarnTwillPreparer implements TwillPreparer {
       TwillSpecificationAdapter.create().toJson(
         new DefaultTwillSpecification(spec.getName(), runtimeSpec, spec.getOrders(), spec.getPlacementPolicies(),
                                       eventHandler), writer);
-    } finally {
-      writer.close();
     }
     LOG.debug("Done {}", Constants.Files.TWILL_SPEC);
 
@@ -501,11 +498,8 @@ final class YarnTwillPreparer implements TwillPreparer {
                                     "Launcher jar should not have dependencies: %s", className);
         try {
           jarOut.putNextEntry(new JarEntry(className.replace('.', '/') + ".class"));
-          InputStream is = classUrl.openStream();
-          try {
+          try (InputStream is = classUrl.openStream()) {
             ByteStreams.copy(is, jarOut);
-          } finally {
-            is.close();
           }
         } catch (IOException e) {
           throw Throwables.propagate(e);
@@ -567,29 +561,21 @@ final class YarnTwillPreparer implements TwillPreparer {
     Map<String, LocalFile> localize = ImmutableMap.copyOf(Maps.filterKeys(localFiles, Predicates.in(includes)));
     LOG.debug("Create and copy {}", Constants.Files.LOCALIZE_FILES);
     Location location = createTempLocation(Constants.Files.LOCALIZE_FILES);
-    Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8);
-    try {
+    try (Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8)) {
       new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
         .create().toJson(localize.values(), new TypeToken<List<LocalFile>>() {
       }.getType(), writer);
-    } finally {
-      writer.close();
     }
     LOG.debug("Done {}", Constants.Files.LOCALIZE_FILES);
     localFiles.put(Constants.Files.LOCALIZE_FILES, createLocalFile(Constants.Files.LOCALIZE_FILES, location));
   }
 
   private Location copyFromURL(URL url, Location target) throws IOException {
-    InputStream is = url.openStream();
-    try {
-      OutputStream os = new BufferedOutputStream(target.getOutputStream());
-      try {
-        ByteStreams.copy(is, os);
-      } finally {
-        os.close();
-      }
-    } finally {
-      is.close();
+    try (
+      InputStream is = url.openStream();
+      OutputStream os = new BufferedOutputStream(target.getOutputStream())
+    ) {
+      ByteStreams.copy(is, os);
     }
     return target;
   }

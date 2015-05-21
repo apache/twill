@@ -69,8 +69,7 @@ public final class LocalFileTestRun extends BaseYarnTest {
     Assert.assertTrue(waitForSize(discoverables, 1, 60));
 
     InetSocketAddress socketAddress = discoverables.iterator().next().getSocketAddress();
-    Socket socket = new Socket(socketAddress.getAddress(), socketAddress.getPort());
-    try {
+    try (Socket socket = new Socket(socketAddress.getAddress(), socketAddress.getPort())) {
       PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8), true);
       LineReader reader = new LineReader(new InputStreamReader(socket.getInputStream(), Charsets.UTF_8));
 
@@ -78,8 +77,6 @@ public final class LocalFileTestRun extends BaseYarnTest {
       writer.println(msg);
       Assert.assertEquals(header, reader.readLine());
       Assert.assertEquals(msg, reader.readLine());
-    } finally {
-      socket.close();
     }
 
     controller.terminate().get(120, TimeUnit.SECONDS);
@@ -99,12 +96,9 @@ public final class LocalFileTestRun extends BaseYarnTest {
     public LocalFileApplication() throws Exception {
       // Create a jar file that contains the header.txt file inside.
       headerFile = tmpFolder.newFile("header.jar");
-      JarOutputStream os = new JarOutputStream(new FileOutputStream(headerFile));
-      try {
+      try (JarOutputStream os = new JarOutputStream(new FileOutputStream(headerFile))) {
         os.putNextEntry(new JarEntry("header.txt"));
         ByteStreams.copy(getClass().getClassLoader().getResourceAsStream("header.txt"), os);
-      } finally {
-        os.close();
       }
     }
 

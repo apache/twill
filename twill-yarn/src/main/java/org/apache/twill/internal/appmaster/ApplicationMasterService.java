@@ -640,14 +640,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   private List<LocalFile> getLocalizeFiles() {
-    try {
-      Reader reader = Files.newReader(new File(Constants.Files.LOCALIZE_FILES), Charsets.UTF_8);
-      try {
-        return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
-                                .create().fromJson(reader, new TypeToken<List<LocalFile>>() { }.getType());
-      } finally {
-        reader.close();
-      }
+    try (Reader reader = Files.newReader(new File(Constants.Files.LOCALIZE_FILES), Charsets.UTF_8)) {
+      return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
+        .create().fromJson(reader, new TypeToken<List<LocalFile>>() {
+        }.getType());
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

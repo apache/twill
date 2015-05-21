@@ -47,15 +47,14 @@ public final class DistributedShell extends AbstractTwillRunnable {
       try {
         Process process = new ProcessBuilder(ImmutableList.copyOf(Splitter.on(' ').split(cmd)))
                               .redirectErrorStream(true).start();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), Charsets.US_ASCII));
-        try {
+        try (
+          BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), Charsets.US_ASCII))
+        ) {
           String line = reader.readLine();
           while (line != null) {
             LOG.info(line);
             line = reader.readLine();
           }
-        } finally {
-          reader.close();
         }
       } catch (IOException e) {
         LOG.error("Fail to execute command " + cmd, e);

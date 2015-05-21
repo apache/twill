@@ -81,16 +81,15 @@ public final class EchoServerTestRun extends BaseYarnTest {
     for (Discoverable discoverable : echoServices) {
       String msg = "Hello: " + discoverable.getSocketAddress();
 
-      Socket socket = new Socket(discoverable.getSocketAddress().getAddress(),
-                                 discoverable.getSocketAddress().getPort());
-      try {
+      try (
+        Socket socket = new Socket(discoverable.getSocketAddress().getAddress(),
+                                   discoverable.getSocketAddress().getPort())
+      ) {
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8), true);
         LineReader reader = new LineReader(new InputStreamReader(socket.getInputStream(), Charsets.UTF_8));
 
         writer.println(msg);
         Assert.assertEquals(msg, reader.readLine());
-      } finally {
-        socket.close();
       }
     }
 

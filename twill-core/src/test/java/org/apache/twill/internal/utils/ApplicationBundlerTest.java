@@ -69,8 +69,7 @@ public class ApplicationBundlerTest {
   }
 
   private void unjar(File jarFile, File targetDir) throws IOException {
-    JarInputStream jarInput = new JarInputStream(new FileInputStream(jarFile));
-    try {
+    try (JarInputStream jarInput = new JarInputStream(new FileInputStream(jarFile))) {
       JarEntry jarEntry = jarInput.getNextJarEntry();
       while (jarEntry != null) {
         File target = new File(targetDir, jarEntry.getName());
@@ -83,8 +82,6 @@ public class ApplicationBundlerTest {
 
         jarEntry = jarInput.getNextJarEntry();
       }
-    } finally {
-      jarInput.close();
     }
   }
 

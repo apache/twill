@@ -18,7 +18,6 @@
 package org.apache.twill.ext;
 
 import com.google.common.io.ByteStreams;
-
 import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -87,18 +86,13 @@ public class BundledJarRunnerTest {
   private void createJarFileFromClass(String className, File jarfile) throws IOException {
     String classAsPath = className.replace(".", "/") + ".class";
     String packagePath = classAsPath.substring(0, classAsPath.lastIndexOf("/") + 1);
-    FileOutputStream fout = null;
-    JarOutputStream jarout = null;
-    try {
-      fout = new FileOutputStream(jarfile.getAbsolutePath());
-      jarout = new JarOutputStream(fout);
+    try (
+      JarOutputStream jarout = new JarOutputStream(new FileOutputStream(jarfile.getAbsolutePath()))
+    ) {
       jarout.putNextEntry(new ZipEntry(packagePath));
       jarout.putNextEntry(new ZipEntry(classAsPath));
       jarout.write(getClassBytes(classAsPath));
       jarout.closeEntry();
-    } finally {
-      jarout.close();
-      fout.close();
     }
   }
 
