@@ -357,6 +357,10 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
     return new Watcher() {
       @Override
       public void process(final WatchedEvent event) {
+        if (eventExecutor.isShutdown()) {
+          LOG.debug("Already shutdown. Discarding event: {}", event);
+          return;
+        }
         eventExecutor.execute(new Runnable() {
           @Override
           public void run() {
