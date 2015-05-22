@@ -203,7 +203,12 @@ public class ZKClientTest {
 
         Assert.assertTrue(expireReconnectLatch.await(60, TimeUnit.SECONDS));
 
-        client.delete("/expireRewatch");
+        // Keep trying to delete the node until it succeed
+        while (ZKOperations.ignoreError(client.delete("/expireRewatch"), KeeperException.class, null).get() == null) {
+          LOG.info("Delete failed. Retrying to delete /expireRewatch");
+          TimeUnit.MILLISECONDS.sleep(10);
+        }
+
         Assert.assertEquals(Watcher.Event.EventType.NodeDeleted, events.poll(60, TimeUnit.SECONDS));
       } finally {
         client.stopAndWait();
