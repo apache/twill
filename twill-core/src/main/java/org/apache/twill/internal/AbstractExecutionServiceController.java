@@ -17,33 +17,53 @@
  */
 package org.apache.twill.internal;
 
+import com.google.common.base.Function;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
+import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.ServiceController;
 import org.apache.twill.common.Threads;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * An abstract base class for implementing {@link ServiceController} that deal with Service state transition and
  * listener callback.
  */
-public abstract class AbstractExecutionServiceController implements ServiceController {
+public abstract class AbstractExecutionServiceController implements ServiceController, Service {
 
   private final RunId runId;
   private final ListenerExecutors listenerExecutors;
   private final Service serviceDelegate;
+  private final SettableFuture<State> terminationFuture;
 
   protected AbstractExecutionServiceController(RunId runId) {
     this.runId = runId;
     this.listenerExecutors = new ListenerExecutors();
     this.serviceDelegate = new ServiceDelegate();
+    this.terminationFuture = SettableFuture.create();
+    addListener(new ServiceListenerAdapter() {
+      @Override
+      public void failed(State from, Throwable failure) {
+        terminationFuture.setException(failure);
+      }
+
+      @Override
+      public void terminated(State from) {
+        terminationFuture.set(State.TERMINATED);
+      }
+    }, Threads.SAME_THREAD_EXECUTOR);
   }
 
   protected abstract void startUp();
@@ -56,6 +76,52 @@ public abstract class AbstractExecutionServiceController implements ServiceContr
   }
 
   @Override
+  public Future<? extends ServiceController> terminate() {
+    stop();
+
+    return Futures.transform(terminationFuture, new Function<State, ServiceController>() {
+      @Override
+      public ServiceController apply(State input) {
+        return AbstractExecutionServiceController.this;
+      }
+    });
+  }
+
+  @Override
+  public void onRunning(final Runnable runnable, Executor executor) {
+    addListener(new ServiceListenerAdapter() {
+      @Override
+      public void running() {
+        runnable.run();
+      }
+    }, executor);
+  }
+
+  @Override
+  public void onTerminated(final Runnable runnable, Executor executor) {
+    addListener(new ServiceListenerAdapter() {
+      @Override
+      public void failed(State from, Throwable failure) {
+        runnable.run();
+      }
+
+      @Override
+      public void terminated(State from) {
+        runnable.run();
+      }
+    }, executor);
+  }
+
+  @Override
+  public void awaitTerminated() throws ExecutionException {
+    Uninterruptibles.getUninterruptibly(terminationFuture);
+  }
+
+  @Override
+  public void awaitTerminated(long timeout, TimeUnit timeoutUnit) throws TimeoutException, ExecutionException {
+    Uninterruptibles.getUninterruptibly(terminationFuture, timeout, timeoutUnit);
+  }
+
   public final void addListener(Listener listener, Executor executor) {
     listenerExecutors.addListener(new ListenerExecutor(listener, executor));
   }

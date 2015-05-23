@@ -22,10 +22,8 @@ import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
-import org.apache.twill.api.ServiceController;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.logging.LogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.zookeeper.NodeData;
@@ -66,9 +64,7 @@ public class ControllerTest {
 
       TwillController controller = getController(zkClientService, runId);
       controller.sendCommand(Command.Builder.of("test").build()).get(2, TimeUnit.SECONDS);
-      controller.stop().get(2, TimeUnit.SECONDS);
-
-      Assert.assertEquals(ServiceController.State.TERMINATED, controller.state());
+      controller.terminate().get(2, TimeUnit.SECONDS);
 
       final CountDownLatch terminateLatch = new CountDownLatch(1);
       service.addListener(new ServiceListenerAdapter() {
@@ -89,7 +85,7 @@ public class ControllerTest {
 
   // Test controller created before service starts.
   @Test
-  public void testControllerBefore() throws InterruptedException {
+  public void testControllerBefore() throws InterruptedException, ExecutionException, TimeoutException {
     InMemoryZKServer zkServer = InMemoryZKServer.builder().build();
     zkServer.startAndWait();
 
@@ -100,17 +96,11 @@ public class ControllerTest {
       zkClientService.startAndWait();
 
       final CountDownLatch runLatch = new CountDownLatch(1);
-      final CountDownLatch stopLatch = new CountDownLatch(1);
       TwillController controller = getController(zkClientService, runId);
-      controller.addListener(new ServiceListenerAdapter() {
+      controller.onRunning(new Runnable() {
         @Override
-        public void running() {
+        public void run() {
           runLatch.countDown();
-        }
-
-        @Override
-        public void terminated(Service.State from) {
-          stopLatch.countDown();
         }
       }, Threads.SAME_THREAD_EXECUTOR);
 
@@ -118,11 +108,16 @@ public class ControllerTest {
       service.start();
 
       Assert.assertTrue(runLatch.await(2, TimeUnit.SECONDS));
-      Assert.assertFalse(stopLatch.await(2, TimeUnit.SECONDS));
+
+      try {
+        controller.awaitTerminated(2, TimeUnit.SECONDS);
+        Assert.fail("Service should not be terminated");
+      } catch (TimeoutException e) {
+        // Expected
+      }
 
       service.stop();
-
-      Assert.assertTrue(stopLatch.await(20000, TimeUnit.SECONDS));
+      controller.awaitTerminated(120, TimeUnit.SECONDS);
 
     } finally {
       zkServer.stopAndWait();
@@ -146,9 +141,9 @@ public class ControllerTest {
 
       final CountDownLatch runLatch = new CountDownLatch(1);
       TwillController controller = getController(zkClientService, runId);
-      controller.addListener(new ServiceListenerAdapter() {
+      controller.onRunning(new Runnable() {
         @Override
-        public void running() {
+        public void run() {
           runLatch.countDown();
         }
       }, Threads.SAME_THREAD_EXECUTOR);
@@ -191,7 +186,7 @@ public class ControllerTest {
   }
 
   private TwillController getController(ZKClient zkClient, RunId runId) {
-    TwillController controller = new AbstractTwillController(runId, zkClient, ImmutableList.<LogHandler>of()) {
+    AbstractTwillController controller = new AbstractTwillController(runId, zkClient, ImmutableList.<LogHandler>of()) {
 
       @Override
       public void kill() {

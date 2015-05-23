@@ -197,14 +197,19 @@ public class ZKClientTest {
         });
 
         client.create("/expireRewatch", null, CreateMode.PERSISTENT);
-        Assert.assertEquals(Watcher.Event.EventType.NodeCreated, events.poll(20, TimeUnit.SECONDS));
+        Assert.assertEquals(Watcher.Event.EventType.NodeCreated, events.poll(60, TimeUnit.SECONDS));
 
         KillZKSession.kill(client.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 10000);
 
-        Assert.assertTrue(expireReconnectLatch.await(20, TimeUnit.SECONDS));
+        Assert.assertTrue(expireReconnectLatch.await(60, TimeUnit.SECONDS));
 
-        client.delete("/expireRewatch");
-        Assert.assertEquals(Watcher.Event.EventType.NodeDeleted, events.poll(20, TimeUnit.SECONDS));
+        // Keep trying to delete the node until it succeed
+        while (ZKOperations.ignoreError(client.delete("/expireRewatch"), KeeperException.class, null).get() == null) {
+          LOG.info("Delete failed. Retrying to delete /expireRewatch");
+          TimeUnit.MILLISECONDS.sleep(10);
+        }
+
+        Assert.assertEquals(Watcher.Event.EventType.NodeDeleted, events.poll(60, TimeUnit.SECONDS));
       } finally {
         client.stopAndWait();
       }

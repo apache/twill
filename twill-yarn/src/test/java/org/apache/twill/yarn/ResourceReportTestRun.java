@@ -29,7 +29,6 @@ import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.internal.EnvKeys;
@@ -54,7 +53,6 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * Using echo server to test resource reports.
- * This test is executed by {@link org.apache.twill.yarn.YarnTestUtils}.
  */
 public final class ResourceReportTestRun extends BaseYarnTest {
 
@@ -82,7 +80,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
   @Test
   public void testRunnablesGetAllowedResourcesInEnv() throws InterruptedException, IOException,
     TimeoutException, ExecutionException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     ResourceSpecification resourceSpec = ResourceSpecification.Builder.with()
       .setVirtualCores(1)
@@ -96,9 +94,9 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -106,7 +104,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
 
     Iterable<Discoverable> envEchoServices = controller.discoverService("envecho");
-    Assert.assertTrue(YarnTestUtils.waitForSize(envEchoServices, 1, 120));
+    Assert.assertTrue(waitForSize(envEchoServices, 1, 120));
 
     // TODO: check virtual cores once yarn adds the ability
     Map<String, String> expectedValues = Maps.newHashMap();
@@ -128,7 +126,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       }
     }
 
-    controller.stop().get(120, TimeUnit.SECONDS);
+    controller.terminate().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -136,7 +134,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
   @Test
   public void testResourceReportWithFailingContainers() throws InterruptedException, IOException,
     TimeoutException, ExecutionException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     ResourceSpecification resourceSpec = ResourceSpecification.Builder.with()
       .setVirtualCores(1)
@@ -150,9 +148,9 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -160,7 +158,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
 
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 120));
+    Assert.assertTrue(waitForSize(echoServices, 2, 120));
     // check that we have 2 runnables.
     ResourceReport report = controller.getResourceReport();
     Assert.assertEquals(2, report.getRunnableResources("BuggyServer").size());
@@ -190,7 +188,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     }
     Assert.assertTrue("Still has 2 contains running after 100 seconds", count < 100);
 
-    controller.stop().get(100, TimeUnit.SECONDS);
+    controller.terminate().get(100, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }
@@ -198,7 +196,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
   @Test
   public void testResourceReport() throws InterruptedException, ExecutionException, IOException,
     URISyntaxException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     final TwillController controller = runner.prepare(new ResourceApplication())
                                         .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
@@ -208,9 +206,9 @@ public final class ResourceReportTestRun extends BaseYarnTest {
                                         .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -219,7 +217,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
 
     // wait for 3 echo servers to come up
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 120));
+    Assert.assertTrue(waitForSize(echoServices, 3, 120));
     ResourceReport report = controller.getResourceReport();
     // make sure resources for echo1 and echo2 are there
     Map<String, Collection<TwillRunResources>> usedResources = report.getResources();
@@ -227,7 +225,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Assert.assertTrue(usedResources.containsKey("echo1"));
     Assert.assertTrue(usedResources.containsKey("echo2"));
 
-    YarnTestUtils.waitForSize(new Iterable<String>() {
+    waitForSize(new Iterable<String>() {
       @Override
       public Iterator<String> iterator() {
         return controller.getResourceReport().getServices().iterator();
@@ -255,7 +253,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     // Decrease number of instances of echo1 from 2 to 1
     controller.changeInstances("echo1", 1);
     echoServices = controller.discoverService("echo1");
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 1, 60));
+    Assert.assertTrue(waitForSize(echoServices, 1, 60));
     report = controller.getResourceReport();
 
     // make sure resources for echo1 and echo2 are there
@@ -280,7 +278,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       Assert.assertEquals(512, resources.getMemoryMB());
     }
 
-    controller.stop().get(120, TimeUnit.SECONDS);
+    controller.terminate().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
   }

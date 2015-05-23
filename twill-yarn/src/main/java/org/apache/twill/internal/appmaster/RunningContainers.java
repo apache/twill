@@ -26,16 +26,15 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Table;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
-import org.apache.twill.api.ServiceController;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.internal.ContainerExitCodes;
 import org.apache.twill.internal.ContainerInfo;
@@ -56,7 +55,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.BitSet;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -307,7 +305,7 @@ final class RunningContainers {
     try {
       // Stop it one by one in reverse order of start sequence
       Iterator<String> itor = startSequence.descendingIterator();
-      List<ListenableFuture<ServiceController.State>> futures = Lists.newLinkedList();
+      List<ListenableFuture<Service.State>> futures = Lists.newLinkedList();
       while (itor.hasNext()) {
         String runnableName = itor.next();
         LOG.info("Stopping all instances of " + runnableName);

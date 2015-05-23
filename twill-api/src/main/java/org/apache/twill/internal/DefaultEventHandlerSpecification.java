@@ -17,10 +17,11 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.collect.ImmutableMap;
 import org.apache.twill.api.EventHandler;
 import org.apache.twill.api.EventHandlerSpecification;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -39,7 +40,7 @@ public class DefaultEventHandlerSpecification implements EventHandlerSpecificati
   public DefaultEventHandlerSpecification(EventHandler eventHandler) {
     EventHandlerSpecification spec = eventHandler.configure();
     this.className = eventHandler.getClass().getName();
-    this.configs = ImmutableMap.copyOf(spec.getConfigs());
+    this.configs = Collections.unmodifiableMap(new HashMap<String, String>(spec.getConfigs()));
   }
 
   @Override

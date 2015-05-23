@@ -25,7 +25,6 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -42,7 +41,7 @@ public class InitializeFailTestRun extends BaseYarnTest {
 
   @Test
   public void testInitFail() throws InterruptedException, ExecutionException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     final CountDownLatch logLatch = new CountDownLatch(1);
 
     // Verify that it receives the exception log entry that thrown when runnable initialize
@@ -68,7 +67,7 @@ public class InitializeFailTestRun extends BaseYarnTest {
       .addLogHandler(logVerifyHandler)
       .start();
 
-    Services.getCompletionFuture(controller).get(2, TimeUnit.MINUTES);
+    controller.awaitTerminated(2, TimeUnit.MINUTES);
     Assert.assertTrue(logLatch.await(10, TimeUnit.SECONDS));
   }
 

@@ -17,13 +17,14 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillRunnableSpecification;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 
 /**
  * Straightforward implementation of {@link RuntimeSpecification}.
@@ -42,7 +43,7 @@ public final class DefaultRuntimeSpecification implements RuntimeSpecification {
     this.name = name;
     this.runnableSpec = runnableSpec;
     this.resourceSpec = resourceSpec;
-    this.localFiles = ImmutableList.copyOf(localFiles);
+    this.localFiles = Collections.unmodifiableList(new ArrayList<LocalFile>(localFiles));
   }
 
   @Override

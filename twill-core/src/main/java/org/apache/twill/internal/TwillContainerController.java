@@ -18,13 +18,14 @@
 package org.apache.twill.internal;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.ServiceController;
 import org.apache.twill.internal.state.Message;
 
 /**
  * A {@link ServiceController} that allows sending a message directly. Internal use only.
  */
-public interface TwillContainerController extends ServiceController {
+public interface TwillContainerController extends ServiceController, Service {
 
   ListenableFuture<Message> sendMessage(Message message);
 

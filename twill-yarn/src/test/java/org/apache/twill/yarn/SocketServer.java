@@ -44,7 +44,6 @@ public abstract class SocketServer extends AbstractTwillRunnable {
   private static final Logger LOG = LoggerFactory.getLogger(SocketServer.class);
 
   protected volatile boolean running;
-  protected volatile Thread runThread;
   protected ServerSocket serverSocket;
   protected Cancellable canceller;
 
@@ -78,7 +77,6 @@ public abstract class SocketServer extends AbstractTwillRunnable {
   @Override
   public void run() {
     try {
-      runThread = Thread.currentThread();
       while (running) {
         try {
           Socket socket = serverSocket.accept();
@@ -103,10 +101,6 @@ public abstract class SocketServer extends AbstractTwillRunnable {
     LOG.info("Stopping server");
     canceller.cancel();
     running = false;
-    Thread t = runThread;
-    if (t != null) {
-      t.interrupt();
-    }
     try {
       serverSocket.close();
     } catch (IOException e) {

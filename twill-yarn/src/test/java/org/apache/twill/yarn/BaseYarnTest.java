@@ -17,16 +17,19 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.collect.Iterables;
+import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.junit.After;
-import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Base class for all YARN tests.
@@ -38,23 +41,72 @@ public abstract class BaseYarnTest {
   @ClassRule
   public static TemporaryFolder tmpFolder = new TemporaryFolder();
 
-  @BeforeClass
-  public static void init() throws IOException {
-    YarnTestUtils.initOnce();
-  }
+  /**
+   * A singleton wrapper so that yarn cluster only bring up once across all tests in the YarnTestSuite.
+   */
+  @ClassRule
+  public static final TwillTester TWILL_TESTER = new TwillTester() {
+    private final AtomicInteger instances = new AtomicInteger();
+
+    @Override
+    protected void before() throws Throwable {
+      if (instances.getAndIncrement() == 0) {
+        super.before();
+      }
+    }
+
+    @Override
+    protected void after() {
+      if (instances.decrementAndGet() == 0) {
+        super.after();
+      }
+    }
+  };
+
 
   @After
   public final void cleanupTest() {
     // Make sure all applications are stopped after a test case is executed, even it failed.
-    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
+    TwillRunner twillRunner = TWILL_TESTER.getTwillRunner();
     for (TwillRunner.LiveInfo liveInfo : twillRunner.lookupLive()) {
       for (TwillController controller : liveInfo.getControllers()) {
         try {
-          controller.stopAndWait();
+          controller.terminate().get();
         } catch (Throwable t) {
           LOG.error("Failed to stop application {}", liveInfo.getApplicationName(), t);
         }
       }
     }
+  }
+
+  /**
+   * Poll the given {@link Iterable} until its size is the same as the given count,
+   * with a limited amount of polls. There is one second sleep between each poll.
+   *
+   * @param iterable the Iterable to poll
+   * @param count the expected size
+   * @param limit number of times to poll.
+   * @param <T> type of the element inside the Iterable
+   * @return true if the Iterable size is the same as the given count
+   */
+  public <T> boolean waitForSize(Iterable<T> iterable, int count, int limit) throws InterruptedException {
+    int trial = 0;
+    int size = Iterables.size(iterable);
+    while (size != count && trial < limit) {
+      LOG.info("Waiting for {} size {} == {}", iterable, size, count);
+      TimeUnit.SECONDS.sleep(1);
+      trial++;
+      size = Iterables.size(iterable);
+    }
+    return trial < limit;
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T extends TwillRunner> T getTwillRunner() {
+    return (T) TWILL_TESTER.getTwillRunner();
+  }
+
+  public List<NodeReport> getNodeReports() throws Exception {
+    return TWILL_TESTER.getNodeReports();
   }
 }

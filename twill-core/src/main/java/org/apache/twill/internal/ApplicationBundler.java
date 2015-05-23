@@ -26,6 +26,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
+import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.utils.Dependencies;
@@ -41,7 +42,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
@@ -149,7 +149,7 @@ public final class ApplicationBundler {
         try {
           Files.copy(tmpJar, os);
         } finally {
-          os.close();
+          Closeables.closeQuietly(os);
         }
       } catch (IOException e) {
         throw new IOException("failed to copy bundle from " + tmpJar.toURI() + " to " + target, e);
@@ -175,6 +175,9 @@ public final class ApplicationBundler {
     if (classLoader == null) {
       classLoader = getClass().getClassLoader();
     }
+
+    // Record the set of classpath URL that are already added to the jar
+    final Set<URL> seenClassPaths = Sets.newHashSet();
     Dependencies.findClassDependencies(classLoader, new Dependencies.ClassAcceptor() {
       @Override
       public boolean accept(String className, URL classUrl, URL classPathUrl) {
@@ -198,7 +201,9 @@ public final class ApplicationBundler {
           }
         }
 
-        putEntry(className, classUrl, classPathUrl, entries, jarOut);
+        if (seenClassPaths.add(classPathUrl)) {
+          putEntry(className, classUrl, classPathUrl, entries, jarOut);
+        }
         return true;
       }
     }, classNames);
@@ -301,7 +306,7 @@ public final class ApplicationBundler {
     LOG.trace("adding whole dir {} to bundle at '{}'", baseDir, entryPrefix);
     URI baseUri = baseDir.toURI();
     Queue<File> queue = Lists.newLinkedList();
-    Collections.addAll(queue, baseDir.listFiles());
+    queue.add(baseDir);
     while (!queue.isEmpty()) {
       File file = queue.remove();
 
@@ -321,7 +326,7 @@ public final class ApplicationBundler {
       if (file.isDirectory()) {
         File[] files = file.listFiles();
         if (files != null) {
-          queue.addAll(Arrays.asList(files));
+          Collections.addAll(queue, files);
         }
       }
     }

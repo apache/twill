@@ -20,6 +20,7 @@ package org.apache.twill.internal.zookeeper;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.twill.api.ElectionHandler;
 import org.apache.twill.zookeeper.ZKClientService;
 import org.junit.AfterClass;
@@ -275,6 +276,54 @@ public class LeaderElectionTest {
       }
     } finally {
       ownZKServer.stopAndWait();
+    }
+  }
+
+  @Test
+  public void testRace() throws InterruptedException {
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    final AtomicInteger leaderCount = new AtomicInteger(0);
+    final CountDownLatch completeLatch = new CountDownLatch(2);
+
+    // Starts two threads and try to compete for leader and immediate drop leadership.
+    // This is to test the case when a follower tries to watch for leader node, but the leader is already gone
+    for (int i = 0; i < 2; i++) {
+      final ZKClientService zkClient = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
+      zkClient.startAndWait();
+      executor.execute(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            for (int i = 0; i < 1000; i++) {
+              final CountDownLatch leaderLatch = new CountDownLatch(1);
+              LeaderElection election = new LeaderElection(zkClient, "/testRace", new ElectionHandler() {
+                @Override
+                public void leader() {
+                  leaderCount.incrementAndGet();
+                  leaderLatch.countDown();
+                }
+
+                @Override
+                public void follower() {
+                  // no-op
+                }
+              });
+              election.startAndWait();
+              Uninterruptibles.awaitUninterruptibly(leaderLatch);
+              election.stopAndWait();
+            }
+            completeLatch.countDown();
+          } finally {
+            zkClient.stopAndWait();
+          }
+        }
+      });
+    }
+
+    try {
+      Assert.assertTrue(completeLatch.await(2, TimeUnit.MINUTES));
+    } finally {
+      executor.shutdownNow();
     }
   }
 

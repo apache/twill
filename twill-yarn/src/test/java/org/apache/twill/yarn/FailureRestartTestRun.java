@@ -37,6 +37,7 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -45,7 +46,7 @@ public final class FailureRestartTestRun extends BaseYarnTest {
 
   @Test
   public void testFailureRestart() throws Exception {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     ResourceSpecification resource = ResourceSpecification.Builder.with()
       .setVirtualCores(1)
@@ -59,7 +60,7 @@ public final class FailureRestartTestRun extends BaseYarnTest {
       .start();
 
     Iterable<Discoverable> discoverables = controller.discoverService("failure");
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 120));
+    Assert.assertTrue(waitForSize(discoverables, 2, 120));
 
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));
@@ -68,15 +69,15 @@ public final class FailureRestartTestRun extends BaseYarnTest {
     controller.sendCommand(FailureRunnable.class.getSimpleName(), Command.Builder.of("kill0").build());
 
     // Make sure the runnable is killed.
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 1, 120));
+    Assert.assertTrue(waitForSize(discoverables, 1, 120));
 
     // Wait for the restart
-    Assert.assertTrue(YarnTestUtils.waitForSize(discoverables, 2, 120));
+    Assert.assertTrue(waitForSize(discoverables, 2, 120));
 
     // Make sure we see the right instance IDs
     Assert.assertEquals(Sets.newHashSet(0, 1), getInstances(discoverables));
 
-    controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   private Set<Integer> getInstances(Iterable<Discoverable> discoverables) throws IOException {

@@ -17,10 +17,6 @@
  */
 package org.apache.twill.filesystem;
 
-import com.google.common.base.Objects;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -29,8 +25,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
@@ -157,7 +155,7 @@ final class LocalLocation implements Location {
       return delete();
     }
 
-    Deque<File> stack = Lists.newLinkedList();
+    Deque<File> stack = new LinkedList<File>();
     stack.add(file);
     while (!stack.isEmpty()) {
       File f = stack.peekLast();
@@ -218,7 +216,7 @@ final class LocalLocation implements Location {
   @Override
   public List<Location> list() throws IOException {
     File[] files = file.listFiles();
-    ImmutableList.Builder<Location> result = ImmutableList.builder();
+    List<Location> result = new ArrayList<Location>();
     if (files != null) {
       for (File file : files) {
         result.add(new LocalLocation(locationFactory, file));
@@ -226,7 +224,7 @@ final class LocalLocation implements Location {
     } else if (!file.exists()) {
       throw new FileNotFoundException("File " + file + " does not exist.");
     }
-    return result.build();
+    return Collections.unmodifiableList(result);
   }
 
   @Override
@@ -243,8 +241,8 @@ final class LocalLocation implements Location {
       return false;
     }
 
-    LocalLocation other = (LocalLocation) o;
-    return Objects.equal(file, other.file);
+    LocalLocation that = (LocalLocation) o;
+    return file.equals(that.file);
   }
 
   @Override

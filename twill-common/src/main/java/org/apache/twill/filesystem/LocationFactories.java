@@ -17,8 +17,6 @@
  */
 package org.apache.twill.filesystem;
 
-import com.google.common.base.Throwables;
-
 import java.io.IOException;
 import java.net.URI;
 
@@ -38,7 +36,7 @@ public final class LocationFactories {
           Location base = getDelegate().create(namespace);
           return base.append(path);
         } catch (IOException e) {
-          throw Throwables.propagate(e);
+          throw new RuntimeException(e);
         }
       }
 
@@ -51,7 +49,7 @@ public final class LocationFactories {
           Location base = getDelegate().create(namespace);
           return base.append(uri.getPath());
         } catch (IOException e) {
-          throw Throwables.propagate(e);
+          throw new RuntimeException(e);
         }
       }
 

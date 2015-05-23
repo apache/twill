@@ -27,13 +27,13 @@ import com.google.common.util.concurrent.SettableFuture;
 import org.apache.twill.api.ElectionHandler;
 import org.apache.twill.common.Threads;
 import org.apache.twill.zookeeper.NodeChildren;
+import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.OperationFuture;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -240,10 +240,10 @@ public final class LeaderElection extends AbstractService {
    * Starts watching for the max. of smaller node.
    */
   private void watchNode(final String nodePath, Watcher watcher) {
-    OperationFuture<Stat> watchFuture = zkClient.exists(nodePath, watcher);
-    Futures.addCallback(watchFuture, new FutureCallback<Stat>() {
+    OperationFuture<NodeData> watchFuture = zkClient.getData(nodePath, watcher);
+    Futures.addCallback(watchFuture, new FutureCallback<NodeData>() {
       @Override
-      public void onSuccess(Stat result) {
+      public void onSuccess(NodeData nodeData) {
         if (state != State.CANCELLED) {
           becomeFollower();
         }
@@ -251,7 +251,8 @@ public final class LeaderElection extends AbstractService {
 
       @Override
       public void onFailure(Throwable t) {
-        LOG.warn("Exception while setting watch on node {}. Retry.", nodePath, t);
+        // On any kind of failure, just rerun the election.
+        LOG.debug("Exception while setting watch on node {}. Retry.", nodePath, t);
         runElection();
       }
     }, executor);

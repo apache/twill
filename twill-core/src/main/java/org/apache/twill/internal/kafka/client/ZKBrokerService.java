@@ -63,7 +63,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * A {@link BrokerService} that watches kafka zk nodes for updates of broker lists and leader for
  * each topic partition.
  */
-final class ZKBrokerService extends AbstractIdleService implements BrokerService {
+public final class ZKBrokerService extends AbstractIdleService implements BrokerService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ZKBrokerService.class);
   private static final String BROKER_IDS_PATH = "/brokers/ids";
@@ -91,7 +91,7 @@ final class ZKBrokerService extends AbstractIdleService implements BrokerService
   private ExecutorService executorService;
   private Supplier<Iterable<BrokerInfo>> brokerList;
 
-  ZKBrokerService(ZKClient zkClient) {
+  public ZKBrokerService(ZKClient zkClient) {
     this.zkClient = zkClient;
     this.brokerInfos = CacheBuilder.newBuilder().build(createCacheLoader(new CacheInvalidater<BrokerId>() {
       @Override

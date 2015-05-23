@@ -17,10 +17,11 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.ServiceDiscovered;
+
+import java.util.concurrent.Future;
 
 /**
  * For controlling a running application.
@@ -46,11 +47,11 @@ public interface TwillController extends ServiceController {
    *
    * @param runnable The name of the runnable.
    * @param newCount Number of instances for the given runnable.
-   * @return A {@link ListenableFuture} that will be completed when the number running instances has been
+   * @return A {@link Future} that will be completed when the number running instances has been
    *         successfully changed. The future will carry the new count as the result. If there is any error
    *         while changing instances, it'll be reflected in the future.
    */
-  ListenableFuture<Integer> changeInstances(String runnable, int newCount);
+  Future<Integer> changeInstances(String runnable, int newCount);
 
   /**
    * Get a snapshot of the resources used by the application, broken down by each runnable.

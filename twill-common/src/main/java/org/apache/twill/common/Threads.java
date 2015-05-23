@@ -17,11 +17,9 @@
  */
 package org.apache.twill.common;
 
-import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
@@ -31,20 +29,32 @@ public final class Threads {
   /**
    * A executor that execute task from the submitter thread.
    */
-  public static final Executor SAME_THREAD_EXECUTOR = MoreExecutors.sameThreadExecutor();
+  public static final Executor SAME_THREAD_EXECUTOR = new Executor() {
+    @Override
+    public void execute(Runnable command) {
+      command.run();
+    }
+  };
 
   /**
    * Handy method to create {@link ThreadFactory} that creates daemon threads with the given name format.
    *
-   * @param nameFormat Name format for the thread names
+   * @param nameFormat Name format for the thread names. It should be a format string compatible
+   *                   with the {@link String#format(String, Object...)} that takes a single number as the format
+   *                   argument.
    * @return A {@link ThreadFactory}.
-   * @see ThreadFactoryBuilder
    */
-  public static ThreadFactory createDaemonThreadFactory(String nameFormat) {
-    return new ThreadFactoryBuilder()
-      .setDaemon(true)
-      .setNameFormat(nameFormat)
-      .build();
+  public static ThreadFactory createDaemonThreadFactory(final String nameFormat) {
+    final AtomicLong id = new AtomicLong(0);
+    return new ThreadFactory() {
+      @Override
+      public Thread newThread(Runnable r) {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.setName(String.format(nameFormat, id.getAndIncrement()));
+        return t;
+      }
+    };
   }
 
   private Threads() {

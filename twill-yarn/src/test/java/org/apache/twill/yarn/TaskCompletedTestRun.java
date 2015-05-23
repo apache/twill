@@ -18,13 +18,11 @@
 package org.apache.twill.yarn;
 
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.junit.Assert;
 import org.junit.Test;
@@ -32,7 +30,9 @@ import org.junit.Test;
 import java.io.PrintWriter;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Testing application master will shutdown itself when all tasks are completed.
@@ -62,8 +62,8 @@ public final class TaskCompletedTestRun extends BaseYarnTest {
   }
 
   @Test
-  public void testTaskCompleted() throws InterruptedException {
-    TwillRunner twillRunner = YarnTestUtils.getTwillRunner();
+  public void testTaskCompleted() throws InterruptedException, TimeoutException, ExecutionException {
+    TwillRunner twillRunner = getTwillRunner();
     TwillController controller = twillRunner.prepare(new SleepTask(),
                                                 ResourceSpecification.Builder.with()
                                                   .setVirtualCores(1)
@@ -73,23 +73,15 @@ public final class TaskCompletedTestRun extends BaseYarnTest {
                                             .start();
 
     final CountDownLatch runLatch = new CountDownLatch(1);
-    final CountDownLatch stopLatch = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
-
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         runLatch.countDown();
-      }
-
-      @Override
-      public void terminated(Service.State from) {
-        stopLatch.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
     Assert.assertTrue(runLatch.await(1, TimeUnit.MINUTES));
-
-    Assert.assertTrue(stopLatch.await(1, TimeUnit.MINUTES));
+    controller.awaitTerminated(1, TimeUnit.MINUTES);
 
     TimeUnit.SECONDS.sleep(2);
   }

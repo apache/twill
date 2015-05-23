@@ -28,7 +28,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.Services;
 import org.junit.Test;
 
 import java.io.PrintWriter;
@@ -45,7 +44,7 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
 
   @Test
   public void testProvisionTimeout() throws InterruptedException, ExecutionException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     TwillController controller = runner.prepare(new TimeoutApplication())
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
@@ -54,7 +53,7 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
     // The provision should failed in 30 seconds after AM started, which AM could took a while to start.
     // Hence we give 90 seconds max time here.
     try {
-      Services.getCompletionFuture(controller).get(90, TimeUnit.SECONDS);
+      controller.awaitTerminated(90, TimeUnit.SECONDS);
     } finally {
       // If it timeout, kill the app as cleanup.
       controller.kill();

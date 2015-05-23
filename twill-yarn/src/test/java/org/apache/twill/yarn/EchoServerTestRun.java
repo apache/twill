@@ -24,7 +24,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.apache.twill.common.ServiceListenerAdapter;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
 import org.junit.Assert;
@@ -45,7 +44,6 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * Using echo server to test various behavior of YarnTwillService.
- * This test is executed by {@link YarnTestUtils}.
  */
 public final class EchoServerTestRun extends BaseYarnTest {
 
@@ -54,7 +52,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
   @Test
   public void testEchoServer() throws InterruptedException, ExecutionException, IOException,
     URISyntaxException, TimeoutException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
 
     TwillController controller = runner.prepare(new EchoServer(),
                                                 ResourceSpecification.Builder.with()
@@ -68,9 +66,9 @@ public final class EchoServerTestRun extends BaseYarnTest {
                                         .start();
 
     final CountDownLatch running = new CountDownLatch(1);
-    controller.addListener(new ServiceListenerAdapter() {
+    controller.onRunning(new Runnable() {
       @Override
-      public void running() {
+      public void run() {
         running.countDown();
       }
     }, Threads.SAME_THREAD_EXECUTOR);
@@ -78,7 +76,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
     Assert.assertTrue(running.await(120, TimeUnit.SECONDS));
 
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 120));
+    Assert.assertTrue(waitForSize(echoServices, 2, 120));
 
     for (Discoverable discoverable : echoServices) {
       String msg = "Hello: " + discoverable.getSocketAddress();
@@ -98,38 +96,38 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
     // Increase number of instances
     controller.changeInstances("EchoServer", 3);
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 3, 120));
+    Assert.assertTrue(waitForSize(echoServices, 3, 120));
 
     echoServices = controller.discoverService("echo2");
 
     // Decrease number of instances
     controller.changeInstances("EchoServer", 1);
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 1, 120));
+    Assert.assertTrue(waitForSize(echoServices, 1, 120));
 
     // Increase number of instances again
     controller.changeInstances("EchoServer", 2);
-    Assert.assertTrue(YarnTestUtils.waitForSize(echoServices, 2, 120));
+    Assert.assertTrue(waitForSize(echoServices, 2, 120));
 
     // Make sure still only one app is running
     Iterable<TwillRunner.LiveInfo> apps = runner.lookupLive();
-    Assert.assertTrue(YarnTestUtils.waitForSize(apps, 1, 120));
+    Assert.assertTrue(waitForSize(apps, 1, 120));
 
     // Creates a new runner service to check it can regain control over running app.
-    TwillRunnerService runnerService = YarnTestUtils.createTwillRunnerService();
-    runnerService.startAndWait();
+    TwillRunnerService runnerService = TWILL_TESTER.createTwillRunnerService();
+    runnerService.start();
 
     try {
       Iterable <TwillController> controllers = runnerService.lookup("EchoServer");
-      Assert.assertTrue(YarnTestUtils.waitForSize(controllers, 1, 120));
+      Assert.assertTrue(waitForSize(controllers, 1, 120));
 
       for (TwillController c : controllers) {
         LOG.info("Stopping application: " + c.getRunId());
-        c.stop().get(30, TimeUnit.SECONDS);
+        c.terminate().get(30, TimeUnit.SECONDS);
       }
 
-      Assert.assertTrue(YarnTestUtils.waitForSize(apps, 0, 120));
+      Assert.assertTrue(waitForSize(apps, 0, 120));
     } finally {
-      runnerService.stopAndWait();
+      runnerService.stop();
     }
 
     // Sleep a bit before exiting.

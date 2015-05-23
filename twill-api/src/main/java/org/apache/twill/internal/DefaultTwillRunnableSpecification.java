@@ -17,9 +17,10 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.collect.ImmutableMap;
 import org.apache.twill.api.TwillRunnableSpecification;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -34,13 +35,13 @@ public final class DefaultTwillRunnableSpecification implements TwillRunnableSpe
   public DefaultTwillRunnableSpecification(String className, String name, Map<String, String> arguments) {
     this.className = className;
     this.name = name;
-    this.arguments = ImmutableMap.copyOf(arguments);
+    this.arguments = Collections.unmodifiableMap(new HashMap<String, String>(arguments));
   }
 
   public DefaultTwillRunnableSpecification(String className, TwillRunnableSpecification other) {
     this.className = className;
     this.name = other.getName();
-    this.arguments = ImmutableMap.copyOf(other.getConfigs());
+    this.arguments = Collections.unmodifiableMap(new HashMap<String, String>(other.getConfigs()));
   }
 
   @Override

@@ -139,7 +139,8 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
         RunnableProcessLauncher launcher = (RunnableProcessLauncher) l;
         if (!launcher.isLaunched()) {
           YarnContainerInfo containerInfo = launcher.getContainerInfo();
-          LOG.info("Nothing to run in container, releasing it: {}", containerInfo.getContainer());
+          // Casting is needed in Java 8, otherwise it complains about ambiguous method over the info(String, Throwable)
+          LOG.info("Nothing to run in container, releasing it: {}", (Object) containerInfo.getContainer());
           releaseAssignedContainer(containerInfo);
         }
       }

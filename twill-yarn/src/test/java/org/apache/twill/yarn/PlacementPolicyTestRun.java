@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -77,7 +78,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
     int trials = 0;
     while (trials++ < 20) {
       try {
-        nodeReports = YarnTestUtils.getNodeReports();
+        nodeReports = TWILL_TESTER.getNodeReports();
         if (nodeReports != null && nodeReports.size() == 3) {
           break;
         }
@@ -111,7 +112,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
 
     waitNodeManagerCount(0, 10, TimeUnit.SECONDS);
 
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new PlacementPolicyApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .withApplicationArguments("PlacementPolicyTest")
@@ -123,12 +124,12 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
     try {
       // All runnables should get started.
       ServiceDiscovered serviceDiscovered = controller.discoverService("PlacementPolicyTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 4, 80));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 4, 80));
 
       // DISTRIBUTED runnables should be provisioned on different nodes.
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 2);
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
 
     // Sleep a bit before exiting.
@@ -168,7 +169,7 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
 
     waitNodeManagerCount(0, 10, TimeUnit.SECONDS);
 
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new DistributedApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .withApplicationArguments("DistributedTest")
@@ -180,29 +181,29 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
     try {
       // All runnables should get started with DISTRIBUTED ones being on different nodes.
       ServiceDiscovered serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 3, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 3, 60));
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 2);
 
       // Spawning a new instance for DISTRIBUTED runnable Alice, which should get a different node.
       controller.changeInstances("Alice", 2);
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 4, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 4, 60));
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 3);
 
       // Spawning a new instance for DEFAULT runnable Eve,
       // which should not be affected by placement policies of previous runnables.
       controller.changeInstances("Eve", 2);
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 5, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 5, 60));
 
       // Spawning a new instance for DISTRIBUTED runnable Bob,
       // which will be forced to give up it's placement policy restrictions, since there are only three nodes.
       controller.changeInstances("Bob", 2);
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 6, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 6, 60));
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 3);
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
 
     // Sleep a bit before exiting.
@@ -250,13 +251,13 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Test to verify changing instances during application run works for DISTRIBUTED runnables.
    */
   @Test
-  public void testChangeInstance() throws InterruptedException {
+  public void testChangeInstance() throws InterruptedException, TimeoutException, ExecutionException {
     // Ignore test if it is running against older Hadoop versions which does not support blacklists.
     Assume.assumeTrue(YarnUtils.getHadoopVersion().equals(YarnUtils.HadoopVersions.HADOOP_22));
 
     ServiceDiscovered serviceDiscovered;
 
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new ChangeInstanceApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .withApplicationArguments("DistributedTest")
@@ -268,29 +269,29 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
     try {
       // All runnables should get started.
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 4, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 4, 60));
 
       // Increasing the instance count for runnable Alice by 2.
       controller.changeInstances("Alice", 4);
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 6, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 6, 60));
 
       // Decreasing instance count for runnable Alice by 3.
       controller.changeInstances("Alice", 1);
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 3, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 3, 60));
 
       // Increasing instance count for runnable Bob by 2.
       controller.changeInstances("Bob", 3);
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 5, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 5, 60));
 
       // Increasing instance count for runnable Eve by 2.
       controller.changeInstances("Eve", 3);
       serviceDiscovered = controller.discoverService("DistributedTest");
-      Assert.assertTrue(YarnTestUtils.waitForSize(serviceDiscovered, 7, 60));
+      Assert.assertTrue(waitForSize(serviceDiscovered, 7, 60));
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
 
     // Sleep a bit before exiting.
@@ -321,12 +322,12 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Test to verify exception is thrown in case a non-existent runnable is specified in a placement policy.
    */
   @Test(expected = IllegalArgumentException.class)
-  public void testNonExistentRunnable() {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+  public void testNonExistentRunnable() throws InterruptedException, ExecutionException, TimeoutException {
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new FaultyApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
-      controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   /**
@@ -354,12 +355,12 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Test to verify exception is thrown in case a runnable is mentioned in more than one placement policy.
    */
   @Test(expected = IllegalArgumentException.class)
-  public void testPlacementPolicySpecification() {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+  public void testPlacementPolicySpecification() throws InterruptedException, ExecutionException, TimeoutException {
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new BadApplication())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
-      controller.stopAndWait();
+    controller.terminate().get(120, TimeUnit.SECONDS);
   }
 
   /**
@@ -388,9 +389,9 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
    * Returns the number of NodeManagers on which runnables got provisioned.
    * @return number of NodeManagers on which runnables got provisioned.
    */
-  private static int getProvisionedNodeManagerCount() throws Exception {
+  private int getProvisionedNodeManagerCount() throws Exception {
     int provisionedNodeManagerCount = 0;
-    for (NodeReport nodeReport : YarnTestUtils.getNodeReports()) {
+    for (NodeReport nodeReport : getNodeReports()) {
       Resource used = nodeReport.getUsed();
       if (used != null && used.getMemory() > 0) {
           provisionedNodeManagerCount++;

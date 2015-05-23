@@ -31,7 +31,7 @@ import com.google.common.util.concurrent.Service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.twill.api.logging.LogThrowable;
-import org.apache.twill.common.Services;
+import org.apache.twill.internal.Services;
 import org.apache.twill.common.Threads;
 import org.apache.twill.internal.json.ILoggingEventSerializer;
 import org.apache.twill.internal.json.LogThrowableCodec;

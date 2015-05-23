@@ -17,8 +17,7 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.collect.ImmutableMap;
-
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -117,7 +116,8 @@ public abstract class EventHandler {
 
   /**
    * Invoked by the application to initialize this EventHandler instance.
-   * @param context
+   *
+   * @param context context object for accessing the event handler execution context.
    */
   public void initialize(EventHandlerContext context) {
     this.context = context;
@@ -141,6 +141,6 @@ public abstract class EventHandler {
    * Returns set of configurations available at runtime for access.
    */
   protected Map<String, String> getConfigs() {
-    return ImmutableMap.of();
+    return Collections.emptyMap();
   }
 }

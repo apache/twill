@@ -17,10 +17,8 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -35,13 +33,15 @@ public interface Command {
   /**
    * Builder for creating {@link Command} object.
    */
-  static final class Builder {
+  final class Builder {
 
     private final String command;
-    private final ImmutableMap.Builder<String, String> options = ImmutableMap.builder();
+    private final Map<String, String> options = new HashMap<String, String>();
 
     public static Builder of(String command) {
-      Preconditions.checkArgument(command != null, "Command cannot be null.");
+      if (command == null) {
+        throw new IllegalArgumentException("Command cannot be null.");
+      }
       return new Builder(command);
     }
 
@@ -56,7 +56,7 @@ public interface Command {
     }
 
     public Command build() {
-      return new SimpleCommand(command, options.build());
+      return new SimpleCommand(command, Collections.unmodifiableMap(new HashMap<String, String>(options)));
     }
 
     private Builder(String command) {
@@ -86,28 +86,32 @@ public interface Command {
       }
 
       @Override
+      public boolean equals(Object o) {
+        if (this == o) {
+          return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+          return false;
+        }
+
+        SimpleCommand that = (SimpleCommand) o;
+        return command.equals(that.command) && options.equals(that.options);
+
+      }
+
+      @Override
       public int hashCode() {
-        return Objects.hashCode(command, options);
+        int result = command.hashCode();
+        result = 31 * result + options.hashCode();
+        return result;
       }
 
       @Override
       public String toString() {
-        return Objects.toStringHelper(Command.class)
-          .add("command", command)
-          .add("options", options)
-          .toString();
-      }
-
-      @Override
-      public boolean equals(Object obj) {
-        if (obj == this) {
-          return true;
-        }
-        if (!(obj instanceof Command)) {
-          return false;
-        }
-        Command other = (Command) obj;
-        return command.equals(other.getCommand()) && options.equals(other.getOptions());
+        return "SimpleCommand{" +
+          "command='" + command + '\'' +
+          ", options=" + options +
+          '}';
       }
     }
   }

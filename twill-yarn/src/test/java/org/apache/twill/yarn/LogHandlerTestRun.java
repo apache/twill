@@ -36,6 +36,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Test for LogHandler able to receive logs from AM and runnable.
@@ -43,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 public class LogHandlerTestRun extends BaseYarnTest {
 
   @Test
-  public void testLogHandler() throws ExecutionException, InterruptedException {
+  public void testLogHandler() throws ExecutionException, InterruptedException, TimeoutException {
     final CountDownLatch latch = new CountDownLatch(3);
     final Queue<LogThrowable> throwables = new ConcurrentLinkedQueue<LogThrowable>();
     final Queue<String> runnables = new ConcurrentLinkedQueue<String>();
@@ -70,7 +71,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
       }
     };
 
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new LogRunnable())
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                        .addLogHandler(logHandler)
@@ -79,7 +80,7 @@ public class LogHandlerTestRun extends BaseYarnTest {
     try {
       Assert.assertTrue(latch.await(100, TimeUnit.SECONDS));
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
 
     // Verify the runnable names

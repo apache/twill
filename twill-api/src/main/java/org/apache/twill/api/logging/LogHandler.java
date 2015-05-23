@@ -18,9 +18,12 @@
 package org.apache.twill.api.logging;
 
 /**
- *
+ * Represents class that can receive logs from the application.
  */
 public interface LogHandler {
 
+  /**
+   * Invokes when there is new {@link LogEntry} received from the application.
+   */
   void onLog(LogEntry logEntry);
 }

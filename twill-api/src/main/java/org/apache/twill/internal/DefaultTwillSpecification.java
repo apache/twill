@@ -17,17 +17,16 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.base.Objects;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import org.apache.twill.api.EventHandlerSpecification;
 import org.apache.twill.api.Hosts;
 import org.apache.twill.api.Racks;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,8 +47,8 @@ public final class DefaultTwillSpecification implements TwillSpecification {
                                    List<Order> orders, List<PlacementPolicy> placementPolicies,
                                    EventHandlerSpecification eventHandler) {
     this.name = name;
-    this.runnables = ImmutableMap.copyOf(runnables);
-    this.orders = ImmutableList.copyOf(orders);
+    this.runnables = Collections.unmodifiableMap(new HashMap<String, RuntimeSpecification>(runnables));
+    this.orders = Collections.unmodifiableList(new ArrayList<Order>(orders));
     this.placementPolicies = placementPolicies;
     this.eventHandler = eventHandler;
   }
@@ -88,8 +87,8 @@ public final class DefaultTwillSpecification implements TwillSpecification {
     private final Set<String> names;
     private final Type type;
 
-    public DefaultOrder(Iterable<String> names, Type type) {
-      this.names = ImmutableSet.copyOf(names);
+    public DefaultOrder(Set<String> names, Type type) {
+      this.names = Collections.unmodifiableSet(new HashSet<String>(names));
       this.type = type;
     }
 
@@ -105,10 +104,10 @@ public final class DefaultTwillSpecification implements TwillSpecification {
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this)
-        .add("names", names)
-        .add("type", type)
-        .toString();
+      return "DefaultOrder{" +
+        "names=" + names +
+        ", type=" + type +
+        '}';
     }
   }
 
@@ -122,15 +121,11 @@ public final class DefaultTwillSpecification implements TwillSpecification {
     private final Hosts hosts;
     private final Racks racks;
 
-    public DefaultPlacementPolicy(Iterable<String> names, Type type, Hosts hosts, Racks racks) {
-      this.names = ImmutableSet.copyOf(names);
+    public DefaultPlacementPolicy(Set<String> names, Type type, Hosts hosts, Racks racks) {
+      this.names = Collections.unmodifiableSet(new HashSet<String>(names));
       this.type = type;
       this.hosts = hosts;
       this.racks = racks;
-    }
-
-    public DefaultPlacementPolicy(Iterable<String> names, Type type) {
-      this(names, type, null, null);
     }
 
     /**
@@ -171,17 +166,14 @@ public final class DefaultTwillSpecification implements TwillSpecification {
       return this.racks.get();
     }
 
-    /**
-     * @return String representation of Placement Policy
-     */
     @Override
     public String toString() {
-      return Objects.toStringHelper(this)
-        .add("names", names)
-        .add("type", type)
-        .add("hosts", hosts)
-        .add("racks", racks)
-        .toString();
+      return "DefaultPlacementPolicy{" +
+        "hosts=" + hosts +
+        ", names=" + names +
+        ", type=" + type +
+        ", racks=" + racks +
+        '}';
     }
   }
 }

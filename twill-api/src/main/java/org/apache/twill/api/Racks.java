@@ -17,9 +17,9 @@
  */
 package org.apache.twill.api;
 
-import com.google.common.collect.ImmutableSet;
-
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -30,14 +30,16 @@ public class Racks {
   private final Set<String> racks;
 
   public Racks(Set<String> racks) {
-    this.racks = ImmutableSet.copyOf(racks);
+    this.racks = Collections.unmodifiableSet(new HashSet<String>(racks));
   }
 
   public Racks(String rack, String...moreRacks) {
-    this.racks = ImmutableSet.<String>builder()
-      .add(rack)
-      .addAll(Arrays.asList(moreRacks))
-      .build();
+    Set<String> racks = new HashSet<String>();
+    racks.add(rack);
+    racks.addAll(Arrays.asList(moreRacks));
+
+    this.racks = Collections.unmodifiableSet(racks);
+
   }
 
   /**

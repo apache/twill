@@ -17,19 +17,21 @@
  */
 package org.apache.twill.api.logging;
 
-import com.google.common.base.Splitter;
-
 import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Formatter;
 import java.util.TimeZone;
+import java.util.regex.Pattern;
 
 /**
  * A {@link LogHandler} that prints the {@link LogEntry} through a {@link PrintWriter}.
  */
 public final class PrinterLogHandler implements LogHandler {
+
+  // A regex for splitting string by ".".
+  private static final Pattern DOT_SPLIT = Pattern.compile("\\.");
 
   private static final ThreadLocal<DateFormat> DATE_FORMAT = new ThreadLocal<DateFormat>() {
     @Override
@@ -99,7 +101,7 @@ public final class PrinterLogHandler implements LogHandler {
   private String getShortenLoggerName(String loggerName) {
     StringBuilder builder = new StringBuilder();
     String previous = null;
-    for (String part : Splitter.on('.').split(loggerName)) {
+    for (String part : DOT_SPLIT.split(loggerName)) {
       if (previous != null) {
         builder.append(previous.charAt(0)).append('.');
       }

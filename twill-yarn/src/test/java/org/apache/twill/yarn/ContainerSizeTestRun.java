@@ -31,8 +31,9 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.PrintWriter;
-import java.util.Random;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Test for requesting different container size in different order.
@@ -41,17 +42,17 @@ import java.util.concurrent.TimeUnit;
 public class ContainerSizeTestRun extends BaseYarnTest {
 
   @Test
-  public void testContainerSize() throws InterruptedException {
-    TwillRunner runner = YarnTestUtils.getTwillRunner();
+  public void testContainerSize() throws InterruptedException, TimeoutException, ExecutionException {
+    TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new SleepApp())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
 
     try {
       ServiceDiscovered discovered = controller.discoverService("sleep");
-      Assert.assertTrue(YarnTestUtils.waitForSize(discovered, 2, 120));
+      Assert.assertTrue(waitForSize(discovered, 2, 120));
     } finally {
-      controller.stopAndWait();
+      controller.terminate().get(120, TimeUnit.SECONDS);
     }
   }
 
