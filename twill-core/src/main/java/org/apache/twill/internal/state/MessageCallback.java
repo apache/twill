@@ -20,7 +20,7 @@ package org.apache.twill.internal.state;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
- *
+ * Define interface that could provide override-able callback method when a message is received.
  */
 public interface MessageCallback {
 

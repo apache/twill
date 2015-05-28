@@ -21,7 +21,7 @@ import com.google.common.base.Objects;
 import org.apache.twill.api.Command;
 
 /**
- *
+ * Implementation of {@code Message} interface to pass information about {@code Command} to execute.
  */
 final class SimpleMessage implements Message {
 

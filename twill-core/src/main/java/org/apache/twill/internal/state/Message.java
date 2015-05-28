@@ -20,7 +20,7 @@ package org.apache.twill.internal.state;
 import org.apache.twill.api.Command;
 
 /**
- *
+ * Represent message objects to communicate between components in Twill.
  */
 public interface Message {
 
