@@ -253,7 +253,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   @Override
   public TwillController start() {
     try {
-      final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(user, twillSpec, schedulerQueue);
+      final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(twillSpec, schedulerQueue);
       final ApplicationId appId = launcher.getContainerInfo();
 
       Callable<ProcessController<YarnApplicationReport>> submitTask =
