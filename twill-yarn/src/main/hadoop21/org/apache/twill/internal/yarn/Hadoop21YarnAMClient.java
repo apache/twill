@@ -40,7 +40,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /**
- *
+ * Wrapper class for {@link AMRMClient} for Hadoop version 2.1 or greater.
  */
 public class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.ContainerRequest> {
 

@@ -20,6 +20,7 @@ package org.apache.twill.internal;
 import org.apache.twill.api.ElectionHandler;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillContext;
+import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.discovery.Discoverable;
@@ -34,7 +35,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.locks.Lock;
 
 /**
- *
+ * Implementation of {@link TwillContext} that provides the basic runtime information of a {@link TwillRunnable}.
  */
 public final class BasicTwillContext implements TwillContext {
 

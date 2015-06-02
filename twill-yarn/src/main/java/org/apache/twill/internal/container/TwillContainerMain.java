@@ -58,7 +58,7 @@ import java.io.IOException;
 import java.io.Reader;
 
 /**
- *
+ * The main class for launching a {@link TwillContainerService}.
  */
 public final class TwillContainerMain extends ServiceMain {
 

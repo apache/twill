@@ -68,6 +68,16 @@ public final class TwillContainerLauncher {
     this.secureStoreLocation = secureStoreLocation;
   }
 
+  /**
+   * Start execution run for a class in a container. Will return instance of {@link TwillContainerController}
+   * that allows sending messages directly to the container.
+   *
+   * @param runId Use to represent unique id of the container run.
+   * @param instanceId The Twill instance Id.
+   * @param mainClass The main class to run in the container.
+   * @param classPath The class path to load classes for the container.
+   * @return instance of {@link TwillContainerController} to control the container run.
+   */
   public TwillContainerController start(RunId runId, int instanceId, Class<?> mainClass, String classPath) {
     // Clean up zookeeper path in case this is a retry and there are old messages and state there.
     Futures.getUnchecked(ZKOperations.ignoreError(

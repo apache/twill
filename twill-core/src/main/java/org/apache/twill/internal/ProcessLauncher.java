@@ -45,7 +45,7 @@ public interface ProcessLauncher<T> {
   interface PrepareLaunchContext {
 
     /**
-     * Adds list of files to be localized for the container
+     * Adds list of files to be localized for the container.
      */
     PrepareLaunchContext addResources(LocalFile...localFiles);
 
