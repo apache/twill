@@ -17,6 +17,7 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 
 import java.net.URI;
@@ -184,6 +185,15 @@ public interface TwillPreparer {
    * @return This {@link TwillPreparer}.
    */
   TwillPreparer addSecureStore(SecureStore secureStore);
+
+  /**
+   * Set the log level for Twill applications running in a container.
+   *
+   * @param logLevel the {@link LogEntry.Level} that should be set.
+   *                 The level match the {@code Logback} levels.
+   * @return This {@link TwillPreparer}.
+   */
+  TwillPreparer setLogLevel(LogEntry.Level logLevel);
 
   /**
    * Starts the application.

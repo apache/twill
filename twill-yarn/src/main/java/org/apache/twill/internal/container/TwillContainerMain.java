@@ -19,6 +19,7 @@ package org.apache.twill.internal.container;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractService;
 import com.google.common.util.concurrent.Service;
@@ -108,6 +109,13 @@ public final class TwillContainerMain extends ServiceMain {
       new LogFlushService(),
       zkClientService,
       new TwillZKPathService(containerZKClient, runId));
+  }
+
+  @Override
+  protected String getLoggerLevel(Logger logger) {
+    String appLogLevel = System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL);
+
+    return Strings.isNullOrEmpty(appLogLevel) ? super.getLoggerLevel(logger) : appLogLevel;
   }
 
   private static void loadSecureStore() throws IOException {

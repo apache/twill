@@ -603,6 +603,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       String runnableName = provisionRequest.getRuntimeSpec().getName();
       LOG.info("Starting runnable {} with {}", runnableName, processLauncher);
 
+      LOG.debug("Log level for Twill runnable {} is {}", runnableName, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+
       int containerCount = expectedContainers.getExpected(runnableName);
 
       ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(
@@ -611,6 +613,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
           .put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER))
           .put(EnvKeys.TWILL_APP_RUN_ID, runId.getId())
           .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
+          .put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL))
           .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
           .put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect())
           .build()

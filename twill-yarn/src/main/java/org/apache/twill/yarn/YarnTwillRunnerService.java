@@ -58,6 +58,7 @@ import org.apache.twill.api.TwillPreparer;
 import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
@@ -277,7 +278,7 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     final String appName = twillSpec.getName();
 
     return new YarnTwillPreparer(yarnConfig, twillSpec, yarnAppClient, zkClientService, locationFactory, jvmOptions,
-                                 new YarnTwillControllerFactory() {
+                                 LogEntry.Level.INFO, new YarnTwillControllerFactory() {
       @Override
       public YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
                                         Callable<ProcessController<YarnApplicationReport>> startUp) {
