@@ -221,10 +221,10 @@
                     <configuration>
                         <excludePackageNames>*.internal.*:echo:*.example.*</excludePackageNames>
                         <links>
-                            <link>http://download.oracle.com/javase/6/docs/api/</link>
+                            <link>http://docs.oracle.com/javase/7/docs/api/</link>
                         </links>
                         <bottom>
-                            <![CDATA[Copyright &#169; 2013 <a href="http://www.apache.org">The Apache Software Foundation</a>. All rights reserved.]]>
+                            <![CDATA[Copyright &#169; 2013-2015 <a href="http://www.apache.org">The Apache Software Foundation</a>. All rights reserved.]]>
                         </bottom>
                     </configuration>
                     <executions>
