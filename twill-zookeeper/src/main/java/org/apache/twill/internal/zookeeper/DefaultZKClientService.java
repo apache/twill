@@ -58,7 +58,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 
@@ -91,11 +90,11 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
                                 Watcher connectionWatcher, Multimap<String, byte[]> authInfos) {
     this.zkStr = zkStr;
     this.sessionTimeout = sessionTimeout;
-    this.connectionWatchers = new CopyOnWriteArrayList<Watcher>();
+    this.connectionWatchers = new CopyOnWriteArrayList<>();
     this.authInfos = copyAuthInfo(authInfos);
     addConnectionWatcher(connectionWatcher);
 
-    this.zooKeeper = new AtomicReference<ZooKeeper>();
+    this.zooKeeper = new AtomicReference<>();
     serviceDelegate = new ServiceDelegate();
   }
 
@@ -111,7 +110,7 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
   }
 
   @Override
-  public Cancellable addConnectionWatcher(Watcher watcher) {
+  public Cancellable addConnectionWatcher(final Watcher watcher) {
     if (watcher == null) {
       return new Cancellable() {
         @Override
@@ -121,12 +120,13 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
       };
     }
 
-    final Watcher wrappedWatcher = wrapWatcher(watcher);
-    connectionWatchers.add(wrappedWatcher);
+    // Invocation of connection watchers are already done inside the event thread,
+    // hence no need to wrap the watcher again.
+    connectionWatchers.add(watcher);
     return new Cancellable() {
       @Override
       public void cancel() {
-        connectionWatchers.remove(wrappedWatcher);
+        connectionWatchers.remove(watcher);
       }
     };
   }
@@ -391,25 +391,57 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
 
   private final class ServiceDelegate extends AbstractService implements Watcher {
 
-    private final AtomicBoolean stopNotified = new AtomicBoolean(false);
-    private volatile boolean executorStopped;
+    private final Runnable stopTask;
+
+    private ServiceDelegate() {
+      // Creates the stop task runnable in constructor so that if the stop() method is called from shutdown hook,
+      // it won't fail with class loading error due to failure to load inner class from the shutdown thread.
+      this.stopTask = createStopTask();
+
+      // Add a listener for state changes so that we can terminate the service even it is in STARTING state upoon
+      // stop is requested
+      addListener(new Listener() {
+        @Override
+        public void starting() {
+          // no-op
+        }
+
+        @Override
+        public void running() {
+          // no-op
+        }
+
+        @Override
+        public void stopping(State from) {
+          if (from == State.STARTING) {
+            // If it is still starting, just notify that it's started to transit out of the STARTING phase.
+            notifyStarted();
+          }
+        }
+
+        @Override
+        public void terminated(State from) {
+          // no-op
+        }
+
+        @Override
+        public void failed(State from, Throwable failure) {
+          eventExecutor.shutdownNow();
+          // Close the ZK client if there is exception. It is needed because the stop task may not get executed
+          closeZooKeeper(zooKeeper.getAndSet(null));
+        }
+      }, Threads.SAME_THREAD_EXECUTOR);
+    }
 
     @Override
     protected void doStart() {
-      // A single thread executor
-      eventExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
-                                             Threads.createDaemonThreadFactory("zk-client-EventThread")) {
-        @Override
-        protected void terminated() {
-          super.terminated();
-
-          // Only call notifyStopped if the executor.shutdown() returned, otherwise deadlock (TWILL-110) can occur.
-          // Also, notifyStopped() should only be called once.
-          if (executorStopped && stopNotified.compareAndSet(false, true)) {
-            notifyStopped();
-          }
-        }
-      };
+      // A single thread executor for all events
+      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+                                                           new LinkedBlockingQueue<Runnable>(),
+                                                           Threads.createDaemonThreadFactory("zk-client-EventThread"));
+      // Just discard the execution if the executor is closed
+      executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+      eventExecutor = executor;
 
       try {
         zooKeeper.set(createZooKeeper());
@@ -420,29 +452,21 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
 
     @Override
     protected void doStop() {
-      ZooKeeper zk = zooKeeper.getAndSet(null);
-      if (zk != null) {
-        try {
-          zk.close();
-        } catch (InterruptedException e) {
-          notifyFailed(e);
-        } finally {
-          eventExecutor.shutdown();
-          executorStopped = true;
-
-          // If the executor state is terminated, meaning the terminate() method is triggered,
-          // call notifyStopped() if it hasn't been called yet.
-          if (eventExecutor.isTerminated() && stopNotified.compareAndSet(false, true)) {
-            notifyStopped();
-          }
-        }
-      }
+      // Submit a task to the executor to make sure all pending events in the executor are fired before
+      // transiting this Service into STOPPED state
+      eventExecutor.submit(stopTask);
+      eventExecutor.shutdown();
     }
 
     @Override
     public void process(WatchedEvent event) {
+      State state = state();
+      if (state == State.TERMINATED || state == State.FAILED) {
+        return;
+      }
+
       try {
-        if (event.getState() == Event.KeeperState.SyncConnected && state() == State.STARTING) {
+        if (event.getState() == Event.KeeperState.SyncConnected && state == State.STARTING) {
           LOG.debug("Connected to ZooKeeper: {}", zkStr);
           notifyStarted();
           return;
@@ -451,23 +475,27 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
           LOG.info("ZooKeeper session expired: {}", zkStr);
 
           // When connection expired, simply reconnect again
-          Thread t = new Thread(new Runnable() {
+          if (state != State.RUNNING) {
+            return;
+          }
+          eventExecutor.submit(new Runnable() {
             @Override
             public void run() {
+              // Only reconnect if the current state is running
+              if (state() != State.RUNNING) {
+                return;
+              }
               try {
                 LOG.info("Reconnect to ZooKeeper due to expiration: {}", zkStr);
-                zooKeeper.set(createZooKeeper());
+                closeZooKeeper(zooKeeper.getAndSet(createZooKeeper()));
               } catch (IOException e) {
-                zooKeeper.set(null);
                 notifyFailed(e);
               }
             }
-          }, "zk-reconnect");
-          t.setDaemon(true);
-          t.start();
+          });
         }
       } finally {
-        if (event.getType() == Event.EventType.None && !connectionWatchers.isEmpty()) {
+        if (event.getType() == Event.EventType.None) {
           for (Watcher connectionWatcher : connectionWatchers) {
             connectionWatcher.process(event);
           }
@@ -475,15 +503,57 @@ public final class DefaultZKClientService extends AbstractZKClient implements ZK
       }
     }
 
+
+    /**
+     * Creates a {@link Runnable} task that will get executed in the event executor for transiting this
+     * Service into STOPPED state.
+     */
+    private Runnable createStopTask() {
+      return new Runnable() {
+        @Override
+        public void run() {
+          try {
+            // Close the ZK connection in this task will make sure if there is ZK connection created
+            // after doStop() was called but before this task has been executed is also closed.
+            // It is possible to happen when the following sequence happens:
+            //
+            // 1. session expired, hence the expired event is triggered
+            // 2. The reconnect task executed. With Service.state() == RUNNING, it creates a new ZK client
+            // 3. Service.stop() gets called, Service.state() changed to STOPPING
+            // 4. The new ZK client created from the reconnect thread update the zooKeeper with the new one
+            closeZooKeeper(zooKeeper.getAndSet(null));
+            notifyStopped();
+          } catch (Exception e) {
+            notifyFailed(e);
+          }
+        }
+      };
+    }
+
     /**
      * Creates a new ZooKeeper connection.
      */
     private ZooKeeper createZooKeeper() throws IOException {
-      ZooKeeper zk = new ZooKeeper(zkStr, sessionTimeout, this);
+      ZooKeeper zk = new ZooKeeper(zkStr, sessionTimeout, wrapWatcher(this));
       for (Map.Entry<String, byte[]> authInfo : authInfos.entries()) {
         zk.addAuthInfo(authInfo.getKey(), authInfo.getValue());
       }
       return zk;
+    }
+
+    /**
+     * Closes the given {@link ZooKeeper} if it is not null. If there is InterruptedException,
+     * it will get logged.
+     */
+    private void closeZooKeeper(@Nullable ZooKeeper zk) {
+      try {
+        if (zk != null) {
+          zk.close();
+        }
+      } catch (InterruptedException e) {
+        LOG.warn("Interrupted when closing ZooKeeper", e);
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
@@ -235,38 +236,40 @@ public class ZKClientTest {
         }
       }
     }).build(), RetryStrategies.fixDelay(0, TimeUnit.SECONDS)));
-    client.startAndWait();
-
-    zkServer.stopAndWait();
-
-    Assert.assertTrue(disconnectLatch.await(1, TimeUnit.SECONDS));
 
     final CountDownLatch createLatch = new CountDownLatch(1);
-    Futures.addCallback(client.create("/testretry/test", null, CreateMode.PERSISTENT), new FutureCallback<String>() {
-      @Override
-      public void onSuccess(String result) {
-        createLatch.countDown();
-      }
-
-      @Override
-      public void onFailure(Throwable t) {
-        t.printStackTrace(System.out);
-      }
-    });
-
-    TimeUnit.SECONDS.sleep(2);
-    zkServer = InMemoryZKServer.builder()
-                               .setDataDir(dataDir)
-                               .setAutoCleanDataDir(true)
-                               .setPort(port)
-                               .setTickTime(1000)
-                               .build();
-    zkServer.startAndWait();
-
+    client.startAndWait();
     try {
-      Assert.assertTrue(createLatch.await(10, TimeUnit.SECONDS));
-    } finally {
       zkServer.stopAndWait();
+
+      Assert.assertTrue(disconnectLatch.await(1, TimeUnit.SECONDS));
+      Futures.addCallback(client.create("/testretry/test", null, CreateMode.PERSISTENT), new FutureCallback<String>() {
+        @Override
+        public void onSuccess(String result) {
+          createLatch.countDown();
+        }
+
+        @Override
+        public void onFailure(Throwable t) {
+          t.printStackTrace(System.out);
+        }
+      });
+
+      TimeUnit.SECONDS.sleep(2);
+      zkServer = InMemoryZKServer.builder()
+                                 .setDataDir(dataDir)
+                                 .setAutoCleanDataDir(true)
+                                 .setPort(port)
+                                 .setTickTime(1000)
+                                 .build();
+      zkServer.startAndWait();
+      try {
+        Assert.assertTrue(createLatch.await(10, TimeUnit.SECONDS));
+      } finally {
+        zkServer.stopAndWait();
+      }
+    } finally {
+      client.stopAndWait();
     }
   }
 
@@ -351,6 +354,34 @@ public class ZKClientTest {
 
     } finally {
       zkServer.stopAndWait();
+    }
+  }
+
+  @Test
+  public void testStop() throws IOException, InterruptedException, ExecutionException {
+    try (final ServerSocket serverSocket = new ServerSocket(0)) {
+      // A latch to make sure at least one connection attempt from the zk client has been made
+      final CountDownLatch connectLatch = new CountDownLatch(1);
+      Thread serverThread = new Thread() {
+        public void run() {
+          try {
+            while (!interrupted()) {
+              serverSocket.accept().close();
+              connectLatch.countDown();
+            }
+          } catch (Exception e) {
+            // no-op
+          }
+        }
+      };
+      serverThread.start();
+
+      ZKClientService zkClient = ZKClientService.Builder.of("localhost:" + serverSocket.getLocalPort()).build();
+      zkClient.start();
+      Assert.assertTrue(connectLatch.await(10, TimeUnit.SECONDS));
+
+      zkClient.stopAndWait();
+      serverThread.interrupt();
     }
   }
 }
