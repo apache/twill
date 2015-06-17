@@ -19,7 +19,9 @@ package org.apache.twill.internal;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.primitives.Booleans;
 
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -83,5 +85,35 @@ public final class JvmOptions {
     public boolean doDebug(String runnable) {
       return doDebug && (runnables == null || runnables.contains(runnable));
     }
+
+    @Override
+    public boolean equals(Object object) {
+      if (this == object) {
+        return true;
+      }
+      if (!(object instanceof DebugOptions)) {
+        return false;
+      }
+
+      DebugOptions that = (DebugOptions) object;
+      return (this.doDebug == that.doDebug()) && (this.doSuspend == this.doSuspend()) &&
+        Objects.equals(this.runnables, that.getRunnables());
+    }
+
+    @Override
+    public int hashCode() {
+      int hash = 17;
+      hash = 31 *  hash + Booleans.hashCode(doDebug);
+      hash = 31 *  hash + Booleans.hashCode(doSuspend);
+      hash = 31 *  hash + Objects.hashCode(runnables);
+      return hash;
+    }
+
+    @Override
+    public String toString() {
+      return "{\"doDebug\":" + doDebug + ",\"doSuspend\":" + doSuspend + ",\"runnables\":" + (runnables != null ?
+      runnables.toString() : "none") + "}";
+    }
+
   }
 }
