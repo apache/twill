@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
+import org.apache.twill.api.ClassAcceptor;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -46,23 +47,6 @@ import java.util.Set;
  * Utility class to help find out class dependencies.
  */
 public final class Dependencies {
-
-  /**
-   * Represents a callback for accepting a class during dependency traversal.
-   */
-  public interface ClassAcceptor {
-    /**
-     * Invoked when a class is being found as a dependency.
-     *
-     * @param className Name of the class.
-     * @param classUrl URL for the class resource.
-     * @param classPathUrl URL for the class path resource that contains the class resource.
-     *                     If the URL protocol is {@code file}, it would be the path to root package.
-     *                     If the URL protocol is {@code jar}, it would be the jar file.
-     * @return true keep finding dependencies on the given class.
-     */
-    boolean accept(String className, URL classUrl, URL classPathUrl);
-  }
 
   public static void findClassDependencies(ClassLoader classLoader,
                                            ClassAcceptor acceptor,

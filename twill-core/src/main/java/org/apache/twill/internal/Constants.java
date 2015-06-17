@@ -45,6 +45,8 @@ public final class Constants {
   public static final String STDOUT = "stdout";
   public static final String STDERR = "stderr";
 
+  public static final String CLASSPATH = "classpath";
+  public static final String APPLICATION_CLASSPATH = "application-classpath";
   /**
    * Constants for names of internal files that are shared between client, AM and containers.
    */
