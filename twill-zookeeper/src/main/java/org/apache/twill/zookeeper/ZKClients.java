@@ -22,7 +22,7 @@ import org.apache.twill.internal.zookeeper.NamespaceZKClient;
 import org.apache.twill.internal.zookeeper.RewatchOnExpireZKClient;
 
 /**
- *
+ * Utility class to create {@link ZKClient} instances.
  */
 public final class ZKClients {
 
@@ -51,7 +51,13 @@ public final class ZKClients {
     return new FailureRetryZKClient(client, retryStrategy);
   }
 
-
+  /**
+   * Creates a {@link ZKClient} that will add prefix namespace for every paths.
+   *
+   * @param zkClient The {@link ZKClient} for operations delegation.
+   * @param namespace The prefix namespace to be prepended to paths.
+   * @return A {@link ZKClient} that will add namespace to every path.
+   */
   public static ZKClient namespace(ZKClient zkClient, String namespace) {
     return new NamespaceZKClient(zkClient, namespace);
   }
