@@ -21,7 +21,7 @@ import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- *
+ * Helper factory class to return the right instance of {@link YarnAppClient} based on Apache Hadoop version.
  */
 public final class VersionDetectYarnAppClientFactory implements YarnAppClientFactory {
 

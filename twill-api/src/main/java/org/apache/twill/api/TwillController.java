@@ -41,7 +41,6 @@ public interface TwillController extends ServiceController {
    */
   ServiceDiscovered discoverService(String serviceName);
 
-
   /**
    * Changes the number of running instances of a given runnable.
    *
