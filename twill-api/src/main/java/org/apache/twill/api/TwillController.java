@@ -22,6 +22,7 @@ import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.ServiceDiscovered;
 
 import java.util.concurrent.Future;
+import javax.annotation.Nullable;
 
 /**
  * For controlling a running application.
@@ -55,7 +56,9 @@ public interface TwillController extends ServiceController {
   /**
    * Get a snapshot of the resources used by the application, broken down by each runnable.
    *
-   * @return A {@link ResourceReport} containing information about resources used by the application.
+   * @return A {@link ResourceReport} containing information about resources used by the application or
+   *         null in case the user calls this before the application completely starts.
    */
+  @Nullable
   ResourceReport getResourceReport();
 }

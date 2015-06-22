@@ -36,11 +36,13 @@ import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.ContainerExitCodes;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.ContainerLiveNodeData;
 import org.apache.twill.internal.DefaultResourceReport;
 import org.apache.twill.internal.DefaultTwillRunResources;
+import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillContainerController;
 import org.apache.twill.internal.TwillContainerLauncher;
@@ -132,7 +134,8 @@ final class RunningContainers {
                                                                  containerInfo.getVirtualCores(),
                                                                  containerInfo.getMemoryMB(),
                                                                  containerInfo.getHost().getHostName(),
-                                                                 controller);
+                                                                 controller,
+                                                                 System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
       resourceReport.addRunResources(runnableName, resources);
       containerStats.put(runnableName, containerInfo);
 
@@ -517,8 +520,9 @@ final class RunningContainers {
 
     private DynamicTwillRunResources(int instanceId, String containerId,
                                      int cores, int memoryMB, String host,
-                                     TwillContainerController controller) {
-      super(instanceId, containerId, cores, memoryMB, host, null);
+                                     TwillContainerController controller, String logLevel) {
+      super(instanceId, containerId, cores, memoryMB, host, null,
+            (logLevel != null) ? LogEntry.Level.valueOf(logLevel) : null);
       this.controller = controller;
     }
 
