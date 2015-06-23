@@ -58,6 +58,7 @@ import org.apache.twill.api.TwillPreparer;
 import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
@@ -277,7 +278,7 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     final String appName = twillSpec.getName();
 
     return new YarnTwillPreparer(yarnConfig, twillSpec, yarnAppClient, zkClientService, locationFactory, jvmOptions,
-                                 new YarnTwillControllerFactory() {
+                                 LogEntry.Level.INFO, new YarnTwillControllerFactory() {
       @Override
       public YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
                                         Callable<ProcessController<YarnApplicationReport>> startUp) {
@@ -587,11 +588,8 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     // Try to read the old credentials.
     Credentials credentials = new Credentials();
     if (credentialsLocation.exists()) {
-      DataInputStream is = new DataInputStream(new BufferedInputStream(credentialsLocation.getInputStream()));
-      try {
+      try (DataInputStream is = new DataInputStream(new BufferedInputStream(credentialsLocation.getInputStream()))) {
         credentials.readTokenStorageStream(is);
-      } finally {
-        is.close();
       }
     }
 
@@ -602,11 +600,8 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     Location tmpLocation = credentialsLocation.getTempFile(Constants.Files.CREDENTIALS);
 
     // Save the credentials store with user-only permission.
-    DataOutputStream os = new DataOutputStream(new BufferedOutputStream(tmpLocation.getOutputStream("600")));
-    try {
+    try (DataOutputStream os = new DataOutputStream(new BufferedOutputStream(tmpLocation.getOutputStream("600")))) {
       credentials.writeTokenStorageToStream(os);
-    } finally {
-      os.close();
     }
 
     // Rename the tmp file into the credentials location

@@ -17,6 +17,8 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.api.logging.LogEntry;
+
 /**
  * Information about the container the {@link TwillRunnable}
  * is running in.
@@ -53,4 +55,10 @@ public interface TwillRunResources {
    * @return the debug port of the container's JVM, or null if not debug-enabled.
    */
   Integer getDebugPort();
+
+  /**
+   * @return the enabled log level for the container where the runnable is running in.
+   */
+  LogEntry.Level getLogLevel();
+
 }

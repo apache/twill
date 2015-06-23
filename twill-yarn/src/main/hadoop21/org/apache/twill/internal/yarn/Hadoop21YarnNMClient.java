@@ -30,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Wrapper class for {@link NMClient} for Hadoop version 2.1 or greater.
  */
 public final class Hadoop21YarnNMClient extends AbstractIdleService implements YarnNMClient {
 

@@ -25,11 +25,8 @@ import java.net.ServerSocket;
 public class FindFreePort {
 
   public static void main(String[] args) throws Exception {
-    ServerSocket socket = new ServerSocket(0);
-    try {
+    try (ServerSocket socket = new ServerSocket(0)) {
       System.out.println(socket.getLocalPort());
-    } finally {
-      socket.close();
     }
   }
 

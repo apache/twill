@@ -49,20 +49,14 @@ public class JvmOptionsCodec implements JsonSerializer<JvmOptions>, JsonDeserial
                                                     .create();
 
   public static void encode(JvmOptions jvmOptions, OutputSupplier<? extends Writer> writerSupplier) throws IOException {
-    Writer writer = writerSupplier.getOutput();
-    try {
+    try (Writer writer = writerSupplier.getOutput()) {
       GSON.toJson(jvmOptions, writer);
-    } finally {
-      writer.close();
     }
   }
 
   public static JvmOptions decode(InputSupplier<? extends Reader> readerSupplier) throws IOException {
-    Reader reader = readerSupplier.getInput();
-    try {
+    try (Reader reader = readerSupplier.getInput()) {
       return GSON.fromJson(reader, JvmOptions.class);
-    } finally {
-      reader.close();
     }
   }
 

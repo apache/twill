@@ -82,11 +82,8 @@ public final class TwillSpecificationAdapter {
   }
 
   public void toJson(TwillSpecification spec, File file) throws IOException {
-    Writer writer = Files.newWriter(file, Charsets.UTF_8);
-    try {
+    try (Writer writer = Files.newWriter(file, Charsets.UTF_8)) {
       toJson(spec, writer);
-    } finally {
-      writer.close();
     }
   }
 
@@ -99,17 +96,15 @@ public final class TwillSpecificationAdapter {
   }
 
   public TwillSpecification fromJson(File file) throws IOException {
-    Reader reader = Files.newReader(file, Charsets.UTF_8);
-    try {
+    try (Reader reader = Files.newReader(file, Charsets.UTF_8)) {
       return fromJson(reader);
-    } finally {
-      reader.close();
     }
   }
 
   // This is to get around gson ignoring of inner class
   private static final class TwillSpecificationTypeAdapterFactory implements TypeAdapterFactory {
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
       Class<?> rawType = type.getRawType();

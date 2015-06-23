@@ -37,6 +37,9 @@ public final class EnvKeys {
   public static final String TWILL_APP_DIR = "TWILL_APP_DIR";
 
   public static final String TWILL_APP_NAME = "TWILL_APP_NAME";
+
+  public static final String TWILL_APP_LOG_LEVEL = "TWILL_APP_LOG_LEVEL";
+
   public static final String TWILL_RUNNABLE_NAME = "TWILL_RUNNABLE_NAME";
 
   public static final String TWILL_LOG_KAFKA_ZK = "TWILL_LOG_KAFKA_ZK";

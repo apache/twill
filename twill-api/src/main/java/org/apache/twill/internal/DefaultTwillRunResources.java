@@ -18,6 +18,7 @@
 package org.apache.twill.internal;
 
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.logging.LogEntry.Level;
 
 /**
  *  Straightforward implementation of {@link org.apache.twill.api.TwillRunResources}.
@@ -29,15 +30,17 @@ public class DefaultTwillRunResources implements TwillRunResources {
   private final int memoryMB;
   private final String host;
   private final Integer debugPort;
+  private final Level logLevel;
 
-  public DefaultTwillRunResources(int instanceId, String containerId,
-                                  int cores, int memoryMB, String host, Integer debugPort) {
+  public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
+                                  String host, Integer debugPort, Level logLevel) {
     this.instanceId = instanceId;
     this.containerId = containerId;
     this.virtualCores = cores;
     this.memoryMB = memoryMB;
     this.host = host;
     this.debugPort = debugPort;
+    this.logLevel = logLevel;
   }
 
   /**
@@ -84,6 +87,11 @@ public class DefaultTwillRunResources implements TwillRunResources {
   @Override
   public Integer getDebugPort() {
     return debugPort;
+  }
+
+  @Override
+  public Level getLogLevel() {
+    return logLevel;
   }
 
   @Override

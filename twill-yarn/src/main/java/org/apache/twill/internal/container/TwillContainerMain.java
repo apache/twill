@@ -19,6 +19,7 @@ package org.apache.twill.internal.container;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractService;
 import com.google.common.util.concurrent.Service;
@@ -57,7 +58,7 @@ import java.io.IOException;
 import java.io.Reader;
 
 /**
- *
+ * The main class for launching a {@link TwillContainerService}.
  */
 public final class TwillContainerMain extends ServiceMain {
 
@@ -110,6 +111,13 @@ public final class TwillContainerMain extends ServiceMain {
       new TwillZKPathService(containerZKClient, runId));
   }
 
+  @Override
+  protected String getLoggerLevel(Logger logger) {
+    String appLogLevel = System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL);
+
+    return Strings.isNullOrEmpty(appLogLevel) ? super.getLoggerLevel(logger) : appLogLevel;
+  }
+
   private static void loadSecureStore() throws IOException {
     if (!UserGroupInformation.isSecurityEnabled()) {
       return;
@@ -118,11 +126,8 @@ public final class TwillContainerMain extends ServiceMain {
     File file = new File(Constants.Files.CREDENTIALS);
     if (file.exists()) {
       Credentials credentials = new Credentials();
-      DataInputStream input = new DataInputStream(new FileInputStream(file));
-      try {
+      try (DataInputStream input = new DataInputStream(new FileInputStream(file))) {
         credentials.readTokenStorageStream(input);
-      } finally {
-        input.close();
       }
 
       UserGroupInformation.getCurrentUser().addCredentials(credentials);
@@ -165,11 +170,8 @@ public final class TwillContainerMain extends ServiceMain {
   }
 
   private static TwillSpecification loadTwillSpec(File specFile) throws IOException {
-    Reader reader = Files.newReader(specFile, Charsets.UTF_8);
-    try {
+    try (Reader reader = Files.newReader(specFile, Charsets.UTF_8)) {
       return TwillSpecificationAdapter.create().fromJson(reader);
-    } finally {
-      reader.close();
     }
   }
 

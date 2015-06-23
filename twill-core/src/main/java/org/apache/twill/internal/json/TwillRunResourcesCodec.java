@@ -25,6 +25,7 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.DefaultTwillRunResources;
 
 import java.lang.reflect.Type;
@@ -34,18 +35,28 @@ import java.lang.reflect.Type;
  */
 public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunResources>,
                                               JsonDeserializer<TwillRunResources> {
+  private final String CONTAINER_ID = "containerId";
+  private final String INSTANCE_ID = "instanceId";
+  private final String HOST = "host";
+  private final String MEMORY_MB = "memoryMB";
+  private final String VIRTUAL_CORES = "virtualCores";
+  private final String DEBUG_PORT = "debugPort";
+  private final String LOG_LEVEL = "logLevel";
 
   @Override
   public JsonElement serialize(TwillRunResources src, Type typeOfSrc, JsonSerializationContext context) {
     JsonObject json = new JsonObject();
 
-    json.addProperty("containerId", src.getContainerId());
-    json.addProperty("instanceId", src.getInstanceId());
-    json.addProperty("host", src.getHost());
-    json.addProperty("memoryMB", src.getMemoryMB());
-    json.addProperty("virtualCores", src.getVirtualCores());
+    json.addProperty(CONTAINER_ID, src.getContainerId());
+    json.addProperty(INSTANCE_ID, src.getInstanceId());
+    json.addProperty(HOST, src.getHost());
+    json.addProperty(MEMORY_MB, src.getMemoryMB());
+    json.addProperty(VIRTUAL_CORES, src.getVirtualCores());
     if (src.getDebugPort() != null) {
-      json.addProperty("debugPort", src.getDebugPort());
+      json.addProperty(DEBUG_PORT, src.getDebugPort());
+    }
+    if (src.getLogLevel() != null) {
+      json.addProperty(LOG_LEVEL, src.getLogLevel().toString());
     }
 
     return json;
@@ -60,6 +71,8 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
                                         jsonObj.get("virtualCores").getAsInt(),
                                         jsonObj.get("memoryMB").getAsInt(),
                                         jsonObj.get("host").getAsString(),
-                                        jsonObj.has("debugPort") ? jsonObj.get("debugPort").getAsInt() : null);
+                                        jsonObj.has("debugPort") ? jsonObj.get("debugPort").getAsInt() : null,
+                                        jsonObj.has("logLevel") ? LogEntry.Level.valueOf(
+                                          jsonObj.get("logLevel").getAsString()) : LogEntry.Level.INFO);
   }
 }

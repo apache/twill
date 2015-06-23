@@ -50,6 +50,7 @@ import org.apache.twill.api.SecureStore;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillPreparer;
 import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.filesystem.LocationFactory;
@@ -127,10 +128,11 @@ final class YarnTwillPreparer implements TwillPreparer {
   private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
+  private LogEntry.Level logLevel;
 
   YarnTwillPreparer(YarnConfiguration yarnConfig, TwillSpecification twillSpec,
                     YarnAppClient yarnAppClient, ZKClient zkClient,
-                    LocationFactory locationFactory, String extraOptions,
+                    LocationFactory locationFactory, String extraOptions, LogEntry.Level logLevel,
                     YarnTwillControllerFactory controllerFactory) {
     this.yarnConfig = yarnConfig;
     this.twillSpec = twillSpec;
@@ -144,6 +146,7 @@ final class YarnTwillPreparer implements TwillPreparer {
                                             Configs.Defaults.JAVA_RESERVED_MEMORY_MB);
     this.user = System.getProperty("user.name");
     this.extraOptions = extraOptions;
+    this.logLevel = logLevel;
   }
 
   @Override
@@ -251,9 +254,15 @@ final class YarnTwillPreparer implements TwillPreparer {
   }
 
   @Override
+  public TwillPreparer setLogLevel(LogEntry.Level logLevel) {
+    this.logLevel = logLevel;
+    return this;
+  }
+
+  @Override
   public TwillController start() {
     try {
-      final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(user, twillSpec, schedulerQueue);
+      final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(twillSpec, schedulerQueue);
       final ApplicationId appId = launcher.getContainerInfo();
 
       Callable<ProcessController<YarnApplicationReport>> submitTask =
@@ -287,18 +296,20 @@ final class YarnTwillPreparer implements TwillPreparer {
           //     appMaster.jar
           //     org.apache.twill.internal.appmaster.ApplicationMasterMain
           //     false
-          return launcher.prepareLaunch(
-            ImmutableMap.<String, String>builder()
-                        .put(EnvKeys.TWILL_FS_USER, fsUser)
-                        .put(EnvKeys.TWILL_APP_DIR, getAppLocation().toURI().toASCIIString())
-                        .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
-                        .put(EnvKeys.TWILL_RUN_ID, runId.getId())
-                        .put(EnvKeys.TWILL_RESERVED_MEMORY_MB, Integer.toString(reservedMemory))
-                        .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
-                        .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS))
-                        .build(),
-            localFiles.values(), credentials
-          ).addCommand(
+          ImmutableMap.Builder<String, String> builder = ImmutableMap.<String, String>builder()
+            .put(EnvKeys.TWILL_FS_USER, fsUser)
+            .put(EnvKeys.TWILL_APP_DIR, getAppLocation().toURI().toASCIIString())
+            .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
+            .put(EnvKeys.TWILL_RUN_ID, runId.getId())
+            .put(EnvKeys.TWILL_RESERVED_MEMORY_MB, Integer.toString(reservedMemory))
+            .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
+            .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS));
+          if (logLevel != null) {
+            LOG.debug("Log level is set to {} for the Twill application.", logLevel);
+            builder.put(EnvKeys.TWILL_APP_LOG_LEVEL, logLevel.toString());
+          }
+          return launcher.prepareLaunch(builder.build(), localFiles.values(), credentials)
+            .addCommand(
               "$JAVA_HOME/bin/java",
               "-Djava.io.tmpdir=tmp",
               "-Dyarn.appId=$" + EnvKeys.YARN_APP_ID_STR,
@@ -449,8 +460,7 @@ final class YarnTwillPreparer implements TwillPreparer {
     // Serialize into a local temp file.
     LOG.debug("Create and copy {}", Constants.Files.TWILL_SPEC);
     Location location = createTempLocation(Constants.Files.TWILL_SPEC);
-    Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8);
-    try {
+    try (Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8)) {
       EventHandlerSpecification eventHandler = spec.getEventHandler();
       if (eventHandler == null) {
         eventHandler = new LogOnlyEventHandler().configure();
@@ -459,8 +469,6 @@ final class YarnTwillPreparer implements TwillPreparer {
       TwillSpecificationAdapter.create().toJson(
         new DefaultTwillSpecification(spec.getName(), runtimeSpec, spec.getOrders(), spec.getPlacementPolicies(),
                                       eventHandler), writer);
-    } finally {
-      writer.close();
     }
     LOG.debug("Done {}", Constants.Files.TWILL_SPEC);
 
@@ -501,11 +509,8 @@ final class YarnTwillPreparer implements TwillPreparer {
                                     "Launcher jar should not have dependencies: %s", className);
         try {
           jarOut.putNextEntry(new JarEntry(className.replace('.', '/') + ".class"));
-          InputStream is = classUrl.openStream();
-          try {
+          try (InputStream is = classUrl.openStream()) {
             ByteStreams.copy(is, jarOut);
-          } finally {
-            is.close();
           }
         } catch (IOException e) {
           throw Throwables.propagate(e);
@@ -567,29 +572,21 @@ final class YarnTwillPreparer implements TwillPreparer {
     Map<String, LocalFile> localize = ImmutableMap.copyOf(Maps.filterKeys(localFiles, Predicates.in(includes)));
     LOG.debug("Create and copy {}", Constants.Files.LOCALIZE_FILES);
     Location location = createTempLocation(Constants.Files.LOCALIZE_FILES);
-    Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8);
-    try {
+    try (Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8)) {
       new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
         .create().toJson(localize.values(), new TypeToken<List<LocalFile>>() {
       }.getType(), writer);
-    } finally {
-      writer.close();
     }
     LOG.debug("Done {}", Constants.Files.LOCALIZE_FILES);
     localFiles.put(Constants.Files.LOCALIZE_FILES, createLocalFile(Constants.Files.LOCALIZE_FILES, location));
   }
 
   private Location copyFromURL(URL url, Location target) throws IOException {
-    InputStream is = url.openStream();
-    try {
-      OutputStream os = new BufferedOutputStream(target.getOutputStream());
-      try {
-        ByteStreams.copy(is, os);
-      } finally {
-        os.close();
-      }
-    } finally {
-      is.close();
+    try (
+      InputStream is = url.openStream();
+      OutputStream os = new BufferedOutputStream(target.getOutputStream())
+    ) {
+      ByteStreams.copy(is, os);
     }
     return target;
   }

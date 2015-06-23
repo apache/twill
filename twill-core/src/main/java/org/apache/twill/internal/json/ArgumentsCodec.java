@@ -49,21 +49,15 @@ public final class ArgumentsCodec implements JsonSerializer<Arguments>, JsonDese
                                                     .create();
 
   public static void encode(Arguments arguments, OutputSupplier<? extends Writer> writerSupplier) throws IOException {
-    Writer writer = writerSupplier.getOutput();
-    try {
+    try (Writer writer = writerSupplier.getOutput()) {
       GSON.toJson(arguments, writer);
-    } finally {
-      writer.close();
     }
   }
 
 
   public static Arguments decode(InputSupplier<? extends Reader> readerSupplier) throws IOException {
-    Reader reader = readerSupplier.getInput();
-    try {
+    try (Reader reader = readerSupplier.getInput()) {
       return GSON.fromJson(reader, Arguments.class);
-    } finally {
-      reader.close();
     }
   }
 

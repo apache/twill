@@ -101,12 +101,20 @@ public final class LeaderElection extends AbstractService {
     Futures.addCallback(completion, new FutureCallback<String>() {
       @Override
       public void onSuccess(String result) {
-        notifyStopped();
+        try {
+          notifyStopped();
+        } finally {
+          executor.shutdown();
+        }
       }
 
       @Override
       public void onFailure(Throwable t) {
-        notifyFailed(t);
+        try {
+          notifyFailed(t);
+        } finally {
+          executor.shutdown();
+        }
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 

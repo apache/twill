@@ -84,8 +84,7 @@ public final class FailureRestartTestRun extends BaseYarnTest {
     Set<Integer> instances = Sets.newHashSet();
     for (Discoverable discoverable : discoverables) {
       InetSocketAddress socketAddress = discoverable.getSocketAddress();
-      Socket socket = new Socket(socketAddress.getAddress(), socketAddress.getPort());
-      try {
+      try (Socket socket = new Socket(socketAddress.getAddress(), socketAddress.getPort())) {
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8), true);
         LineReader reader = new LineReader(new InputStreamReader(socket.getInputStream(), Charsets.UTF_8));
 
@@ -95,8 +94,6 @@ public final class FailureRestartTestRun extends BaseYarnTest {
         String line = reader.readLine();
         Assert.assertTrue(line.endsWith(msg));
         instances.add(Integer.parseInt(line.substring(0, line.length() - msg.length())));
-      } finally {
-        socket.close();
       }
     }
     return instances;

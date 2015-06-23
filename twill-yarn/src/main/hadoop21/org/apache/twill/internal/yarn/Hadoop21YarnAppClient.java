@@ -46,7 +46,12 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /**
+ * <p>
+ * The service implementation of {@link YarnAppClient} for Apache Hadoop 2.1 and beyond.
  *
+ * The {@link VersionDetectYarnAppClientFactory} class will decide to return instance of this class for
+ * Apache Hadoop 2.1 and beyond.
+ * </p>
  */
 public final class Hadoop21YarnAppClient extends AbstractIdleService implements YarnAppClient {
 

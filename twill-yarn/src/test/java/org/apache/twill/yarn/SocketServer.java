@@ -78,15 +78,10 @@ public abstract class SocketServer extends AbstractTwillRunnable {
   public void run() {
     try {
       while (running) {
-        try {
-          Socket socket = serverSocket.accept();
-          try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), Charsets.UTF_8));
-            PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
-            handleRequest(reader, writer);
-          } finally {
-            socket.close();
-          }
+        try (Socket socket = serverSocket.accept()) {
+          BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), Charsets.UTF_8));
+          PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
+          handleRequest(reader, writer);
         } catch (SocketException e) {
           LOG.info("Socket exception: " + e);
         }

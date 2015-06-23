@@ -94,7 +94,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- *
+ * The class that acts as {@code ApplicationMaster} for Twill applications.
  */
 public final class ApplicationMasterService extends AbstractYarnTwillService implements Supplier<ResourceReport> {
 
@@ -191,7 +191,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       appMasterContainerId.toString(),
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_VIRTUAL_CORES)),
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
-      appMasterHost, null);
+      appMasterHost, null, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
     return new RunningContainers(appId, appMasterResources, zkClient);
   }
@@ -603,6 +603,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       String runnableName = provisionRequest.getRuntimeSpec().getName();
       LOG.info("Starting runnable {} with {}", runnableName, processLauncher);
 
+      LOG.debug("Log level for Twill runnable {} is {}", runnableName, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+
       int containerCount = expectedContainers.getExpected(runnableName);
 
       ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(
@@ -611,6 +613,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
           .put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER))
           .put(EnvKeys.TWILL_APP_RUN_ID, runId.getId())
           .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
+          .put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL))
           .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
           .put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect())
           .build()
@@ -640,14 +643,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   private List<LocalFile> getLocalizeFiles() {
-    try {
-      Reader reader = Files.newReader(new File(Constants.Files.LOCALIZE_FILES), Charsets.UTF_8);
-      try {
-        return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
-                                .create().fromJson(reader, new TypeToken<List<LocalFile>>() { }.getType());
-      } finally {
-        reader.close();
-      }
+    try (Reader reader = Files.newReader(new File(Constants.Files.LOCALIZE_FILES), Charsets.UTF_8)) {
+      return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
+        .create().fromJson(reader, new TypeToken<List<LocalFile>>() {
+        }.getType());
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
