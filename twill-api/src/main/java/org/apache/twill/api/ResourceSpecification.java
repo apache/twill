@@ -25,7 +25,7 @@ import org.apache.twill.internal.DefaultResourceSpecification;
  */
 public interface ResourceSpecification {
 
-  final ResourceSpecification BASIC = Builder.with().setVirtualCores(1).setMemory(512, SizeUnit.MEGA).build();
+  ResourceSpecification BASIC = Builder.with().setVirtualCores(1).setMemory(512, SizeUnit.MEGA).build();
 
   /**
    * Unit for specifying memory size.
