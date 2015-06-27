@@ -17,8 +17,9 @@
  */
 package org.apache.twill.internal.state;
 
-import com.google.common.base.Preconditions;
 import org.apache.twill.api.Command;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Collection of predefined system messages.
@@ -41,6 +42,30 @@ public final class SystemMessages {
     Preconditions.checkArgument(instances > 0, "Instances should be > 0.");
     return new SimpleMessage(Message.Type.SYSTEM, Message.Scope.RUNNABLE, runnableName,
                              Command.Builder.of("instances").addOption("count", Integer.toString(instances)).build());
+  }
+
+  /**
+   * Helper method to get System {@link Message} for update instances for a runnable.
+   *
+   * @param updateCommand The {@link Command} to be added to the message.
+   * @param runnableName The name of the runnable to be restarted.
+   * @return An instance of System {@link Message} to restart runnable instances.
+   */
+  public static Message updateRunnableInstances(Command updateCommand, String runnableName) {
+    Preconditions.checkNotNull(updateCommand);
+    Preconditions.checkNotNull(runnableName);
+    return new SimpleMessage(Message.Type.SYSTEM, Message.Scope.RUNNABLE, runnableName, updateCommand);
+  }
+
+  /**
+   * Helper method to get System {@link Message} for restarting certain instances from certain runnables.
+   *
+   * @param updateCommand The {@link Command} to be added to the message.
+   * @return An instance of System {@link Message} to restart runnables' instances.
+   */
+  public static Message updateRunnablesInstances(Command updateCommand) {
+    Preconditions.checkNotNull(updateCommand);
+    return new SimpleMessage(Message.Type.SYSTEM, Message.Scope.RUNNABLES, null, updateCommand);
   }
 
   private SystemMessages() {

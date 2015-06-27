@@ -228,7 +228,7 @@ public abstract class ServiceMain {
   }
 
   /**
-   * Override to return the right log level for the service
+   * Override to return the right log level for the service.
    *
    * @param logger the {@link Logger} instance of the service context.
    * @return String of log level based on {@code slf4j} log levels.

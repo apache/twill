@@ -21,6 +21,8 @@ import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.ServiceDiscovered;
 
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 
@@ -61,4 +63,30 @@ public interface TwillController extends ServiceController {
    */
   @Nullable
   ResourceReport getResourceReport();
+
+  /**
+   * Restart all instances of a particular {@link TwillRunnable}.
+   *
+   * @param runnable The name of the runnable to restart.
+   * @return A {@link Future} that will be completed when the restart operation has been done.
+   */
+  Future<String> restartAllInstances(String runnable);
+
+  /**
+   * Restart instances of some {@link TwillRunnable}.
+   *
+   * @param runnableToInstanceIds A map of runnable ID to list of instance IDs to be restarted.
+   * @return A {@link Future} that will be completed when the restart operation has been done.
+   */
+  Future<Set<String>> restartInstances(Map<String, ? extends Set<Integer>> runnableToInstanceIds);
+
+  /**
+   * Restart instances of some {@link TwillRunnable}.
+   *
+   * @param runnable The name of the runnable to restart.
+   * @param instanceId The main instance id to be restarted.
+   * @param moreInstanceIds The optional instance ids.
+   * @return A {@link Future} that will be completed when the restart operation has been done.
+   */
+  Future<String> restartInstances(String runnable, int instanceId, int... moreInstanceIds);
 }

@@ -20,14 +20,17 @@ package org.apache.twill.internal.appmaster;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
+import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
+import com.google.common.collect.Ranges;
 import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.google.common.io.InputSupplier;
@@ -35,6 +38,7 @@ import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -92,6 +96,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /**
  * The class that acts as {@code ApplicationMaster} for Twill applications.
@@ -99,6 +104,7 @@ import java.util.concurrent.TimeUnit;
 public final class ApplicationMasterService extends AbstractYarnTwillService implements Supplier<ResourceReport> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApplicationMasterService.class);
+  private static final Gson GSON = new Gson();
 
   // Copied from org.apache.hadoop.yarn.security.AMRMTokenIdentifier.KIND_NAME since it's missing in Hadoop-2.0
   private static final Text AMRM_TOKEN_KIND_NAME = new Text("YARN_AM_RM_TOKEN");
@@ -285,6 +291,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     }
 
     if (handleSetInstances(message, completion)) {
+      return result;
+    }
+
+    if (handleRestartRunnablesInstances(message, completion)) {
       return result;
     }
 
@@ -786,5 +796,74 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     capability.setMemory(resourceSpec.getMemorySize());
     return capability;
+  }
+
+  /**
+   * Attempt to restart some instances from a runnable or some runnables.
+   * @return {@code true} if the message requests restarting some instances and {@code false} otherwise.
+   */
+  private boolean handleRestartRunnablesInstances(final Message message, final Runnable completion) {
+    LOG.debug("Check if it should process a restart runnable instances.");
+
+    if (message.getType() != Message.Type.SYSTEM) {
+      return false;
+    }
+
+    Message.Scope messageScope = message.getScope();
+    if (messageScope != Message.Scope.RUNNABLE && messageScope != Message.Scope.RUNNABLES) {
+      return false;
+    }
+
+    Command requestCommand = message.getCommand();
+    if (!Constants.RESTART_ALL_RUNNABLE_INSTANCES.equals(requestCommand.getCommand()) &&
+      !Constants.RESTART_RUNNABLES_INSTANCES.equals(requestCommand.getCommand())) {
+      return false;
+    }
+
+    LOG.debug("Processing restart runnable instances message {}.", message);
+
+    if (!Strings.isNullOrEmpty(message.getRunnableName()) && message.getScope() == Message.Scope.RUNNABLE) {
+      // ... for a runnable ...
+      String runnableName = message.getRunnableName();
+      LOG.debug("Start restarting all runnable {} instances.", runnableName);
+      restartRunnableInstances(runnableName, null);
+    } else {
+      // ... or maybe some runnables
+      for (Map.Entry<String, String> option : requestCommand.getOptions().entrySet()) {
+        String runnableName = option.getKey();
+        Set<Integer> restartedInstanceIds = GSON.fromJson(option.getValue(),
+                                                           new TypeToken<Set<Integer>>() {}.getType());
+
+        LOG.debug("Start restarting runnable {} instances {}", runnableName, restartedInstanceIds);
+        restartRunnableInstances(runnableName, restartedInstanceIds);
+      }
+    }
+
+    completion.run();
+    return true;
+  }
+
+  /**
+   * Helper method to restart instances of runnables.
+   */
+  private void restartRunnableInstances(String runnableName, @Nullable Set<Integer> instanceIds) {
+    LOG.debug("Begin restart runnable {} instances.", runnableName);
+
+    Set<Integer> instancesToRemove = instanceIds;
+    if (instancesToRemove == null) {
+      instancesToRemove = Ranges.closedOpen(0, runningContainers.count(runnableName)).asSet(DiscreteDomains.integers());
+    }
+
+    for (int instanceId : instancesToRemove) {
+      LOG.debug("Remove instance {} for runnable {}", instanceId, runnableName);
+      try {
+        runningContainers.removeById(runnableName, instanceId);
+      } catch (Exception ex) {
+        // could be thrown if the container already stopped.
+        LOG.info("Exception thrown when stopping instance {} probably already stopped.", instanceId);
+      }
+    }
+    LOG.info("Restarting instances {} for runnable {}", instancesToRemove, runnableName);
+    runnableContainerRequests.add(createRunnableContainerRequest(runnableName, instancesToRemove.size()));
   }
 }

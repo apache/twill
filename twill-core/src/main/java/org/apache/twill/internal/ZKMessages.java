@@ -28,7 +28,7 @@ import org.apache.twill.zookeeper.ZKOperations;
 import org.apache.zookeeper.CreateMode;
 
 /**
- *
+ * Helper class to send messages to remote instances using Apache Zookeeper watch mechanism.
  */
 public final class ZKMessages {
 

@@ -38,7 +38,8 @@ public interface Message {
   enum Scope {
     APPLICATION,
     ALL_RUNNABLE,
-    RUNNABLE
+    RUNNABLE,
+    RUNNABLES
   }
 
   Type getType();
