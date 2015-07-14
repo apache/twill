@@ -32,33 +32,33 @@ public interface ResourceReport {
    * @param runnableName the runnable name.
    * @return resources being used by all instances of the runnable.
    */
-  public Collection<TwillRunResources> getRunnableResources(String runnableName);
+  Collection<TwillRunResources> getRunnableResources(String runnableName);
 
   /**
    * Get all the run resources being used across all runnables.
    *
    * @return all run resources used by all instances of all runnables.
    */
-  public Map<String, Collection<TwillRunResources>> getResources();
+  Map<String, Collection<TwillRunResources>> getResources();
 
   /**
    * Get the resources application master is using.
    *
    * @return resources being used by the application master.
    */
-  public TwillRunResources getAppMasterResources();
+  TwillRunResources getAppMasterResources();
 
   /**
    * Get the id of the application master.
    *
    * @return id of the application master.
    */
-  public String getApplicationId();
+  String getApplicationId();
 
   /**
    * Get the list of services of the application master.
    *
    * @return list of services of the application master.
    */
-  public List<String> getServices();
+  List<String> getServices();
 }

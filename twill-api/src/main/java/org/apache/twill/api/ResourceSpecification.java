@@ -36,7 +36,7 @@ public interface ResourceSpecification {
 
     private final int multiplier;
 
-    private SizeUnit(int multiplier) {
+    SizeUnit(int multiplier) {
       this.multiplier = multiplier;
     }
   }
@@ -81,7 +81,7 @@ public interface ResourceSpecification {
   /**
    * Builder for creating {@link ResourceSpecification}.
    */
-  static final class Builder {
+  final class Builder {
 
     private int cores;
     private int memory;

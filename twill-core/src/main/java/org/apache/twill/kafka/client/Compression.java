@@ -28,7 +28,7 @@ public enum Compression {
 
   private final String codec;
 
-  private Compression() {
+  Compression() {
     this.codec = name().toLowerCase();
   }
 

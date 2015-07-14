@@ -64,7 +64,6 @@ import java.net.URL;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import javax.ws.rs.GET;
 
 /**
  * Webservice that the Application Master will register back to the resource manager

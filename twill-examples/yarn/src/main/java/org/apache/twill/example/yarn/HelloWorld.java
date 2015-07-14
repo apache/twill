@@ -104,10 +104,7 @@ public class HelloWorld {
     @Override
     public boolean accept(String className, URL classUrl, URL classPathUrl) {
       // exclude hadoop but not hbase package
-      if (className.startsWith("org.apache.hadoop") && !className.startsWith("org.apache.hadoop.hbase")) {
-        return false;
-      }
-      return true;
+      return !(className.startsWith("org.apache.hadoop") && !className.startsWith("org.apache.hadoop.hbase"));
     }
   }
 }
