@@ -48,7 +48,7 @@ public final class Constants {
   public static final String CLASSPATH = "classpath";
   public static final String APPLICATION_CLASSPATH = "application-classpath";
 
-  /** For runnables instance lifecycle ZK path */
+  /** Command names for the restart runnable instances. */
   public static final String RESTART_ALL_RUNNABLE_INSTANCES = "restartAllRunnableInstances";
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
 
