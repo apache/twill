@@ -163,7 +163,7 @@
             <unsubscribe>commits-unsubscribe@twill.incubator.apache.org</unsubscribe>
             <archive>http://mail-archives.apache.org/mod_mbox/twill-commits/</archive>
             <otherArchives>
-                <otherArchive>http://twill-comits.markmail.org</otherArchive>
+                <otherArchive>http://twill-commits.markmail.org</otherArchive>
             </otherArchives>
         </mailingList>
     </mailingLists>
