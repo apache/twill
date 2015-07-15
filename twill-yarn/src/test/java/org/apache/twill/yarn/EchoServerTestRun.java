@@ -117,7 +117,8 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
     // Test restart on instances for runnable
     Map<Integer, String> instanceIdToContainerId = Maps.newHashMap();
-    ResourceReport report = waitForAfterRestartResourceReport(controller, "EchoServer", 30L, TimeUnit.SECONDS, 2, null);
+    ResourceReport report = waitForAfterRestartResourceReport(controller, "EchoServer", 15L,
+                                                              TimeUnit.MINUTES, 2, null);
     Assert.assertTrue(report != null);
     Collection<TwillRunResources> runResources = report.getRunnableResources("EchoServer");
     for (TwillRunResources twillRunResources : runResources) {
@@ -127,7 +128,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
     controller.restartAllInstances("EchoServer");
     Assert.assertTrue(waitForSize(echoServices, 2, 120));
 
-    report = waitForAfterRestartResourceReport(controller, "EchoServer", 30L, TimeUnit.SECONDS, 2,
+    report = waitForAfterRestartResourceReport(controller, "EchoServer", 15L, TimeUnit.MINUTES, 2,
                                                instanceIdToContainerId);
     Assert.assertTrue(report != null);
 
@@ -181,6 +182,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
       } else {
         if (instanceIdToContainerId == null) {
+          LOG.info("Return resource report without comparing container ids.");
           return report;
         }
         Collection<TwillRunResources> runResources = report.getRunnableResources(runnable);
@@ -189,17 +191,21 @@ public final class EchoServerTestRun extends BaseYarnTest {
           int instanceId = twillRunResources.getInstanceId();
           if (twillRunResources.getContainerId().equals(instanceIdToContainerId.get(instanceId))) {
             // found same container id lets wait again.
+            LOG.warn("Found an instance id {} with same container id {} for restart all, let's wait for a while.",
+                     instanceId, twillRunResources.getContainerId());
             isSameContainer = true;
             break;
           }
         }
         if (!isSameContainer) {
-          LOG.error("Unable to get different container ids for restart.");
+          LOG.info("Get set of different container ids for restart.");
           return report;
         }
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
       }
     } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
+
+    LOG.error("Unable to get different container ids for restart.");
     return null;
   }
 }

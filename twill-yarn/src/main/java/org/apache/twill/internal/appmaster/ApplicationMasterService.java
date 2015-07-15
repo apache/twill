@@ -832,7 +832,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       for (Map.Entry<String, String> option : requestCommand.getOptions().entrySet()) {
         String runnableName = option.getKey();
         Set<Integer> restartedInstanceIds = GSON.fromJson(option.getValue(),
-                                                           new TypeToken<Set<Integer>>() {}.getType());
+                                                          new TypeToken<Set<Integer>>() {}.getType());
 
         LOG.debug("Start restarting runnable {} instances {}", runnableName, restartedInstanceIds);
         restartRunnableInstances(runnableName, restartedInstanceIds);
