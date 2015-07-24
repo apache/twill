@@ -18,9 +18,14 @@
 package org.apache.twill.yarn;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Stopwatch;
+import com.google.common.collect.Maps;
 import com.google.common.io.LineReader;
+import com.google.common.util.concurrent.Uninterruptibles;
+import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.logging.PrinterLogHandler;
@@ -37,10 +42,13 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.URISyntaxException;
+import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 
 /**
  * Using echo server to test various behavior of YarnTwillService.
@@ -107,6 +115,23 @@ public final class EchoServerTestRun extends BaseYarnTest {
     controller.changeInstances("EchoServer", 2);
     Assert.assertTrue(waitForSize(echoServices, 2, 120));
 
+    // Test restart on instances for runnable
+    Map<Integer, String> instanceIdToContainerId = Maps.newHashMap();
+    ResourceReport report = waitForAfterRestartResourceReport(controller, "EchoServer", 15L,
+                                                              TimeUnit.MINUTES, 2, null);
+    Assert.assertTrue(report != null);
+    Collection<TwillRunResources> runResources = report.getRunnableResources("EchoServer");
+    for (TwillRunResources twillRunResources : runResources) {
+      instanceIdToContainerId.put(twillRunResources.getInstanceId(), twillRunResources.getContainerId());
+    }
+
+    controller.restartAllInstances("EchoServer");
+    Assert.assertTrue(waitForSize(echoServices, 2, 120));
+
+    report = waitForAfterRestartResourceReport(controller, "EchoServer", 15L, TimeUnit.MINUTES, 2,
+                                               instanceIdToContainerId);
+    Assert.assertTrue(report != null);
+
     // Make sure still only one app is running
     Iterable<TwillRunner.LiveInfo> apps = runner.lookupLive();
     Assert.assertTrue(waitForSize(apps, 1, 120));
@@ -131,5 +156,56 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
+  }
+
+  /**
+   *  Need helper method here to wait for getting resource report because {@link TwillController#getResourceReport()}
+   *  could return null if the application has not fully started.
+   *
+   *  This method helps validate restart scenario.
+   *
+   *  To avoid long sleep if instanceIdToContainerId is passed, then compare the container ids to ones before.
+   *  Otherwise just return the valid resource report.
+   */
+  @Nullable
+  private ResourceReport waitForAfterRestartResourceReport(TwillController controller, String runnable, long timeout,
+                                                           TimeUnit timeoutUnit, int numOfResources,
+                                                           @Nullable Map<Integer, String> instanceIdToContainerId) {
+    Stopwatch stopwatch = new Stopwatch();
+    stopwatch.start();
+    do {
+      ResourceReport report = controller.getResourceReport();
+      if (report == null || report.getRunnableResources(runnable) == null) {
+        Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      } else if (report.getRunnableResources(runnable) == null ||
+          report.getRunnableResources(runnable).size() != numOfResources) {
+        Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      } else {
+        if (instanceIdToContainerId == null) {
+          LOG.info("Return resource report without comparing container ids.");
+          return report;
+        }
+        Collection<TwillRunResources> runResources = report.getRunnableResources(runnable);
+        boolean isSameContainer = false;
+        for (TwillRunResources twillRunResources : runResources) {
+          int instanceId = twillRunResources.getInstanceId();
+          if (twillRunResources.getContainerId().equals(instanceIdToContainerId.get(instanceId))) {
+            // found same container id lets wait again.
+            LOG.warn("Found an instance id {} with same container id {} for restart all, let's wait for a while.",
+                     instanceId, twillRunResources.getContainerId());
+            isSameContainer = true;
+            break;
+          }
+        }
+        if (!isSameContainer) {
+          LOG.info("Get set of different container ids for restart.");
+          return report;
+        }
+        Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      }
+    } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
+
+    LOG.error("Unable to get different container ids for restart.");
+    return null;
   }
 }

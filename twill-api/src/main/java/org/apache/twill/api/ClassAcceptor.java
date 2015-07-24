@@ -15,41 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.internal.state;
+package org.apache.twill.api;
 
-import org.apache.twill.api.Command;
+import java.net.URL;
 
 /**
- * Represent message objects to communicate between components in Twill.
+ * Class that can be used to determine if class can be accepted.
  */
-public interface Message {
-
+public class ClassAcceptor {
   /**
-   * Type of message.
+   * Invoked to determine if class can be accepted. default behavior returns true.
+   *
+   * @param className Name of the class.
+   * @param classUrl URL for the class resource.
+   * @param classPathUrl URL for the class path resource that contains the class resource.
+   *                     If the URL protocol is {@code file}, it would be the path to root package.
+   *                     If the URL protocol is {@code jar}, it would be the jar file.
+   * @return true to accept the given class, false otherwise.
    */
-  enum Type {
-    SYSTEM,
-    USER
+  public boolean accept(String className, URL classUrl, URL classPathUrl) {
+    return true;
   }
-
-  /**
-   * Scope of the message.
-   */
-  enum Scope {
-    APPLICATION,
-    ALL_RUNNABLE,
-    RUNNABLE,
-    RUNNABLES
-  }
-
-  Type getType();
-
-  Scope getScope();
-
-  /**
-   * @return the name of the target runnable if scope is {@link Scope#RUNNABLE} or {@code null} otherwise.
-   */
-  String getRunnableName();
-
-  Command getCommand();
 }

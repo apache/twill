@@ -179,6 +179,26 @@ public interface TwillPreparer {
   TwillPreparer withClassPaths(Iterable<String> classPaths);
 
   /**
+   * Adds the set of paths to the classpath on the target machine for ApplicationMaster and all runnables.
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withApplicationClassPaths(String... classPaths);
+
+  /**
+   * Adds the set of paths to the classpath on the target machine for ApplicationMaster and all runnables.
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withApplicationClassPaths(Iterable<String> classPaths);
+
+  /**
+   * Uses {@link ClassAcceptor} to determine the classes to include in the bundle jar for
+   * ApplicationMaster and all runnables.
+   * @param classAcceptor to specify which classes to include in the bundle jar
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withBundlerClassAcceptor(ClassAcceptor classAcceptor);
+
+  /**
    * Adds security credentials for the runtime environment to gives application access to resources.
    *
    * @param secureStore Contains security token available for the runtime environment.

@@ -73,7 +73,7 @@ public interface KafkaPublisher {
 
     private final int ack;
 
-    private Ack(int ack) {
+    Ack(int ack) {
       this.ack = ack;
     }
 

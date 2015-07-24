@@ -179,7 +179,13 @@ public final class ApplicationMasterMain extends ServiceMain {
       prop.setProperty("log.flush.interval.ms", "1000");
       prop.setProperty("log.segment.bytes", "536870912");
       prop.setProperty("zookeeper.connect", kafkaZKConnect);
-      prop.setProperty("zookeeper.connection.timeout.ms", "1000000");
+      // Set the connection timeout to relatively short time (3 seconds).
+      // It is only used by the org.I0Itec.zkclient.ZKClient inside KafkaServer
+      // to block and wait for ZK connection goes into SyncConnected state.
+      // However, due to race condition described in TWILL-139 in the ZK client library used by Kafka,
+      // when ZK authentication is enabled, the ZK client may hang until connection timeout.
+      // Setting it to lower value allow the AM to retry multiple times if race happens.
+      prop.setProperty("zookeeper.connection.timeout.ms", "3000");
       prop.setProperty("default.replication.factor", "1");
       return prop;
     }

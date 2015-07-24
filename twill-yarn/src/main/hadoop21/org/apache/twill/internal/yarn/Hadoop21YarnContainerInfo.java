@@ -24,7 +24,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 /**
- *
+ * Implementation of {@link YarnContainerInfo} for Apache Hadoop 2.1.0 or above.
  */
 public final class Hadoop21YarnContainerInfo implements YarnContainerInfo {
 

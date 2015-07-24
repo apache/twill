@@ -42,6 +42,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.twill.api.ClassAcceptor;
 import org.apache.twill.api.EventHandlerSpecification;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.RunId;
@@ -122,12 +123,14 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final List<URI> resources = Lists.newArrayList();
   private final List<String> classPaths = Lists.newArrayList();
   private final ListMultimap<String, String> runnableArgs = ArrayListMultimap.create();
+  private final List<String> applicationClassPaths = Lists.newArrayList();
   private final Credentials credentials;
   private final int reservedMemory;
   private String user;
   private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
+  private ClassAcceptor classAcceptor;
   private LogEntry.Level logLevel;
 
   YarnTwillPreparer(YarnConfiguration yarnConfig, TwillSpecification twillSpec,
@@ -147,6 +150,7 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.user = System.getProperty("user.name");
     this.extraOptions = extraOptions;
     this.logLevel = logLevel;
+    this.classAcceptor = new ClassAcceptor();
   }
 
   @Override
@@ -246,6 +250,23 @@ final class YarnTwillPreparer implements TwillPreparer {
   }
 
   @Override
+  public TwillPreparer withApplicationClassPaths(String... classPaths) {
+    return withApplicationClassPaths(ImmutableList.copyOf(classPaths));
+  }
+
+  @Override
+  public TwillPreparer withApplicationClassPaths(Iterable<String> classPaths) {
+    Iterables.addAll(this.applicationClassPaths, classPaths);
+    return this;
+  }
+
+  @Override
+  public TwillPreparer withBundlerClassAcceptor(ClassAcceptor classAcceptor) {
+    this.classAcceptor = classAcceptor;
+    return this;
+  }
+
+  @Override
   public TwillPreparer addSecureStore(SecureStore secureStore) {
     Object store = secureStore.getStore();
     Preconditions.checkArgument(store instanceof Credentials, "Only Hadoop Credentials is supported.");
@@ -264,7 +285,6 @@ final class YarnTwillPreparer implements TwillPreparer {
     try {
       final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(twillSpec, schedulerQueue);
       final ApplicationId appId = launcher.getContainerInfo();
-
       Callable<ProcessController<YarnApplicationReport>> submitTask =
         new Callable<ProcessController<YarnApplicationReport>>() {
         @Override
@@ -304,6 +324,7 @@ final class YarnTwillPreparer implements TwillPreparer {
             .put(EnvKeys.TWILL_RESERVED_MEMORY_MB, Integer.toString(reservedMemory))
             .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
             .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS));
+
           if (logLevel != null) {
             LOG.debug("Log level is set to {} for the Twill application.", logLevel);
             builder.put(EnvKeys.TWILL_APP_LOG_LEVEL, logLevel.toString());
@@ -351,7 +372,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   }
 
   private ApplicationBundler createBundler() {
-    return new ApplicationBundler(ImmutableList.<String>of());
+    return new ApplicationBundler(classAcceptor);
   }
 
   private LocalFile createLocalFile(String name, Location location) throws IOException {
@@ -502,7 +523,7 @@ final class YarnTwillPreparer implements TwillPreparer {
     if (classLoader == null) {
       classLoader = getClass().getClassLoader();
     }
-    Dependencies.findClassDependencies(classLoader, new Dependencies.ClassAcceptor() {
+    Dependencies.findClassDependencies(classLoader, new ClassAcceptor() {
       @Override
       public boolean accept(String className, URL classUrl, URL classPathUrl) {
         Preconditions.checkArgument(className.startsWith(launcherName) || className.equals(portFinderName),
@@ -520,16 +541,21 @@ final class YarnTwillPreparer implements TwillPreparer {
     }, launcherName, portFinderName);
 
     try {
-      if (!classPaths.isEmpty()) {
-        jarOut.putNextEntry(new JarEntry("classpath"));
-        jarOut.write(Joiner.on(':').join(classPaths).getBytes(Charsets.UTF_8));
-      }
+      addClassPaths(Constants.CLASSPATH, classPaths, jarOut);
+      addClassPaths(Constants.APPLICATION_CLASSPATH, applicationClassPaths, jarOut);
     } finally {
       jarOut.close();
     }
     LOG.debug("Done {}", Constants.Files.LAUNCHER_JAR);
 
     localFiles.put(Constants.Files.LAUNCHER_JAR, createLocalFile(Constants.Files.LAUNCHER_JAR, location));
+  }
+
+  private void addClassPaths(String classpathId, List<String> classPaths, JarOutputStream jarOut) throws IOException {
+    if (!classPaths.isEmpty()) {
+      jarOut.putNextEntry(new JarEntry(classpathId));
+      jarOut.write(Joiner.on(':').join(classPaths).getBytes(Charsets.UTF_8));
+    }
   }
 
   private void saveJvmOptions(Map<String, LocalFile> localFiles) throws IOException {

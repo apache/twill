@@ -121,6 +121,9 @@ final class RunningContainers {
     }
   }
 
+  /**
+   * Start a container for a runnable.
+   */
   void start(String runnableName, ContainerInfo containerInfo, TwillContainerLauncher launcher) {
     containerLock.lock();
     try {
@@ -186,32 +189,47 @@ final class RunningContainers {
         LOG.warn("No running container found for {}", runnableName);
         return;
       }
-
-      String lastContainerId = null;
-      TwillContainerController lastController = null;
-
-      // Find the controller with the maxInstanceId
-      for (Map.Entry<String, TwillContainerController> entry : containers.row(runnableName).entrySet()) {
-        if (getInstanceId(entry.getValue().getRunId()) == maxInstanceId) {
-          lastContainerId = entry.getKey();
-          lastController = entry.getValue();
-          break;
-        }
-      }
-
-      Preconditions.checkState(lastContainerId != null,
-                               "No container found for {} with instanceId = {}", runnableName, maxInstanceId);
-
-      LOG.info("Stopping service: {} {}", runnableName, lastController.getRunId());
-      lastController.stopAndWait();
-      containers.remove(runnableName, lastContainerId);
-      removeContainerInfo(lastContainerId);
-      removeInstanceId(runnableName, maxInstanceId);
-      resourceReport.removeRunnableResources(runnableName, lastContainerId);
-      containerChange.signalAll();
+      removeInstanceById(runnableName, maxInstanceId);
     } finally {
       containerLock.unlock();
     }
+  }
+
+  /**
+   * Stop and remove a container for a runnable on an id.
+   */
+  void removeById(String runnableName, int instanceId) {
+    containerLock.lock();
+    try {
+      removeInstanceById(runnableName, instanceId);
+    } finally {
+      containerLock.unlock();
+    }
+  }
+
+  private void removeInstanceById(String runnableName, int instanceId) {
+    String containerId = null;
+    TwillContainerController controller = null;
+
+    // Find the controller with particular instance id.
+    for (Map.Entry<String, TwillContainerController> entry : containers.row(runnableName).entrySet()) {
+      if (getInstanceId(entry.getValue().getRunId()) == instanceId) {
+        containerId = entry.getKey();
+        controller = entry.getValue();
+        break;
+      }
+    }
+
+    Preconditions.checkState(containerId != null,
+                             "No container found for {} with instanceId = {}", runnableName, instanceId);
+
+    LOG.info("Stopping service: {} {}", runnableName, controller.getRunId());
+    controller.stopAndWait();
+    containers.remove(runnableName, containerId);
+    removeContainerInfo(containerId);
+    removeInstanceId(runnableName, instanceId);
+    resourceReport.removeRunnableResources(runnableName, containerId);
+    containerChange.signalAll();
   }
 
   /**
@@ -446,6 +464,9 @@ final class RunningContainers {
     return instanceId;
   }
 
+  /**
+   * Remove instance id for a given runnable.
+   */
   private void removeInstanceId(String runnableName, int instanceId) {
     BitSet instances = runnableInstances.get(runnableName);
     if (instances == null) {
@@ -469,7 +490,7 @@ final class RunningContainers {
   }
 
   /**
-   * Returns nnumber of running instances for the given runnable.
+   * Returns number of running instances for the given runnable.
    */
   private int getRunningInstances(String runableName) {
     BitSet instances = runnableInstances.get(runableName);

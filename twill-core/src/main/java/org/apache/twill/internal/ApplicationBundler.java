@@ -28,6 +28,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
+import org.apache.twill.api.ClassAcceptor;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.utils.Dependencies;
 import org.slf4j.Logger;
@@ -43,7 +44,6 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
 import java.util.Collections;
-import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.jar.JarEntry;
@@ -57,15 +57,35 @@ import java.util.zip.CheckedOutputStream;
 public final class ApplicationBundler {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApplicationBundler.class);
-  
+
   public static final String SUBDIR_CLASSES = "classes/";
   public static final String SUBDIR_LIB = "lib/";
   public static final String SUBDIR_RESOURCES = "resources/";
 
-  private final List<String> excludePackages;
-  private final List<String> includePackages;
+  private final ClassAcceptor classAcceptor;
   private final Set<String> bootstrapClassPaths;
   private final CRC32 crc32;
+
+  /**
+   * Constructs a ApplicationBundler.
+   *
+   * @param classAcceptor ClassAcceptor for class packages to include
+   */
+  public ApplicationBundler(ClassAcceptor classAcceptor) {
+    this.classAcceptor = classAcceptor;
+    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+    for (String classpath : Splitter.on(File.pathSeparatorChar).split(System.getProperty("sun.boot.class.path"))) {
+      File file = new File(classpath);
+      builder.add(file.getAbsolutePath());
+      try {
+        builder.add(file.getCanonicalPath());
+      } catch (IOException e) {
+        // Ignore the exception and proceed.
+      }
+    }
+    this.bootstrapClassPaths = builder.build();
+    this.crc32 = new CRC32();
+  }
 
   /**
    * Constructs a ApplicationBundler.
@@ -83,23 +103,23 @@ public final class ApplicationBundler {
    * @param includePackages Class packages that should be included. Anything in this list will override the
    *                        one provided in excludePackages.
    */
-  public ApplicationBundler(Iterable<String> excludePackages, Iterable<String> includePackages) {
-    this.excludePackages = ImmutableList.copyOf(excludePackages);
-    this.includePackages = ImmutableList.copyOf(includePackages);
-
-    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-    for (String classpath : Splitter.on(File.pathSeparatorChar).split(System.getProperty("sun.boot.class.path"))) {
-      File file = new File(classpath);
-      builder.add(file.getAbsolutePath());
-      try {
-        builder.add(file.getCanonicalPath());
-      } catch (IOException e) {
-        // Ignore the exception and proceed.
+  public ApplicationBundler(final Iterable<String> excludePackages, final Iterable<String> includePackages) {
+    this(new ClassAcceptor() {
+      @Override
+      public boolean accept(String className, URL classUrl, URL classPathUrl) {
+        for (String includePackage : includePackages) {
+          if (className.startsWith(includePackage)) {
+            return true;
+          }
+        }
+        for (String excludePackage : excludePackages) {
+          if (className.startsWith(excludePackage)) {
+            return false;
+          }
+        }
+        return true;
       }
-    }
-    this.bootstrapClassPaths = builder.build();
-    this.crc32 = new CRC32();
-
+    });
   }
 
   public void createBundle(Location target, Iterable<Class<?>> classes) throws IOException {
@@ -175,29 +195,15 @@ public final class ApplicationBundler {
 
     // Record the set of classpath URL that are already added to the jar
     final Set<URL> seenClassPaths = Sets.newHashSet();
-    Dependencies.findClassDependencies(classLoader, new Dependencies.ClassAcceptor() {
+    Dependencies.findClassDependencies(classLoader, new ClassAcceptor() {
       @Override
       public boolean accept(String className, URL classUrl, URL classPathUrl) {
         if (bootstrapClassPaths.contains(classPathUrl.getFile())) {
           return false;
         }
-
-        boolean shouldInclude = false;
-        for (String include : includePackages) {
-          if (className.startsWith(include)) {
-            shouldInclude = true;
-            break;
-          }
+        if (!classAcceptor.accept(className, classUrl, classPathUrl)) {
+          return false;
         }
-
-        if (!shouldInclude) {
-          for (String exclude : excludePackages) {
-            if (className.startsWith(exclude)) {
-              return false;
-            }
-          }
-        }
-
         if (seenClassPaths.add(classPathUrl)) {
           putEntry(className, classUrl, classPathUrl, entries, jarOut);
         }

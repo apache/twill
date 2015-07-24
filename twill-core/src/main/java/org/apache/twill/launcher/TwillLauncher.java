@@ -17,6 +17,8 @@
  */
 package org.apache.twill.launcher;
 
+import org.apache.twill.internal.Constants;
+
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -156,26 +158,30 @@ public final class TwillLauncher {
       }
 
       if (useClassPath) {
-        InputStream is = ClassLoader.getSystemResourceAsStream("classpath");
-        if (is != null) {
-          try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")));
-            String line = reader.readLine();
-            if (line != null) {
-              for (String path : line.split(":")) {
-                urls.addAll(getClassPaths(path));
-              }
-            }
-          } finally {
-            is.close();
-          }
-        }
+        addClassPathsToList(urls, Constants.CLASSPATH);
       }
+
+      addClassPathsToList(urls, Constants.APPLICATION_CLASSPATH);
 
       return new URLClassLoader(urls.toArray(new URL[0]));
 
     } catch (Exception e) {
       throw new IllegalStateException(e);
+    }
+  }
+
+  private static void addClassPathsToList(List<URL> urls, String resource) throws IOException {
+    try (InputStream is = ClassLoader.getSystemResourceAsStream(resource)) {
+      if (is != null) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")))) {
+          String line = reader.readLine();
+          if (line != null) {
+            for (String path : line.split(":")) {
+              urls.addAll(getClassPaths(path.trim()));
+            }
+          }
+        }
+      }
     }
   }
 
