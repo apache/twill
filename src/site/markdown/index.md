@@ -27,6 +27,7 @@ allowing developers to focus more on their application logic. Apache Twill allow
 with a programming model that is similar to running threads.
 
 ### Why do I need Apache Twill?
+
 Apache Twill dramatically simplifies and reduces development efforts, enabling you to quickly and
 easily develop and manage distributed applications through its simple abstraction layer on top of YARN.
 YARN, although originally designed for MapReduce v2, can be used as a generic cluster resource management framework
@@ -39,6 +40,12 @@ Apache Twill allows you to develop, deploy and manage your distributed applicati
 with rich build-in features for common distributed applications needs. Whether you are a developer or operating engineer
 will find Apache Twill helps you greatly reduces the effort in developing and operating your applications on a
 Hadoop® cluster.
+
+### Latest Release
+
+The latest release of Apache Twill is [0.6.0-incubating](releases/0.6.0-incubating.html). It comes with a lot of new
+features and improvements over the previous release. Please go to the [release](releases/0.6.0-incubating.html) page
+to find out more.
 
 ### Is it Building?
 
