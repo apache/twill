@@ -26,7 +26,6 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
-import org.apache.twill.internal.utils.Paths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,13 +64,6 @@ public abstract class AbstractYarnProcessLauncher<T> implements ProcessLauncher<
   }
 
   /**
-   * Tells whether to append suffix to localize resource name for archive file type. Default is true.
-   */
-  protected boolean useArchiveSuffix() {
-    return true;
-  }
-
-  /**
    * For children class to override to perform actual process launching.
    */
   protected abstract <R> ProcessController<R> doLaunch(YarnLaunchContext launchContext);
@@ -100,17 +92,7 @@ public abstract class AbstractYarnProcessLauncher<T> implements ProcessLauncher<
     }
 
     private void addLocalFile(LocalFile localFile) {
-      String name = localFile.getName();
-      // Always append the file extension as the resource name so that archive expansion by Yarn could work.
-      // Renaming would happen by the Container Launcher.
-      if (localFile.isArchive() && useArchiveSuffix()) {
-        String path = localFile.getURI().toString();
-        String suffix = Paths.getExtension(path);
-        if (!suffix.isEmpty()) {
-          name += '.' + suffix;
-        }
-      }
-      localResources.put(name, YarnUtils.createLocalResource(localFile));
+      localResources.put(localFile.getName(), YarnUtils.createLocalResource(localFile));
     }
 
     @Override

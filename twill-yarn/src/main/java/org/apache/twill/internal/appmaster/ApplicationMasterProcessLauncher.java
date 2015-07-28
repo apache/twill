@@ -43,11 +43,6 @@ public final class ApplicationMasterProcessLauncher extends AbstractYarnProcessL
   }
 
   @Override
-  protected boolean useArchiveSuffix() {
-    return false;
-  }
-
-  @Override
   @SuppressWarnings("unchecked")
   protected <R> ProcessController<R> doLaunch(YarnLaunchContext launchContext) {
     final ApplicationId appId = getContainerInfo();
