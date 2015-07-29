@@ -34,15 +34,31 @@ import java.util.Map;
 final class RunnableContainerRequest {
   private final TwillSpecification.Order.Type orderType;
   private final Iterator<Map.Entry<AllocationSpecification, Collection<RuntimeSpecification>>> requests;
+  private volatile boolean isReadyToBeProvisioned;
 
   RunnableContainerRequest(TwillSpecification.Order.Type orderType,
                            Map<AllocationSpecification, Collection<RuntimeSpecification>> requests) {
+    this(orderType, requests, true);
+  }
+
+  RunnableContainerRequest(TwillSpecification.Order.Type orderType,
+                           Map<AllocationSpecification, Collection<RuntimeSpecification>> requests,
+                           boolean isReadyToBeProvisioned) {
     this.orderType = orderType;
     this.requests = requests.entrySet().iterator();
+    this.isReadyToBeProvisioned = isReadyToBeProvisioned;
   }
 
   TwillSpecification.Order.Type getOrderType() {
     return orderType;
+  }
+
+  public boolean isReadyToBeProvisioned() {
+    return isReadyToBeProvisioned;
+  }
+
+  public void setReadyToBeProvisioned(boolean isProvisioned) {
+    this.isReadyToBeProvisioned = isProvisioned;
   }
 
   /**
