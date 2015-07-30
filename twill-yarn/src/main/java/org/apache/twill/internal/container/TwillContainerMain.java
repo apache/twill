@@ -86,7 +86,6 @@ public final class TwillContainerMain extends ServiceMain {
     ZKClient appRunZkClient = getAppRunZKClient(zkClientService, appRunId);
 
     TwillSpecification twillSpec = loadTwillSpec(twillSpecFile);
-    renameLocalFiles(twillSpec.getRunnables().get(runnableName));
     
     TwillRunnableSpecification runnableSpec = twillSpec.getRunnables().get(runnableName).getRunnableSpecification();
     ContainerInfo containerInfo = new EnvContainerInfo();
@@ -132,18 +131,6 @@ public final class TwillContainerMain extends ServiceMain {
 
       UserGroupInformation.getCurrentUser().addCredentials(credentials);
       LOG.info("Secure store updated from {}", file);
-    }
-  }
-
-  private static void renameLocalFiles(RuntimeSpecification runtimeSpec) {
-    for (LocalFile file : runtimeSpec.getLocalFiles()) {
-      if (file.isArchive()) {
-        String path = file.getURI().toString();
-        String name = file.getName() + (path.endsWith(".tar.gz") ? ".tar.gz" : path.substring(path.lastIndexOf('.')));
-        Preconditions.checkState(new File(name).renameTo(new File(file.getName())),
-                                 "Fail to rename file from %s to %s.",
-                                 name, file.getName());
-      }
     }
   }
 
