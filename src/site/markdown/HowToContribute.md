@@ -49,3 +49,23 @@ these steps to get your contributions in:
 6. Please complete the pull request description with additional details as appropriate.
 7. Once sent, code review will be done through the pull request.
 8. Once all review issues are resolved, we will merge the changes into the `master` branch of the Apache Twill repo.
+
+### How to Merge Code Changes
+
+Committer can merge code changes that are already reviewed into the `master` branch with the following steps:
+
+1. Make sure the GitHub pull request is squashed into one commit. If not, ask the patch contributor to help doing so.
+        
+2. Download the patch file from GitHub. You can append `.patch` to the end of the GitHub pull request URL to get the patch file.
+
+        curl -L -O https://github.com/apache/incubator-twill/pull/${PR_NUMBER}.patch
+3. Edit the patch file and add the following line in the commit message for closing the pull request.
+
+        This closes #${PR_NUMBER} from GitHub.
+4. Apply the patch and push it back to remote repo. Make sure you apply it on the latest `master` branch.
+
+        git checkout master
+        git pull origin master
+        git am --signoff < ${PR_NUMBER}
+        git push origin master
+5. Close the JIRA issue associated with the patch.
