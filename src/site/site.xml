@@ -21,7 +21,7 @@
     <bannerLeft>
         <name>Apache Twill</name>
         <src>images/ApacheTwill_logo.png</src>
-        <href>http://twill.incubator.apache.org/</href>
+        <href>http://twill.incubator.apache.org/index.html</href>
         <alt>Apache Twill</alt>
     </bannerLeft>
     <bannerRight>
@@ -34,20 +34,23 @@
     <publishDate position="none"/>
     <version position="none"/>
 
+    <!--<skin>-->
+        <!--<groupId>org.apache.maven.skins</groupId>-->
+        <!--<artifactId>maven-fluido-skin</artifactId>-->
+        <!--<version>1.3.1</version>-->
+    <!--</skin>-->
     <skin>
-        <groupId>org.apache.maven.skins</groupId>
-        <artifactId>maven-fluido-skin</artifactId>
-        <version>1.3.1</version>
+        <groupId>lt.velykis.maven.skins</groupId>
+        <artifactId>reflow-maven-skin</artifactId>
+        <version>1.1.1</version>
     </skin>
 
     <body>
-
         <breadcrumbs position="left">
-            <item name="Apache Twill" href="http://twill.incubator.apache.org/"/>
+            <item name="Apache Twill" href="http://twill.incubator.apache.org/index.html"/>
         </breadcrumbs>
 
-        <menu name="Apache Twill">
-            <item name="Introduction" href="./index.html"/>
+        <menu name="Documentation">
             <item name="Getting Started" href="./GettingStarted.html"/>
             <item name="API (0.7.0-incubating-SNAPSHOT)" href="./apidocs/index.html"/>
             <item name="API (0.6.0-incubating)" href="./apidocs-0.6.0-incubating/index.html"/>
@@ -81,25 +84,25 @@
         </menu>
 
         <footer>
-            <div class="row span16" style="margin-bottom: 20px">
-                <div>
-                    Apache Twill, Apache, the Apache feather logo,
-                    and the Apache Twill project logos are trademarks of The Apache Software Foundation.
-                    All other marks mentioned may be trademarks or registered trademarks of their respective owners.
-                </div>
+            <div>
+                Apache Twill, Apache, the Apache feather logo,
+                and the Apache Twill project logos are trademarks of The Apache Software Foundation.
+                All other marks mentioned may be trademarks or registered trademarks of their respective owners.
             </div>
         </footer>
     </body>
 
     <custom>
-        <fluidoSkin>
-            <profile>production</profile>
-            <topBarEnabled>true</topBarEnabled>
-            <navBarStyle>navbar-inverse</navBarStyle>
-            <sideBarEnabled>true</sideBarEnabled>
-            <leftColumnClass>span2</leftColumnClass>
-            <bodyColumnClass>span10</bodyColumnClass>
-        </fluidoSkin>
+        <reflowSkin>
+            <theme>bootswatch-flatly</theme>
+            <smoothScroll>true</smoothScroll>
+            <bottomNav maxSpan="9" >
+                <column>Documentation</column>
+                <column>Releases</column>
+                <column>Get Involved</column>
+                <column>ASF</column>
+            </bottomNav>
+        </reflowSkin>
     </custom>
 
 </project>
