@@ -170,7 +170,7 @@ You can run the HelloWorld application from any node of the Hadoop cluster using
 (be sure to add your ZooKeeper Host and Port):
 
 ```sh
-$ export CP=twill-examples-yarn-0.5.0-incubating-SNAPSHOT.jar:`hadoop classpath`
+$ export CP=twill-examples-yarn-0.6.0-incubating-SNAPSHOT.jar:`hadoop classpath`
 $ java -cp $CP org.apache.twill.example.yarn.HelloWorld {zookeeper_host:port}
 ```
 
@@ -193,9 +193,9 @@ You can run the BundleJarExample application from any node of the Hadoop cluster
 (be sure to add your ZooKeeper Host and Port):
 
 ```sh
-$ export CP=twill-examples-yarn-0.5.0-incubating-SNAPSHOT.jar:`hadoop classpath` 
+$ export CP=twill-examples-yarn-0.6.0-incubating-SNAPSHOT.jar:`hadoop classpath` 
 $ java -cp $CP org.apache.twill.example.yarn.BundledJarExample {zookeeper_host:port} \
-    twill-examples-echo-0.5.0-incubating-SNAPSHOT.jar echo.EchoMain arg1
+    twill-examples-echo-0.6.0-incubating-SNAPSHOT.jar echo.EchoMain arg1
 ```
 
 Like with the HelloWorld example, you should see logs output to the terminal.  Once the application is complete, check
