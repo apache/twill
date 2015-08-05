@@ -114,6 +114,7 @@
             </roles>
         </developer>
         <developer>
+            <id>ashau</id>
             <name>Albert Shau</name>
             <email>ashau@apache.org</email>
             <roles>
@@ -121,8 +122,17 @@
             </roles>
         </developer>
         <developer>
+            <id>poorna</id>
             <name>Poorna Chandra</name>
             <email>poorna@apache.org</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+        </developer>
+        <developer>
+            <id>hsaputra</id>
+            <name>Henry Saputra</name>
+            <email>hsaputra@apache.org</email>
             <roles>
                 <role>Committer</role>
             </roles>
