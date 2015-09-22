@@ -35,13 +35,13 @@ import java.lang.reflect.Type;
  */
 public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunResources>,
                                               JsonDeserializer<TwillRunResources> {
-  private final String CONTAINER_ID = "containerId";
-  private final String INSTANCE_ID = "instanceId";
-  private final String HOST = "host";
-  private final String MEMORY_MB = "memoryMB";
-  private final String VIRTUAL_CORES = "virtualCores";
-  private final String DEBUG_PORT = "debugPort";
-  private final String LOG_LEVEL = "logLevel";
+  private static final String CONTAINER_ID = "containerId";
+  private static final String INSTANCE_ID = "instanceId";
+  private static final String HOST = "host";
+  private static final String MEMORY_MB = "memoryMB";
+  private static final String VIRTUAL_CORES = "virtualCores";
+  private static final String DEBUG_PORT = "debugPort";
+  private static final String LOG_LEVEL = "logLevel";
 
   @Override
   public JsonElement serialize(TwillRunResources src, Type typeOfSrc, JsonSerializationContext context) {

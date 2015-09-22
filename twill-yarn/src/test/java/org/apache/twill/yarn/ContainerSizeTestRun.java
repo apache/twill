@@ -29,6 +29,8 @@ import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.discovery.ServiceDiscovered;
 import org.junit.Assert;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
 import java.util.concurrent.ExecutionException;
@@ -36,11 +38,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Test for requesting different container size in different order.
- * It specifically test for workaround for YARN-314.
+ * Tests related to different container sizes.
  */
 public class ContainerSizeTestRun extends BaseYarnTest {
 
+  /**
+   * Test for requesting different container size in different order.
+   * It specifically test for workaround for YARN-314.
+   */
   @Test
   public void testContainerSize() throws InterruptedException, TimeoutException, ExecutionException {
     TwillRunner runner = getTwillRunner();
@@ -56,6 +61,20 @@ public class ContainerSizeTestRun extends BaseYarnTest {
     }
   }
 
+  @Test
+  public void testMaxHeapSize() throws InterruptedException, TimeoutException, ExecutionException {
+    TwillRunner runner = getTwillRunner();
+    TwillController controller = runner.prepare(new MaxHeapApp())
+      .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
+      .start();
+
+    try {
+      ServiceDiscovered discovered = controller.discoverService("sleep");
+      Assert.assertTrue(waitForSize(discovered, 1, 120));
+    } finally {
+      controller.terminate().get(120, TimeUnit.SECONDS);
+    }
+  }
 
   /**
    * An application that has two runnables with different memory size.
@@ -86,7 +105,6 @@ public class ContainerSizeTestRun extends BaseYarnTest {
     }
   }
 
-
   /**
    * A runnable that sleep for 120 seconds.
    */
@@ -100,6 +118,65 @@ public class ContainerSizeTestRun extends BaseYarnTest {
 
     @Override
     public void run() {
+      runThread = Thread.currentThread();
+      getContext().announce("sleep", Integer.parseInt(getContext().getSpecification().getConfigs().get("port")));
+      try {
+        TimeUnit.SECONDS.sleep(120);
+      } catch (InterruptedException e) {
+        // Ignore.
+      }
+    }
+
+    @Override
+    public void stop() {
+      if (runThread != null) {
+        runThread.interrupt();
+      }
+    }
+  }
+
+  /**
+   * An application for testing max heap size.
+   */
+  public static final class MaxHeapApp implements TwillApplication {
+
+    @Override
+    public TwillSpecification configure() {
+      // Make the runnable request for container smaller than 128MB (the allocation minimum)
+      ResourceSpecification res = ResourceSpecification.Builder.with()
+        .setVirtualCores(1)
+        .setMemory(16, ResourceSpecification.SizeUnit.MEGA)
+        .build();
+
+      return TwillSpecification.Builder.with()
+        .setName("MaxHeapApp")
+        .withRunnable()
+        .add("sleep", new MaxHeapRunnable(12345), res).noLocalFiles()
+        .anyOrder()
+        .build();
+    }
+  }
+
+  /**
+   * The runnable for testing max heap size.
+   */
+  public static final class MaxHeapRunnable extends AbstractTwillRunnable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MaxHeapRunnable.class);
+    private volatile Thread runThread;
+
+    public MaxHeapRunnable(int port) {
+      super(ImmutableMap.of("port", Integer.toString(port)));
+    }
+
+    @Override
+    public void run() {
+      // This heap size should be > 16, since the min allocation size is 128mb
+      if (Runtime.getRuntime().maxMemory() <= 16 * 1024 * 1024) {
+        LOG.error("Memory size is too small: {}", Runtime.getRuntime().maxMemory());
+        return;
+      }
+
       runThread = Thread.currentThread();
       getContext().announce("sleep", Integer.parseInt(getContext().getSpecification().getConfigs().get("port")));
       try {

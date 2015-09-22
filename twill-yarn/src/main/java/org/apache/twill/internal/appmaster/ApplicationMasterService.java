@@ -176,10 +176,14 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   @SuppressWarnings("unchecked")
+  @Nullable
   private EventHandler createEventHandler(TwillSpecification twillSpec) {
     try {
       // Should be able to load by this class ClassLoader, as they packaged in the same jar.
       EventHandlerSpecification handlerSpec = twillSpec.getEventHandler();
+      if (handlerSpec == null) {
+        return null;
+      }
 
       Class<?> handlerClass = getClass().getClassLoader().loadClass(handlerSpec.getClassName());
       Preconditions.checkArgument(EventHandler.class.isAssignableFrom(handlerClass),
@@ -221,7 +225,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     LOG.info("Start application master with spec: " + TwillSpecificationAdapter.create().toJson(twillSpec));
 
     // initialize the event handler, if it fails, it will fail the application.
-    eventHandler.initialize(new BasicEventHandlerContext(twillSpec.getEventHandler()));
+    if (eventHandler != null) {
+      eventHandler.initialize(new BasicEventHandlerContext(twillSpec.getEventHandler()));
+    }
 
     instanceChangeExecutor = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("instanceChanger"));
 
@@ -237,11 +243,13 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     LOG.info("Stop application master with spec: {}", TwillSpecificationAdapter.create().toJson(twillSpec));
 
-    try {
-      // call event handler destroy. If there is error, only log and not affected stop sequence.
-      eventHandler.destroy();
-    } catch (Throwable t) {
-      LOG.warn("Exception when calling {}.destroy()", twillSpec.getEventHandler().getClassName(), t);
+    if (eventHandler != null) {
+      try {
+        // call event handler destroy. If there is error, only log and not affected stop sequence.
+        eventHandler.destroy();
+      } catch (Throwable t) {
+        LOG.warn("Exception when calling {}.destroy()", eventHandler.getClass().getName(), t);
+      }
     }
 
     instanceChangeExecutor.shutdownNow();
@@ -491,7 +499,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       }
     }
 
-    if (!timeoutEvents.isEmpty()) {
+    if (!timeoutEvents.isEmpty() && eventHandler != null) {
       try {
         EventHandler.TimeoutAction action = eventHandler.launchTimeout(timeoutEvents);
         if (action.getTimeout() < 0) {
@@ -640,7 +648,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       );
 
       TwillContainerLauncher launcher = new TwillContainerLauncher(
-        twillSpec.getRunnables().get(runnableName), launchContext,
+        twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
         containerCount, jvmOpts, reservedMemory, getSecureStoreLocation());
 

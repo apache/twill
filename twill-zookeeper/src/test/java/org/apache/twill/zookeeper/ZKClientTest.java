@@ -30,6 +30,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.data.ACL;
+import org.apache.zookeeper.data.Stat;
 import org.apache.zookeeper.server.auth.DigestAuthenticationProvider;
 import org.junit.Assert;
 import org.junit.ClassRule;
@@ -188,12 +189,21 @@ public class ZKClientTest {
       client.startAndWait();
 
       try {
-        final BlockingQueue<Watcher.Event.EventType> events = new LinkedBlockingQueue<Watcher.Event.EventType>();
+        final BlockingQueue<Watcher.Event.EventType> events = new LinkedBlockingQueue<>();
         client.exists("/expireRewatch", new Watcher() {
           @Override
-          public void process(WatchedEvent event) {
-            client.exists("/expireRewatch", this);
-            events.add(event.getType());
+          public void process(final WatchedEvent event) {
+            Futures.addCallback(client.exists("/expireRewatch", this), new FutureCallback<Stat>() {
+              @Override
+              public void onSuccess(Stat result) {
+                events.add(event.getType());
+              }
+
+              @Override
+              public void onFailure(Throwable t) {
+                LOG.error("Failed to call exists on /expireRewatch", t);
+              }
+            });
           }
         });
 
@@ -309,7 +319,7 @@ public class ZKClientTest {
       Assert.assertEquals("digest", acl.getId().getScheme());
       Assert.assertEquals(digest, acl.getId().getId());
 
-      Assert.assertEquals("test", new String(noAuthClient.getData(path).get().getData()));
+      Assert.assertArrayEquals("test".getBytes(), noAuthClient.getData(path).get().getData());
 
       // When tries to write using the no-auth zk client, it should fail.
       try {

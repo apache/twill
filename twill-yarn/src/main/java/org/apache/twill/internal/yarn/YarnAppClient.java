@@ -23,6 +23,7 @@ import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
+import org.apache.twill.internal.appmaster.ApplicationMasterInfo;
 
 import java.util.List;
 import javax.annotation.Nullable;
@@ -36,8 +37,8 @@ public interface YarnAppClient extends Service {
    * Creates a {@link ProcessLauncher} for launching the application represented by the given spec. If scheduler queue
    * is available and is supported by the YARN cluster, it will be launched in the given queue.
    */
-  ProcessLauncher<ApplicationId> createLauncher(TwillSpecification twillSpec,
-                                                @Nullable String schedulerQueue) throws Exception;
+  ProcessLauncher<ApplicationMasterInfo> createLauncher(TwillSpecification twillSpec,
+                                                        @Nullable String schedulerQueue) throws Exception;
 
   /**
    * Creates a {@link ProcessLauncher} for launching application with the given user and spec. If scheduler queue
@@ -46,9 +47,9 @@ public interface YarnAppClient extends Service {
    * @deprecated This method will get removed.
    */
   @Deprecated
-  ProcessLauncher<ApplicationId> createLauncher(String user,
-                                                TwillSpecification twillSpec,
-                                                @Nullable String schedulerQueue) throws Exception;
+  ProcessLauncher<ApplicationMasterInfo> createLauncher(String user,
+                                                        TwillSpecification twillSpec,
+                                                        @Nullable String schedulerQueue) throws Exception;
 
   /**
    * Creates a {@link ProcessController} that can controls an application represented by the given application id.

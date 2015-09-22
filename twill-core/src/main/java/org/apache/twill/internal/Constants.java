@@ -37,13 +37,12 @@ public final class Constants {
    */
   public static final int CONSTRAINED_PROVISION_REQUEST_TIMEOUT = 5000;
 
+  public static final double HEAP_MIN_RATIO = 0.7d;
+
   /** Memory size of AM. */
   public static final int APP_MASTER_MEMORY_MB = 512;
 
   public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;
-
-  public static final String STDOUT = "stdout";
-  public static final String STDERR = "stderr";
 
   public static final String CLASSPATH = "classpath";
   public static final String APPLICATION_CLASSPATH = "application-classpath";

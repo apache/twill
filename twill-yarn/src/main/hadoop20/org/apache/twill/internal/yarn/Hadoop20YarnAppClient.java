@@ -38,8 +38,10 @@ import org.apache.hadoop.yarn.client.YarnClientImpl;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
+import org.apache.twill.internal.appmaster.ApplicationMasterInfo;
 import org.apache.twill.internal.appmaster.ApplicationMasterProcessLauncher;
 import org.apache.twill.internal.appmaster.ApplicationSubmitter;
 import org.slf4j.Logger;
@@ -70,8 +72,8 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
   }
 
   @Override
-  public ProcessLauncher<ApplicationId> createLauncher(TwillSpecification twillSpec,
-                                                       @Nullable String schedulerQueue) throws Exception {
+  public ProcessLauncher<ApplicationMasterInfo> createLauncher(TwillSpecification twillSpec,
+                                                               @Nullable String schedulerQueue) throws Exception {
     // Request for new application
     final GetNewApplicationResponse response = yarnClient.getNewApplication();
     final ApplicationId appId = response.getApplicationId();
@@ -86,10 +88,17 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
       appSubmissionContext.setQueue(schedulerQueue);
     }
 
+    // TODO: Make it adjustable through TwillSpec (TWILL-90)
+    // Set the resource requirement for AM
+    Resource amResource = Records.newRecord(Resource.class);
+    amResource.setMemory(Constants.APP_MASTER_MEMORY_MB);
+    final Resource capability = adjustMemory(response, amResource);
+    ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(), 1);
+
     ApplicationSubmitter submitter = new ApplicationSubmitter() {
 
       @Override
-      public ProcessController<YarnApplicationReport> submit(YarnLaunchContext launchContext, Resource capability) {
+      public ProcessController<YarnApplicationReport> submit(YarnLaunchContext launchContext) {
         ContainerLaunchContext context = launchContext.getLaunchContext();
         addRMToken(context);
         context.setUser(appSubmissionContext.getUser());
@@ -106,7 +115,7 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
       }
     };
 
-    return new ApplicationMasterProcessLauncher(appId, submitter);
+    return new ApplicationMasterProcessLauncher(appMasterInfo, submitter);
   }
 
   private Resource adjustMemory(GetNewApplicationResponse response, Resource capability) {
@@ -158,9 +167,9 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
   }
 
   @Override
-  public ProcessLauncher<ApplicationId> createLauncher(String user,
-                                                       TwillSpecification twillSpec,
-                                                       @Nullable String schedulerQueue) throws Exception {
+  public ProcessLauncher<ApplicationMasterInfo> createLauncher(String user,
+                                                               TwillSpecification twillSpec,
+                                                               @Nullable String schedulerQueue) throws Exception {
     this.user = user;
     return createLauncher(twillSpec, schedulerQueue);
   }
