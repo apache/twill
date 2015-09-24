@@ -35,7 +35,7 @@ public final class SettableOperationFuture<V> extends AbstractFuture<V> implemen
   private final Executor executor;
 
   public static <V> SettableOperationFuture<V> create(String path, Executor executor) {
-    return new SettableOperationFuture<V>(path, executor);
+    return new SettableOperationFuture<>(path, executor);
   }
 
   private SettableOperationFuture(String requestPath, Executor executor) {
