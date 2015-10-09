@@ -300,6 +300,7 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer setLogLevel(LogEntry.Level logLevel) {
+    Preconditions.checkNotNull(logLevel);
     this.logLevel = logLevel;
     return this;
   }
@@ -350,10 +351,8 @@ final class YarnTwillPreparer implements TwillPreparer {
             .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
             .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS));
 
-          if (logLevel != null) {
-            LOG.debug("Log level is set to {} for the Twill application.", logLevel);
-            builder.put(EnvKeys.TWILL_APP_LOG_LEVEL, logLevel.toString());
-          }
+          LOG.debug("Log level is set to {} for the Twill application.", logLevel);
+          builder.put(EnvKeys.TWILL_APP_LOG_LEVEL, logLevel.toString());
 
           int memory = Resources.computeMaxHeapSize(appMasterInfo.getMemoryMB(),
                                                     Constants.APP_MASTER_RESERVED_MEMORY_MB, Constants.HEAP_MIN_RATIO);
