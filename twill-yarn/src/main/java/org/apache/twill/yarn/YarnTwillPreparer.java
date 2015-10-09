@@ -52,6 +52,7 @@ import org.apache.twill.api.TwillPreparer;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
+import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.filesystem.LocationFactory;
 import org.apache.twill.internal.ApplicationBundler;
@@ -451,8 +452,8 @@ final class YarnTwillPreparer implements TwillPreparer {
         Location location;
 
         URI uri = localFile.getURI();
-        if ("hdfs".equals(uri.getScheme())) {
-          // Assuming the location factory is HDFS one. If it is not, it will failed, which is the correct behavior.
+        if (locationFactory.getHomeLocation().toURI().getScheme().equals(uri.getScheme())) {
+          // If the source file location is having the same scheme as the target location, no need to copy
           location = locationFactory.create(uri);
         } else {
           URL url = uri.toURL();

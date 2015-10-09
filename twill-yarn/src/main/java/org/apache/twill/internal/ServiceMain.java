@@ -136,20 +136,17 @@ public abstract class ServiceMain {
         return new LocalLocationFactory().create(appDir);
       }
 
-      if ("hdfs".equals(appDir.getScheme()) || "maprfs".equals(appDir.getScheme())) {
-        if (UserGroupInformation.isSecurityEnabled()) {
-          return new HDFSLocationFactory(FileSystem.get(appDir, conf)).create(appDir);
-        }
-
-        String fsUser = System.getenv(EnvKeys.TWILL_FS_USER);
-        if (fsUser == null) {
-          throw new IllegalStateException("Missing environment variable " + EnvKeys.TWILL_FS_USER);
-        }
-        return new HDFSLocationFactory(FileSystem.get(appDir, conf, fsUser)).create(appDir);
+      // If not file, assuming it is a FileSystem, hence construct with HDFSLocationFactory which wraps
+      // a FileSystem created from the Configuration
+      if (UserGroupInformation.isSecurityEnabled()) {
+        return new HDFSLocationFactory(FileSystem.get(appDir, conf)).create(appDir);
       }
 
-      LOG.warn("Unsupported location type {}.", appDir);
-      throw new IllegalArgumentException("Unsupported location type " + appDir);
+      String fsUser = System.getenv(EnvKeys.TWILL_FS_USER);
+      if (fsUser == null) {
+        throw new IllegalStateException("Missing environment variable " + EnvKeys.TWILL_FS_USER);
+      }
+      return new HDFSLocationFactory(FileSystem.get(appDir, conf, fsUser)).create(appDir);
 
     } catch (Exception e) {
       LOG.error("Failed to create application location for {}.", appDir);
