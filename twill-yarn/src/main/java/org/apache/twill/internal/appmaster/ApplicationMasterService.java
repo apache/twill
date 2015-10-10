@@ -25,7 +25,6 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.HashMultiset;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -88,7 +87,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -122,6 +123,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private final EventHandler eventHandler;
   private final Location applicationLocation;
   private final PlacementPolicyManager placementPolicyManager;
+  private final Map<String, Map<String, String>> environments;
 
   private volatile boolean stopped;
   private Queue<RunnableContainerRequest> runnableContainerRequests;
@@ -140,6 +142,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     this.jvmOpts = loadJvmOptions();
     this.reservedMemory = getReservedMemory();
     this.placementPolicyManager = new PlacementPolicyManager(twillSpec.getPlacementPolicies());
+    this.environments = getEnvironments();
 
     this.amLiveNode = new ApplicationMasterLiveNodeData(Integer.parseInt(System.getenv(EnvKeys.YARN_APP_ID)),
                                                         Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
@@ -634,18 +637,22 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
       int containerCount = expectedContainers.getExpected(runnableName);
 
-      ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(
-        ImmutableMap.<String, String>builder()
-          .put(EnvKeys.TWILL_APP_DIR, System.getenv(EnvKeys.TWILL_APP_DIR))
-          .put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER))
-          .put(EnvKeys.TWILL_APP_RUN_ID, runId.getId())
-          .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
-          .put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL))
-          .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
-          .put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect())
-          .build()
-        , getLocalizeFiles(), credentials
-      );
+      // Setup container environment variables
+      Map<String, String> env = new LinkedHashMap<>();
+      if (environments.containsKey(runnableName)) {
+        env.putAll(environments.get(runnableName));
+      }
+      // Override with system env
+      env.put(EnvKeys.TWILL_APP_DIR, System.getenv(EnvKeys.TWILL_APP_DIR));
+      env.put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER));
+      env.put(EnvKeys.TWILL_APP_RUN_ID, runId.getId());
+      env.put(EnvKeys.TWILL_APP_NAME, twillSpec.getName());
+      env.put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+      env.put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString());
+      env.put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect());
+
+      ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env, getLocalizeFiles(),
+                                                                                         credentials);
 
       TwillContainerLauncher launcher = new TwillContainerLauncher(
         twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
@@ -674,6 +681,19 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
         .create().fromJson(reader, new TypeToken<List<LocalFile>>() {
         }.getType());
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
+  private Map<String, Map<String, String>> getEnvironments() {
+    File envFile = new File(Constants.Files.ENVIRONMENTS);
+    if (!envFile.exists()) {
+      return new HashMap<>();
+    }
+
+    try (Reader reader = Files.newReader(envFile, Charsets.UTF_8)) {
+      return new Gson().fromJson(reader, new TypeToken<Map<String, Map<String, String>>>() { }.getType());
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

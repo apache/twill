@@ -36,6 +36,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.OutputSupplier;
 import com.google.common.reflect.TypeToken;
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -52,7 +53,6 @@ import org.apache.twill.api.TwillPreparer;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
-import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.filesystem.LocationFactory;
 import org.apache.twill.internal.ApplicationBundler;
@@ -97,6 +97,8 @@ import java.io.Writer;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -125,6 +127,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final List<URI> resources = Lists.newArrayList();
   private final List<String> classPaths = Lists.newArrayList();
   private final ListMultimap<String, String> runnableArgs = ArrayListMultimap.create();
+  private final Map<String, Map<String, String>> environments = new HashMap<>();
   private final List<String> applicationClassPaths = Lists.newArrayList();
   private final Credentials credentials;
   private final int reservedMemory;
@@ -214,6 +217,8 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer withArguments(String runnableName, Iterable<String> args) {
+    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
+                                "Runnable %s is not defined in the application.", runnableName);
     runnableArgs.putAll(runnableName, args);
     return this;
   }
@@ -248,6 +253,23 @@ final class YarnTwillPreparer implements TwillPreparer {
   @Override
   public TwillPreparer withClassPaths(Iterable<String> classPaths) {
     Iterables.addAll(this.classPaths, classPaths);
+    return this;
+  }
+
+  @Override
+  public TwillPreparer withEnv(Map<String, String> env) {
+    // Add the given environments to all runnables
+    for (String runnableName : twillSpec.getRunnables().keySet()) {
+      setEnv(runnableName, env, false);
+    }
+    return this;
+  }
+
+  @Override
+  public TwillPreparer withEnv(String runnableName, Map<String, String> env) {
+    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
+                                "Runnable %s is not defined in the application.", runnableName);
+    setEnv(runnableName, env, true);
     return this;
   }
 
@@ -306,6 +328,7 @@ final class YarnTwillPreparer implements TwillPreparer {
           saveLauncher(localFiles);
           saveJvmOptions(localFiles);
           saveArguments(new Arguments(arguments, runnableArgs), localFiles);
+          saveEnvironments(localFiles);
           saveLocalFiles(localFiles, ImmutableSet.of(Constants.Files.TWILL_SPEC,
                                                      Constants.Files.LOGBACK_TEMPLATE,
                                                      Constants.Files.CONTAINER_JAR,
@@ -357,6 +380,21 @@ final class YarnTwillPreparer implements TwillPreparer {
     } catch (Exception e) {
       LOG.error("Failed to submit application {}", twillSpec.getName(), e);
       throw Throwables.propagate(e);
+    }
+  }
+
+  private void setEnv(String runnableName, Map<String, String> env, boolean overwrite) {
+    Map<String, String> environment = environments.get(runnableName);
+    if (environment == null) {
+      environment = new LinkedHashMap<>(env);
+      environments.put(runnableName, environment);
+      return;
+    }
+
+    for (Map.Entry<String, String> entry : env.entrySet()) {
+      if (overwrite || !environment.containsKey(entry.getKey())) {
+        environment.put(entry.getKey(), entry.getValue());
+      }
     }
   }
 
@@ -594,6 +632,21 @@ final class YarnTwillPreparer implements TwillPreparer {
     LOG.debug("Done {}", Constants.Files.ARGUMENTS);
 
     localFiles.put(Constants.Files.ARGUMENTS, createLocalFile(Constants.Files.ARGUMENTS, location));
+  }
+
+  private void saveEnvironments(Map<String, LocalFile> localFiles) throws IOException {
+    if (environments.isEmpty()) {
+      return;
+    }
+
+    LOG.debug("Create and copy {}", Constants.Files.ENVIRONMENTS);
+    final Location location = createTempLocation(Constants.Files.ENVIRONMENTS);
+    try (Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8)) {
+      new Gson().toJson(environments, writer);
+    }
+    LOG.debug("Done {}", Constants.Files.ENVIRONMENTS);
+
+    localFiles.put(Constants.Files.ENVIRONMENTS, createLocalFile(Constants.Files.ENVIRONMENTS, location));
   }
 
   /**
