@@ -160,6 +160,10 @@ public class TwillTester extends ExternalResource {
     return yarnAppClient.getNodeReports();
   }
 
+  public String getZKConnectionString() {
+    return zkServer.getConnectionStr();
+  }
+
   private void stopQuietly(Service service) {
     try {
       service.stopAndWait();

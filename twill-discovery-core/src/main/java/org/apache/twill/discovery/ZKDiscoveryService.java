@@ -31,6 +31,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.zookeeper.NodeChildren;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.OperationFuture;
@@ -94,7 +95,6 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceClient {
   private static final Logger LOG = LoggerFactory.getLogger(ZKDiscoveryService.class);
-  private static final String NAMESPACE = "/discoverable";
 
   private static final long RETRY_MILLIS = 1000;
 
@@ -112,7 +112,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
    * @param zkClient The {@link ZKClient} for interacting with zookeeper.
    */
   public ZKDiscoveryService(ZKClient zkClient) {
-    this(zkClient, NAMESPACE);
+    this(zkClient, Constants.DISCOVERY_PATH_PREFIX);
   }
 
   /**

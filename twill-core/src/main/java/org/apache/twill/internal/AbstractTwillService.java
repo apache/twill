@@ -359,7 +359,7 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
   }
 
   private String getLiveNodePath() {
-    return "/instances/" + runId.getId();
+    return String.format("%s/%s", Constants.INSTANCES_PATH_PREFIX, runId.getId());
   }
 
   private <T> byte[] toJson(T obj) {

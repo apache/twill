@@ -63,7 +63,7 @@ public class ZKDiscoveryServiceTest extends DiscoveryServiceTestBase {
     zkServer.stopAndWait();
   }
 
-  @Test (timeout = 10000)
+  @Test (timeout = 30000)
   public void testDoubleRegister() throws Exception {
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
     DiscoveryService discoveryService = entry.getKey();

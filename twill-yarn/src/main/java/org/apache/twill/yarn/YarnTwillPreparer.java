@@ -116,7 +116,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final YarnConfiguration yarnConfig;
   private final TwillSpecification twillSpec;
   private final YarnAppClient yarnAppClient;
-  private final ZKClient zkClient;
+  private final String zkConnectString;
   private final LocationFactory locationFactory;
   private final YarnTwillControllerFactory controllerFactory;
   private final RunId runId;
@@ -139,13 +139,13 @@ final class YarnTwillPreparer implements TwillPreparer {
   private LogEntry.Level logLevel;
 
   YarnTwillPreparer(YarnConfiguration yarnConfig, TwillSpecification twillSpec,
-                    YarnAppClient yarnAppClient, ZKClient zkClient,
+                    YarnAppClient yarnAppClient, String zkConnectString,
                     LocationFactory locationFactory, String extraOptions, LogEntry.Level logLevel,
                     YarnTwillControllerFactory controllerFactory) {
     this.yarnConfig = yarnConfig;
     this.twillSpec = twillSpec;
     this.yarnAppClient = yarnAppClient;
-    this.zkClient = ZKClients.namespace(zkClient, "/" + twillSpec.getName());
+    this.zkConnectString = zkConnectString;
     this.locationFactory = locationFactory;
     this.controllerFactory = controllerFactory;
     this.runId = RunIds.generate();
@@ -345,7 +345,7 @@ final class YarnTwillPreparer implements TwillPreparer {
           ImmutableMap.Builder<String, String> builder = ImmutableMap.<String, String>builder()
             .put(EnvKeys.TWILL_FS_USER, fsUser)
             .put(EnvKeys.TWILL_APP_DIR, getAppLocation().toURI().toASCIIString())
-            .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
+            .put(EnvKeys.TWILL_ZK_CONNECT, zkConnectString)
             .put(EnvKeys.TWILL_RUN_ID, runId.getId())
             .put(EnvKeys.TWILL_RESERVED_MEMORY_MB, Integer.toString(reservedMemory))
             .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())

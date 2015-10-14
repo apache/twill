@@ -31,23 +31,22 @@ import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
+import org.apache.twill.zookeeper.ZKClientService;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 
 /**
@@ -58,8 +57,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
   private static final Logger LOG = LoggerFactory.getLogger(EchoServerTestRun.class);
 
   @Test
-  public void testEchoServer() throws InterruptedException, ExecutionException, IOException,
-    URISyntaxException, TimeoutException {
+  public void testEchoServer() throws Exception {
     TwillRunner runner = getTwillRunner();
 
     TwillController controller = runner.prepare(new EchoServer(),
@@ -156,6 +154,64 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
+  }
+
+  @Test
+  public void testZKCleanup() throws Exception {
+    ZKClientService zkClient = ZKClientService.Builder.of(getZKConnectionString() + "/twill").build();
+    zkClient.startAndWait();
+
+    try {
+      TwillRunner runner = getTwillRunner();
+
+      // Start an application and stop it.
+      TwillController controller = runner.prepare(new EchoServer())
+        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
+        .withApplicationArguments("echo")
+        .withArguments("EchoServer", "echo2")
+        .start();
+
+      Iterable<Discoverable> echoServices = controller.discoverService("echo");
+      Assert.assertTrue(waitForSize(echoServices, 1, 120));
+
+      controller.terminate().get();
+
+      // Verify the ZK node gets cleanup
+      Assert.assertNull(zkClient.exists("/EchoServer").get());
+
+      // Start two instances of the application and stop one of it
+      List<TwillController> controllers = new ArrayList<>();
+      for (int i = 0; i < 2; i++) {
+        controllers.add(runner.prepare(new EchoServer())
+                          .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
+                          .withApplicationArguments("echo")
+                          .withArguments("EchoServer", "echo2")
+                          .start());
+      }
+
+      // There should be two instances up and running.
+      echoServices = controller.discoverService("echo");
+      Assert.assertTrue(waitForSize(echoServices, 2, 120));
+
+      // Stop one instance of the app
+      controllers.get(0).terminate().get();
+
+      // Verify the ZK node should still be there
+      Assert.assertNotNull(zkClient.exists("/EchoServer").get());
+
+      // We should still be able to do discovery, which depends on the ZK node.
+      echoServices = controller.discoverService("echo");
+      Assert.assertTrue(waitForSize(echoServices, 1, 120));
+
+      // Stop second instance of the app
+      controllers.get(1).terminate().get();
+
+      // Verify the ZK node gets cleanup
+      Assert.assertNull(zkClient.exists("/EchoServer").get());
+
+    } finally {
+      zkClient.stopAndWait();
+    }
   }
 
   /**

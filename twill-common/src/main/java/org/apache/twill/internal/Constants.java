@@ -52,6 +52,13 @@ public final class Constants {
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
 
   /**
+   * Common ZK paths constants
+   */
+  public static final String DISCOVERY_PATH_PREFIX = "/discoverable";
+  public static final String INSTANCES_PATH_PREFIX = "/instances";
+
+
+  /**
    * Constants for names of internal files that are shared between client, AM and containers.
    */
   public static final class Files {

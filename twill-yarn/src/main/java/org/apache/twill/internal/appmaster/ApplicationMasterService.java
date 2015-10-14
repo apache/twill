@@ -236,7 +236,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     // Creates ZK path for runnable
     zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT).get();
-    runningContainers.addWatcher("/discoverable");
+    runningContainers.addWatcher(Constants.DISCOVERY_PATH_PREFIX);
     runnableContainerRequests = initContainerRequests();
   }
 
@@ -648,7 +648,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       env.put(EnvKeys.TWILL_APP_RUN_ID, runId.getId());
       env.put(EnvKeys.TWILL_APP_NAME, twillSpec.getName());
       env.put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
-      env.put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString());
+      env.put(EnvKeys.TWILL_ZK_CONNECT, System.getenv(EnvKeys.TWILL_ZK_CONNECT));
       env.put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect());
 
       ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env, getLocalizeFiles(),
@@ -703,7 +703,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     return String.format("/%s/runnables/%s", runId.getId(), runnableName);
   }
 
-  private String getKafkaZKConnect() {
+  String getKafkaZKConnect() {
     return String.format("%s/%s/kafka", zkClient.getConnectString(), runId.getId());
   }
 
