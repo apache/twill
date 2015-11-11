@@ -36,6 +36,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.jar.JarEntry;
@@ -142,18 +143,15 @@ public final class TwillLauncher {
 
   private static URLClassLoader createClassLoader(File dir, boolean useClassPath) {
     try {
-      List<URL> urls = new ArrayList<URL>();
+      List<URL> urls = new ArrayList<>();
       urls.add(dir.toURI().toURL());
       urls.add(new File(dir, "classes").toURI().toURL());
       urls.add(new File(dir, "resources").toURI().toURL());
 
       File libDir = new File(dir, "lib");
-      File[] files = libDir.listFiles();
-      if (files != null) {
-        for (File file : files) {
-          if (file.getName().endsWith(".jar")) {
-            urls.add(file.toURI().toURL());
-          }
+      for (File file : listFiles(libDir)) {
+        if (file.getName().endsWith(".jar")) {
+          urls.add(file.toURI().toURL());
         }
       }
 
@@ -163,7 +161,7 @@ public final class TwillLauncher {
 
       addClassPathsToList(urls, Constants.APPLICATION_CLASSPATH);
 
-      return new URLClassLoader(urls.toArray(new URL[0]));
+      return new URLClassLoader(urls.toArray(new URL[urls.size()]));
 
     } catch (Exception e) {
       throw new IllegalStateException(e);
@@ -190,12 +188,12 @@ public final class TwillLauncher {
     if (classpath.endsWith("/*")) {
       // Grab all .jar files
       File dir = new File(classpath.substring(0, classpath.length() - 2));
-      File[] files = dir.listFiles();
-      if (files == null || files.length == 0) {
+      List<File> files = listFiles(dir);
+      if (files.isEmpty()) {
         return singleItem(dir.toURI().toURL());
       }
 
-      List<URL> result = new ArrayList<URL>(files.length);
+      List<URL> result = new ArrayList<>(files.size());
       for (File file : files) {
         if (file.getName().endsWith(".jar")) {
           result.add(file.toURI().toURL());
@@ -208,7 +206,7 @@ public final class TwillLauncher {
   }
 
   private static Collection<URL> singleItem(URL url) {
-    List<URL> result = new ArrayList<URL>(1);
+    List<URL> result = new ArrayList<>(1);
     result.add(url);
     return result;
   }
@@ -232,5 +230,19 @@ public final class TwillLauncher {
       deleteDir(file);
     }
     dir.delete();
+  }
+
+  /**
+   * Returns a sorted list of {@link File} under the given directory. The list will be empty if
+   * the given directory is empty, not exist or not a directory.
+   */
+  private static List<File> listFiles(File dir) {
+    File[] files = dir.listFiles();
+    if (files == null || files.length == 0) {
+      return Collections.emptyList();
+    }
+    List<File> fileList = Arrays.asList(files);
+    Collections.sort(fileList);
+    return fileList;
   }
 }
