@@ -31,7 +31,7 @@ public final class LocalLocationFactory implements LocationFactory {
    * Constructs a LocalLocationFactory that Location created will be relative to system root.
    */
   public LocalLocationFactory() {
-    this(new File("/"));
+    this(new File(File.separator));
   }
 
   public LocalLocationFactory(File basePath) {
@@ -40,7 +40,7 @@ public final class LocalLocationFactory implements LocationFactory {
 
   @Override
   public Location create(String path) {
-    return new LocalLocation(this, new File(basePath, path));
+    return create(new File(basePath, path).toURI());
   }
 
   @Override

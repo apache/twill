@@ -30,14 +30,12 @@ import java.io.IOException;
 public class HDFSLocationTest extends LocationTestBase {
 
   private static MiniDFSCluster dfsCluster;
-  private static LocationFactory locationFactory;
 
   @BeforeClass
   public static void init() throws IOException {
     Configuration conf = new Configuration();
     conf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, tmpFolder.newFolder().getAbsolutePath());
     dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
-    locationFactory = new HDFSLocationFactory(dfsCluster.getFileSystem());
   }
 
   @AfterClass
@@ -46,7 +44,7 @@ public class HDFSLocationTest extends LocationTestBase {
   }
 
   @Override
-  protected LocationFactory getLocationFactory() {
-    return locationFactory;
+  protected LocationFactory createLocationFactory(String pathBase) throws Exception {
+    return new HDFSLocationFactory(dfsCluster.getFileSystem(), pathBase);
   }
 }

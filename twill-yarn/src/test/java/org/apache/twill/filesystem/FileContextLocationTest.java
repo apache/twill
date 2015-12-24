@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,17 +17,34 @@
  */
 package org.apache.twill.filesystem;
 
-import java.io.File;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+
+import java.io.IOException;
 
 /**
  *
  */
-public class LocalLocationTest extends LocationTestBase {
+public class FileContextLocationTest extends LocationTestBase {
+
+  private static MiniDFSCluster dfsCluster;
+
+  @BeforeClass
+  public static void init() throws IOException {
+    Configuration conf = new Configuration();
+    conf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, tmpFolder.newFolder().getAbsolutePath());
+    dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+  }
+
+  @AfterClass
+  public static void finish() {
+    dfsCluster.shutdown();
+  }
 
   @Override
   protected LocationFactory createLocationFactory(String pathBase) throws Exception {
-    File basePath = new File(tmpFolder.newFolder(), pathBase);
-    basePath.mkdirs();
-    return new LocalLocationFactory(basePath);
+    return new FileContextLocationFactory(dfsCluster.getFileSystem().getConf(), pathBase);
   }
 }

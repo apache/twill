@@ -17,6 +17,7 @@
  */
 package org.apache.twill.filesystem;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -24,10 +25,14 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Objects;
 
 /**
- * A {@link LocationFactory} that creates HDFS {@link Location}.
+ * A {@link LocationFactory} that creates HDFS {@link Location} using {@link FileSystem}.
+ *
+ * @deprecated Deprecated since 0.7.0. Use {@link FileContextLocationFactory} instead.
  */
+@Deprecated
 public final class HDFSLocationFactory implements LocationFactory {
 
   private final FileSystem fileSystem;
@@ -63,14 +68,21 @@ public final class HDFSLocationFactory implements LocationFactory {
 
   @Override
   public Location create(URI uri) {
-    if (!uri.toString().startsWith(fileSystem.getUri().toString())) {
+    URI fsURI = fileSystem.getUri();
+    if (Objects.equals(fsURI.getScheme(), uri.getScheme())
+      && Objects.equals(fsURI.getAuthority(), uri.getAuthority())) {
       // It's a full URI
       return new HDFSLocation(this, new Path(uri));
     }
+
     if (uri.isAbsolute()) {
+      // Needs to be of the same scheme
+      Preconditions.checkArgument(Objects.equals(fsURI.getScheme(), uri.getScheme()),
+                                  "Only URI with '%s' scheme is supported", fsURI.getScheme());
       return new HDFSLocation(this, new Path(fileSystem.getUri() + uri.getPath()));
     }
-    return new HDFSLocation(this, new Path(fileSystem.getUri() + "/" + pathBase + "/" + uri.getPath()));
+
+    return create(uri.getPath());
   }
 
   @Override
