@@ -121,7 +121,7 @@ final class HDFSLocation implements Location {
   }
 
   /**
-   * @return Returns the name of the file or directory denoteed by this abstract pathname.
+   * @return Returns the name of the file or directory denoted by this abstract pathname.
    */
   @Override
   public String getName() {
