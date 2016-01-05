@@ -72,7 +72,8 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
   private static final int SO_TIMEOUT = 5 * 1000;           // 5 seconds.
   private static final int MAX_WAIT = 1000;                 // 1 second.
   private static final long CONSUMER_EXPIRE_MINUTES = 1L;   // close consumer if not used for 1 minute.
-  private static final long CONSUMER_FAILURE_RETRY_INTERVAL = 2000L; // Sleep for 2 seconds if failure in consumer.
+  private static final long INIT_CONSUMER_FAILURE_BACKOFF = 100L; // Initial backoff for 100ms if failure in consumer.
+  private static final long MAX_CONSUMER_FAILURE_BACKOFF = 10000L; // Backoff max for 10 seconds if failure in consumer.
   private static final long EMPTY_FETCH_WAIT = 500L;        // Sleep for 500 ms if no message is fetched.
 
   private final BrokerService brokerService;
@@ -328,16 +329,12 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
       final AtomicLong offset = new AtomicLong(startOffset);
 
       Map.Entry<BrokerInfo, SimpleConsumer> consumerEntry = null;
-
+      ExponentialBackoff backoff = new ExponentialBackoff(INIT_CONSUMER_FAILURE_BACKOFF,
+                                                          MAX_CONSUMER_FAILURE_BACKOFF, TimeUnit.MILLISECONDS);
       while (running) {
         if (consumerEntry == null && (consumerEntry = getConsumerEntry()) == null) {
           LOG.debug("No leader for topic partition {}.", topicPart);
-          try {
-            TimeUnit.MILLISECONDS.sleep(CONSUMER_FAILURE_RETRY_INTERVAL);
-          } catch (InterruptedException e) {
-            // OK to ignore this, as interrupt would be caused by thread termination.
-            LOG.trace("Consumer sleep interrupted.", e);
-          }
+          backoff.backoff();
           continue;
         }
 
@@ -375,10 +372,12 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
 
           // Call the callback
           invokeCallback(messages, offset);
+          backoff.reset();
         } catch (Throwable t) {
           if (running || !(t instanceof ClosedByInterruptException)) {
             // Only log if it is still running, otherwise, it just the interrupt caused by the stop.
             LOG.info("Exception when fetching message on {}.", topicPart, t);
+            backoff.backoff();
           }
           consumers.refresh(consumerEntry.getKey());
           consumerEntry = null;
@@ -476,6 +475,39 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
           return endOfData();
         }
       };
+    }
+
+    /**
+     * Helper class for performance exponential backoff on message fetching failure.
+     */
+    private final class ExponentialBackoff {
+      private final long initialBackoff;
+      private final long maxBackoff;
+      private final TimeUnit backoffUnit;
+      private int failureCount = 0;
+
+      private ExponentialBackoff(long initialBackoff, long maxBackoff, TimeUnit backoffUnit) {
+        this.initialBackoff = initialBackoff;
+        this.maxBackoff = maxBackoff;
+        this.backoffUnit = backoffUnit;
+      }
+
+      void backoff() {
+        failureCount++;
+        long multiplier = failureCount > Long.SIZE ? Long.MAX_VALUE : (1L << (failureCount - 1));
+        long backoff = Math.min(initialBackoff * multiplier, maxBackoff);
+        backoff = backoff < 0 ? maxBackoff : backoff;
+        try {
+          backoffUnit.sleep(backoff);
+        } catch (InterruptedException e) {
+          // OK to ignore since this method is called from the consumer thread only, which on thread shutdown,
+          // the thread will be interrupted
+        }
+      }
+
+      void reset() {
+        failureCount = 0;
+      }
     }
   }
 }

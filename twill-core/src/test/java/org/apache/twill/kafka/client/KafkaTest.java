@@ -42,8 +42,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -81,6 +84,71 @@ public class KafkaTest {
     Services.chainStop(kafkaClient, zkClientService).get();
     kafkaServer.stopAndWait();
     zkServer.stopAndWait();
+  }
+
+  @Test
+  public void testKafkaClientReconnect() throws Exception {
+    String topic = "backoff";
+    Properties kafkServerConfig = generateKafkaConfig(zkServer.getConnectionStr() + "/backoff");
+    EmbeddedKafkaServer server = new EmbeddedKafkaServer(kafkServerConfig);
+
+    ZKClientService zkClient = ZKClientService.Builder.of(zkServer.getConnectionStr() + "/backoff").build();
+    zkClient.startAndWait();
+    try {
+      zkClient.create("/", null, CreateMode.PERSISTENT).get();
+
+      ZKKafkaClientService kafkaClient = new ZKKafkaClientService(zkClient);
+      kafkaClient.startAndWait();
+
+      try {
+        server.startAndWait();
+        try {
+          // Publish a messages
+          createPublishThread(kafkaClient, topic, Compression.NONE, "First message", 1).start();
+
+          // Creater a consumer
+          final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+          Cancellable cancel = kafkaClient.getConsumer().prepare().add(topic, 0, 0)
+            .consume(new KafkaConsumer.MessageCallback() {
+              @Override
+              public void onReceived(Iterator<FetchedMessage> messages) {
+                while (messages.hasNext()) {
+                  queue.offer(Charsets.UTF_8.decode(messages.next().getPayload()).toString());
+                }
+              }
+
+              @Override
+              public void finished() {
+              }
+            });
+
+          // Wait for the first message
+          Assert.assertEquals("0 First message", queue.poll(60, TimeUnit.SECONDS));
+
+          // Shutdown the server
+          server.stopAndWait();
+
+          // Start the server again.
+          // Needs to create a new instance with the same config since guava service cannot be restarted
+          server = new EmbeddedKafkaServer(kafkServerConfig);
+          server.startAndWait();
+
+          // Publish another message
+          createPublishThread(kafkaClient, topic, Compression.NONE, "Second message", 1).start();
+
+          // Should be able to get the second message
+          Assert.assertEquals("0 Second message", queue.poll(60, TimeUnit.SECONDS));
+
+          cancel.cancel();
+        } finally {
+          kafkaClient.stopAndWait();
+        }
+      } finally {
+        server.stopAndWait();
+      }
+    } finally {
+      zkClient.stopAndWait();
+    }
   }
 
   @Test
