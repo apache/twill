@@ -19,7 +19,6 @@ package org.apache.twill.yarn;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.TwillContext;
 import org.apache.twill.common.Cancellable;
@@ -34,6 +33,7 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -57,10 +57,13 @@ public abstract class SocketServer extends AbstractTwillRunnable {
                ", id: " + context.getInstanceId() +
                ", count: " + context.getInstanceCount());
 
-      final List<Cancellable> cancellables = ImmutableList.of(
-        context.announce(context.getApplicationArguments()[0], serverSocket.getLocalPort()),
-        context.announce(context.getArguments()[0], serverSocket.getLocalPort())
-      );
+      // Announce with service names as specified in app arguments and runnable arguments
+      final List<Cancellable> cancellables = new ArrayList<>();
+      for (String[] args : new String[][] {context.getApplicationArguments(), context.getArguments()}) {
+        if (args.length > 0) {
+          cancellables.add(context.announce(args[0], serverSocket.getLocalPort()));
+        }
+      }
       canceller = new Cancellable() {
         @Override
         public void cancel() {
