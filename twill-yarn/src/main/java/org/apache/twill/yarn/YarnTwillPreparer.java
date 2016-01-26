@@ -36,11 +36,11 @@ import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.OutputSupplier;
 import com.google.common.reflect.TypeToken;
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.ClassAcceptor;
 import org.apache.twill.api.EventHandlerSpecification;
@@ -68,6 +68,7 @@ import org.apache.twill.internal.LogOnlyEventHandler;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.RunIds;
+import org.apache.twill.internal.appmaster.ApplicationMasterInfo;
 import org.apache.twill.internal.appmaster.ApplicationMasterMain;
 import org.apache.twill.internal.container.TwillContainerMain;
 import org.apache.twill.internal.json.ArgumentsCodec;
@@ -76,6 +77,7 @@ import org.apache.twill.internal.json.LocalFileCodec;
 import org.apache.twill.internal.json.TwillSpecificationAdapter;
 import org.apache.twill.internal.utils.Dependencies;
 import org.apache.twill.internal.utils.Paths;
+import org.apache.twill.internal.utils.Resources;
 import org.apache.twill.internal.yarn.YarnAppClient;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
 import org.apache.twill.internal.yarn.YarnUtils;
@@ -95,6 +97,8 @@ import java.io.Writer;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -112,7 +116,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final YarnConfiguration yarnConfig;
   private final TwillSpecification twillSpec;
   private final YarnAppClient yarnAppClient;
-  private final ZKClient zkClient;
+  private final String zkConnectString;
   private final LocationFactory locationFactory;
   private final YarnTwillControllerFactory controllerFactory;
   private final RunId runId;
@@ -123,6 +127,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final List<URI> resources = Lists.newArrayList();
   private final List<String> classPaths = Lists.newArrayList();
   private final ListMultimap<String, String> runnableArgs = ArrayListMultimap.create();
+  private final Map<String, Map<String, String>> environments = new HashMap<>();
   private final List<String> applicationClassPaths = Lists.newArrayList();
   private final Credentials credentials;
   private final int reservedMemory;
@@ -134,13 +139,13 @@ final class YarnTwillPreparer implements TwillPreparer {
   private LogEntry.Level logLevel;
 
   YarnTwillPreparer(YarnConfiguration yarnConfig, TwillSpecification twillSpec,
-                    YarnAppClient yarnAppClient, ZKClient zkClient,
+                    YarnAppClient yarnAppClient, String zkConnectString,
                     LocationFactory locationFactory, String extraOptions, LogEntry.Level logLevel,
                     YarnTwillControllerFactory controllerFactory) {
     this.yarnConfig = yarnConfig;
     this.twillSpec = twillSpec;
     this.yarnAppClient = yarnAppClient;
-    this.zkClient = ZKClients.namespace(zkClient, "/" + twillSpec.getName());
+    this.zkConnectString = zkConnectString;
     this.locationFactory = locationFactory;
     this.controllerFactory = controllerFactory;
     this.runId = RunIds.generate();
@@ -212,6 +217,8 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer withArguments(String runnableName, Iterable<String> args) {
+    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
+                                "Runnable %s is not defined in the application.", runnableName);
     runnableArgs.putAll(runnableName, args);
     return this;
   }
@@ -250,6 +257,23 @@ final class YarnTwillPreparer implements TwillPreparer {
   }
 
   @Override
+  public TwillPreparer withEnv(Map<String, String> env) {
+    // Add the given environments to all runnables
+    for (String runnableName : twillSpec.getRunnables().keySet()) {
+      setEnv(runnableName, env, false);
+    }
+    return this;
+  }
+
+  @Override
+  public TwillPreparer withEnv(String runnableName, Map<String, String> env) {
+    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
+                                "Runnable %s is not defined in the application.", runnableName);
+    setEnv(runnableName, env, true);
+    return this;
+  }
+
+  @Override
   public TwillPreparer withApplicationClassPaths(String... classPaths) {
     return withApplicationClassPaths(ImmutableList.copyOf(classPaths));
   }
@@ -276,6 +300,7 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer setLogLevel(LogEntry.Level logLevel) {
+    Preconditions.checkNotNull(logLevel);
     this.logLevel = logLevel;
     return this;
   }
@@ -283,8 +308,8 @@ final class YarnTwillPreparer implements TwillPreparer {
   @Override
   public TwillController start() {
     try {
-      final ProcessLauncher<ApplicationId> launcher = yarnAppClient.createLauncher(twillSpec, schedulerQueue);
-      final ApplicationId appId = launcher.getContainerInfo();
+      final ProcessLauncher<ApplicationMasterInfo> launcher = yarnAppClient.createLauncher(twillSpec, schedulerQueue);
+      final ApplicationMasterInfo appMasterInfo = launcher.getContainerInfo();
       Callable<ProcessController<YarnApplicationReport>> submitTask =
         new Callable<ProcessController<YarnApplicationReport>>() {
         @Override
@@ -304,13 +329,14 @@ final class YarnTwillPreparer implements TwillPreparer {
           saveLauncher(localFiles);
           saveJvmOptions(localFiles);
           saveArguments(new Arguments(arguments, runnableArgs), localFiles);
+          saveEnvironments(localFiles);
           saveLocalFiles(localFiles, ImmutableSet.of(Constants.Files.TWILL_SPEC,
                                                      Constants.Files.LOGBACK_TEMPLATE,
                                                      Constants.Files.CONTAINER_JAR,
                                                      Constants.Files.LAUNCHER_JAR,
                                                      Constants.Files.ARGUMENTS));
 
-          LOG.debug("Submit AM container spec: {}", appId);
+          LOG.debug("Submit AM container spec: {}", appMasterInfo);
           // java -Djava.io.tmpdir=tmp -cp launcher.jar:$HADOOP_CONF_DIR -XmxMemory
           //     org.apache.twill.internal.TwillLauncher
           //     appMaster.jar
@@ -319,16 +345,17 @@ final class YarnTwillPreparer implements TwillPreparer {
           ImmutableMap.Builder<String, String> builder = ImmutableMap.<String, String>builder()
             .put(EnvKeys.TWILL_FS_USER, fsUser)
             .put(EnvKeys.TWILL_APP_DIR, getAppLocation().toURI().toASCIIString())
-            .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
+            .put(EnvKeys.TWILL_ZK_CONNECT, zkConnectString)
             .put(EnvKeys.TWILL_RUN_ID, runId.getId())
             .put(EnvKeys.TWILL_RESERVED_MEMORY_MB, Integer.toString(reservedMemory))
             .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
             .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS));
 
-          if (logLevel != null) {
-            LOG.debug("Log level is set to {} for the Twill application.", logLevel);
-            builder.put(EnvKeys.TWILL_APP_LOG_LEVEL, logLevel.toString());
-          }
+          LOG.debug("Log level is set to {} for the Twill application.", logLevel);
+          builder.put(EnvKeys.TWILL_APP_LOG_LEVEL, logLevel.toString());
+
+          int memory = Resources.computeMaxHeapSize(appMasterInfo.getMemoryMB(),
+                                                    Constants.APP_MASTER_RESERVED_MEMORY_MB, Constants.HEAP_MIN_RATIO);
           return launcher.prepareLaunch(builder.build(), localFiles.values(), credentials)
             .addCommand(
               "$JAVA_HOME/bin/java",
@@ -336,7 +363,7 @@ final class YarnTwillPreparer implements TwillPreparer {
               "-Dyarn.appId=$" + EnvKeys.YARN_APP_ID_STR,
               "-Dtwill.app=$" + EnvKeys.TWILL_APP_NAME,
               "-cp", Constants.Files.LAUNCHER_JAR + ":$HADOOP_CONF_DIR",
-              "-Xmx" + (Constants.APP_MASTER_MEMORY_MB - Constants.APP_MASTER_RESERVED_MEMORY_MB) + "m",
+              "-Xmx" + memory + "m",
               extraOptions == null ? "" : extraOptions,
               TwillLauncher.class.getName(),
               Constants.Files.APP_MASTER_JAR,
@@ -352,6 +379,21 @@ final class YarnTwillPreparer implements TwillPreparer {
     } catch (Exception e) {
       LOG.error("Failed to submit application {}", twillSpec.getName(), e);
       throw Throwables.propagate(e);
+    }
+  }
+
+  private void setEnv(String runnableName, Map<String, String> env, boolean overwrite) {
+    Map<String, String> environment = environments.get(runnableName);
+    if (environment == null) {
+      environment = new LinkedHashMap<>(env);
+      environments.put(runnableName, environment);
+      return;
+    }
+
+    for (Map.Entry<String, String> entry : env.entrySet()) {
+      if (overwrite || !environment.containsKey(entry.getKey())) {
+        environment.put(entry.getKey(), entry.getValue());
+      }
     }
   }
 
@@ -447,8 +489,8 @@ final class YarnTwillPreparer implements TwillPreparer {
         Location location;
 
         URI uri = localFile.getURI();
-        if ("hdfs".equals(uri.getScheme())) {
-          // Assuming the location factory is HDFS one. If it is not, it will failed, which is the correct behavior.
+        if (locationFactory.getHomeLocation().toURI().getScheme().equals(uri.getScheme())) {
+          // If the source file location is having the same scheme as the target location, no need to copy
           location = locationFactory.create(uri);
         } else {
           URL url = uri.toURL();
@@ -589,6 +631,21 @@ final class YarnTwillPreparer implements TwillPreparer {
     LOG.debug("Done {}", Constants.Files.ARGUMENTS);
 
     localFiles.put(Constants.Files.ARGUMENTS, createLocalFile(Constants.Files.ARGUMENTS, location));
+  }
+
+  private void saveEnvironments(Map<String, LocalFile> localFiles) throws IOException {
+    if (environments.isEmpty()) {
+      return;
+    }
+
+    LOG.debug("Create and copy {}", Constants.Files.ENVIRONMENTS);
+    final Location location = createTempLocation(Constants.Files.ENVIRONMENTS);
+    try (Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8)) {
+      new Gson().toJson(environments, writer);
+    }
+    LOG.debug("Done {}", Constants.Files.ENVIRONMENTS);
+
+    localFiles.put(Constants.Files.ENVIRONMENTS, createLocalFile(Constants.Files.ENVIRONMENTS, location));
   }
 
   /**

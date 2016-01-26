@@ -26,7 +26,7 @@ import java.util.Map;
  *
  * @param <T> Type of the object that contains information about the container that the process is going to launch.
  */
-public interface ProcessLauncher<T> {
+public interface ProcessLauncher<T extends ResourceCapability> {
 
   /**
    * Returns information about the container that this launch would launch process in.

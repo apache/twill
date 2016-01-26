@@ -19,38 +19,30 @@ package org.apache.twill.internal.appmaster;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.util.Records;
-import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.yarn.AbstractYarnProcessLauncher;
 import org.apache.twill.internal.yarn.YarnLaunchContext;
-import org.apache.twill.internal.yarn.YarnUtils;
 
 import java.util.Map;
 
 /**
  * A {@link org.apache.twill.internal.ProcessLauncher} for launching Application Master from the client.
  */
-public final class ApplicationMasterProcessLauncher extends AbstractYarnProcessLauncher<ApplicationId> {
+public final class ApplicationMasterProcessLauncher extends AbstractYarnProcessLauncher<ApplicationMasterInfo> {
 
   private final ApplicationSubmitter submitter;
 
-  public ApplicationMasterProcessLauncher(ApplicationId appId, ApplicationSubmitter submitter) {
-    super(appId);
+  public ApplicationMasterProcessLauncher(ApplicationMasterInfo info, ApplicationSubmitter submitter) {
+    super(info);
     this.submitter = submitter;
   }
 
   @Override
   @SuppressWarnings("unchecked")
   protected <R> ProcessController<R> doLaunch(YarnLaunchContext launchContext) {
-    final ApplicationId appId = getContainerInfo();
-
-    // Set the resource requirement for AM
-    Resource capability = Records.newRecord(Resource.class);
-    capability.setMemory(Constants.APP_MASTER_MEMORY_MB);
-    YarnUtils.setVirtualCores(capability, 1);
+    ApplicationMasterInfo appMasterInfo = getContainerInfo();
+    ApplicationId appId = appMasterInfo.getAppId();
 
     // Put in extra environments
     Map<String, String> env = ImmutableMap.<String, String>builder()
@@ -58,11 +50,11 @@ public final class ApplicationMasterProcessLauncher extends AbstractYarnProcessL
       .put(EnvKeys.YARN_APP_ID, Integer.toString(appId.getId()))
       .put(EnvKeys.YARN_APP_ID_CLUSTER_TIME, Long.toString(appId.getClusterTimestamp()))
       .put(EnvKeys.YARN_APP_ID_STR, appId.toString())
-      .put(EnvKeys.YARN_CONTAINER_MEMORY_MB, Integer.toString(Constants.APP_MASTER_MEMORY_MB))
-      .put(EnvKeys.YARN_CONTAINER_VIRTUAL_CORES, Integer.toString(YarnUtils.getVirtualCores(capability)))
+      .put(EnvKeys.YARN_CONTAINER_MEMORY_MB, Integer.toString(appMasterInfo.getMemoryMB()))
+      .put(EnvKeys.YARN_CONTAINER_VIRTUAL_CORES, Integer.toString(appMasterInfo.getVirtualCores()))
       .build();
 
     launchContext.setEnvironment(env);
-    return (ProcessController<R>) submitter.submit(launchContext, capability);
+    return (ProcessController<R>) submitter.submit(launchContext);
   }
 }

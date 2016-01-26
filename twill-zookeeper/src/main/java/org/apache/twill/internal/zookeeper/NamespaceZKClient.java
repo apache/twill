@@ -70,47 +70,58 @@ public final class NamespaceZKClient extends ForwardingZKClient {
   @Override
   public OperationFuture<String> create(String path, @Nullable byte[] data,
                                         CreateMode createMode, boolean createParent, Iterable<ACL> acl) {
-    return relayPath(delegate.create(namespace + path, data, createMode, createParent, acl),
+    return relayPath(delegate.create(getNamespacedPath(path), data, createMode, createParent, acl),
                      this.<String>createFuture(path));
   }
 
   @Override
   public OperationFuture<Stat> exists(String path, @Nullable Watcher watcher) {
-    return relayFuture(delegate.exists(namespace + path, watcher), this.<Stat>createFuture(path));
+    return relayFuture(delegate.exists(getNamespacedPath(path), watcher), this.<Stat>createFuture(path));
   }
 
   @Override
   public OperationFuture<NodeChildren> getChildren(String path, @Nullable Watcher watcher) {
-    return relayFuture(delegate.getChildren(namespace + path, watcher), this.<NodeChildren>createFuture(path));
+    return relayFuture(delegate.getChildren(getNamespacedPath(path), watcher), this.<NodeChildren>createFuture(path));
   }
 
   @Override
   public OperationFuture<NodeData> getData(String path, @Nullable Watcher watcher) {
-    return relayFuture(delegate.getData(namespace + path, watcher), this.<NodeData>createFuture(path));
+    return relayFuture(delegate.getData(getNamespacedPath(path), watcher), this.<NodeData>createFuture(path));
   }
 
   @Override
   public OperationFuture<Stat> setData(String dataPath, byte[] data, int version) {
-    return relayFuture(delegate.setData(namespace + dataPath, data, version), this.<Stat>createFuture(dataPath));
+    return relayFuture(delegate.setData(getNamespacedPath(dataPath), data, version), this.<Stat>createFuture(dataPath));
   }
 
   @Override
   public OperationFuture<String> delete(String deletePath, int version) {
-    return relayPath(delegate.delete(namespace + deletePath, version), this.<String>createFuture(deletePath));
+    return relayPath(delegate.delete(getNamespacedPath(deletePath), version), this.<String>createFuture(deletePath));
   }
 
   @Override
   public OperationFuture<ACLData> getACL(String path) {
-    return relayFuture(delegate.getACL(namespace + path), this.<ACLData>createFuture(path));
+    return relayFuture(delegate.getACL(getNamespacedPath(path)), this.<ACLData>createFuture(path));
   }
 
   @Override
   public OperationFuture<Stat> setACL(String path, Iterable<ACL> acl, int version) {
-    return relayFuture(delegate.setACL(namespace + path, acl, version), this.<Stat>createFuture(path));
+    return relayFuture(delegate.setACL(getNamespacedPath(path), acl, version), this.<Stat>createFuture(path));
+  }
+
+  /**
+   * Returns the namespaced path for the given path. The returned path should be used when performing
+   * ZK operations with the delegating ZKClient.
+   */
+  private String getNamespacedPath(String path) {
+    if ("/".equals(path)) {
+      return namespace;
+    }
+    return namespace + path;
   }
 
   private <V> SettableOperationFuture<V> createFuture(String path) {
-    return SettableOperationFuture.create(namespace + path, Threads.SAME_THREAD_EXECUTOR);
+    return SettableOperationFuture.create(path, Threads.SAME_THREAD_EXECUTOR);
   }
 
   private <V> OperationFuture<V> relayFuture(final OperationFuture<V> from, final SettableOperationFuture<V> to) {
@@ -134,8 +145,8 @@ public final class NamespaceZKClient extends ForwardingZKClient {
       @Override
       public void run() {
         try {
-          String path = from.get();
-          to.set(path.substring(namespace.length()));
+          String relativePath = from.get().substring(namespace.length());
+          to.set(relativePath.isEmpty() ? "/" : relativePath);
         } catch (Exception e) {
           to.setException(e.getCause());
         }

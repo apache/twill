@@ -21,7 +21,6 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-
 import org.apache.twill.api.Command;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.ServiceController;
@@ -239,7 +238,7 @@ public abstract class AbstractZKServiceController extends AbstractExecutionServi
    * Returns the zookeeper node path for the ephemeral instance node for this runId.
    */
   protected final String getInstancePath() {
-    return String.format("/instances/%s", getRunId().getId());
+    return String.format("%s/%s", Constants.INSTANCES_PATH_PREFIX, getRunId().getId());
   }
 
   private String getZKPath(String path) {

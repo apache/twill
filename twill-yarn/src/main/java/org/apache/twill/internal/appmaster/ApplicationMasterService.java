@@ -25,7 +25,6 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.HashMultiset;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -88,7 +87,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -122,6 +123,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private final EventHandler eventHandler;
   private final Location applicationLocation;
   private final PlacementPolicyManager placementPolicyManager;
+  private final Map<String, Map<String, String>> environments;
 
   private volatile boolean stopped;
   private Queue<RunnableContainerRequest> runnableContainerRequests;
@@ -140,6 +142,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     this.jvmOpts = loadJvmOptions();
     this.reservedMemory = getReservedMemory();
     this.placementPolicyManager = new PlacementPolicyManager(twillSpec.getPlacementPolicies());
+    this.environments = getEnvironments();
 
     this.amLiveNode = new ApplicationMasterLiveNodeData(Integer.parseInt(System.getenv(EnvKeys.YARN_APP_ID)),
                                                         Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
@@ -176,10 +179,14 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   @SuppressWarnings("unchecked")
+  @Nullable
   private EventHandler createEventHandler(TwillSpecification twillSpec) {
     try {
       // Should be able to load by this class ClassLoader, as they packaged in the same jar.
       EventHandlerSpecification handlerSpec = twillSpec.getEventHandler();
+      if (handlerSpec == null) {
+        return null;
+      }
 
       Class<?> handlerClass = getClass().getClassLoader().loadClass(handlerSpec.getClassName());
       Preconditions.checkArgument(EventHandler.class.isAssignableFrom(handlerClass),
@@ -221,13 +228,15 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     LOG.info("Start application master with spec: " + TwillSpecificationAdapter.create().toJson(twillSpec));
 
     // initialize the event handler, if it fails, it will fail the application.
-    eventHandler.initialize(new BasicEventHandlerContext(twillSpec.getEventHandler()));
+    if (eventHandler != null) {
+      eventHandler.initialize(new BasicEventHandlerContext(twillSpec.getEventHandler()));
+    }
 
     instanceChangeExecutor = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("instanceChanger"));
 
     // Creates ZK path for runnable
     zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT).get();
-    runningContainers.addWatcher("/discoverable");
+    runningContainers.addWatcher(Constants.DISCOVERY_PATH_PREFIX);
     runnableContainerRequests = initContainerRequests();
   }
 
@@ -237,11 +246,13 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     LOG.info("Stop application master with spec: {}", TwillSpecificationAdapter.create().toJson(twillSpec));
 
-    try {
-      // call event handler destroy. If there is error, only log and not affected stop sequence.
-      eventHandler.destroy();
-    } catch (Throwable t) {
-      LOG.warn("Exception when calling {}.destroy()", twillSpec.getEventHandler().getClassName(), t);
+    if (eventHandler != null) {
+      try {
+        // call event handler destroy. If there is error, only log and not affected stop sequence.
+        eventHandler.destroy();
+      } catch (Throwable t) {
+        LOG.warn("Exception when calling {}.destroy()", eventHandler.getClass().getName(), t);
+      }
     }
 
     instanceChangeExecutor.shutdownNow();
@@ -491,7 +502,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       }
     }
 
-    if (!timeoutEvents.isEmpty()) {
+    if (!timeoutEvents.isEmpty() && eventHandler != null) {
       try {
         EventHandler.TimeoutAction action = eventHandler.launchTimeout(timeoutEvents);
         if (action.getTimeout() < 0) {
@@ -626,21 +637,25 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
       int containerCount = expectedContainers.getExpected(runnableName);
 
-      ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(
-        ImmutableMap.<String, String>builder()
-          .put(EnvKeys.TWILL_APP_DIR, System.getenv(EnvKeys.TWILL_APP_DIR))
-          .put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER))
-          .put(EnvKeys.TWILL_APP_RUN_ID, runId.getId())
-          .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
-          .put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL))
-          .put(EnvKeys.TWILL_ZK_CONNECT, zkClient.getConnectString())
-          .put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect())
-          .build()
-        , getLocalizeFiles(), credentials
-      );
+      // Setup container environment variables
+      Map<String, String> env = new LinkedHashMap<>();
+      if (environments.containsKey(runnableName)) {
+        env.putAll(environments.get(runnableName));
+      }
+      // Override with system env
+      env.put(EnvKeys.TWILL_APP_DIR, System.getenv(EnvKeys.TWILL_APP_DIR));
+      env.put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER));
+      env.put(EnvKeys.TWILL_APP_RUN_ID, runId.getId());
+      env.put(EnvKeys.TWILL_APP_NAME, twillSpec.getName());
+      env.put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+      env.put(EnvKeys.TWILL_ZK_CONNECT, System.getenv(EnvKeys.TWILL_ZK_CONNECT));
+      env.put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect());
+
+      ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env, getLocalizeFiles(),
+                                                                                         credentials);
 
       TwillContainerLauncher launcher = new TwillContainerLauncher(
-        twillSpec.getRunnables().get(runnableName), launchContext,
+        twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
         containerCount, jvmOpts, reservedMemory, getSecureStoreLocation());
 
@@ -671,11 +686,24 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     }
   }
 
+  private Map<String, Map<String, String>> getEnvironments() {
+    File envFile = new File(Constants.Files.ENVIRONMENTS);
+    if (!envFile.exists()) {
+      return new HashMap<>();
+    }
+
+    try (Reader reader = Files.newReader(envFile, Charsets.UTF_8)) {
+      return new Gson().fromJson(reader, new TypeToken<Map<String, Map<String, String>>>() { }.getType());
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
+  }
+
   private String getZKNamespace(String runnableName) {
     return String.format("/%s/runnables/%s", runId.getId(), runnableName);
   }
 
-  private String getKafkaZKConnect() {
+  String getKafkaZKConnect() {
     return String.format("%s/%s/kafka", zkClient.getConnectString(), runId.getId());
   }
 

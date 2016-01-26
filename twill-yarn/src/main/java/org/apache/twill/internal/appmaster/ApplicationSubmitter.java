@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal.appmaster;
 
-import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
 import org.apache.twill.internal.yarn.YarnLaunchContext;
@@ -27,5 +26,5 @@ import org.apache.twill.internal.yarn.YarnLaunchContext;
  */
 public interface ApplicationSubmitter {
 
-  ProcessController<YarnApplicationReport> submit(YarnLaunchContext launchContext, Resource capability);
+  ProcessController<YarnApplicationReport> submit(YarnLaunchContext launchContext);
 }

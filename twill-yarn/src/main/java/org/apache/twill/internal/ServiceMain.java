@@ -136,20 +136,17 @@ public abstract class ServiceMain {
         return new LocalLocationFactory().create(appDir);
       }
 
-      if ("hdfs".equals(appDir.getScheme()) || "maprfs".equals(appDir.getScheme())) {
-        if (UserGroupInformation.isSecurityEnabled()) {
-          return new HDFSLocationFactory(FileSystem.get(appDir, conf)).create(appDir);
-        }
-
-        String fsUser = System.getenv(EnvKeys.TWILL_FS_USER);
-        if (fsUser == null) {
-          throw new IllegalStateException("Missing environment variable " + EnvKeys.TWILL_FS_USER);
-        }
-        return new HDFSLocationFactory(FileSystem.get(appDir, conf, fsUser)).create(appDir);
+      // If not file, assuming it is a FileSystem, hence construct with HDFSLocationFactory which wraps
+      // a FileSystem created from the Configuration
+      if (UserGroupInformation.isSecurityEnabled()) {
+        return new HDFSLocationFactory(FileSystem.get(appDir, conf)).create(appDir);
       }
 
-      LOG.warn("Unsupported location type {}.", appDir);
-      throw new IllegalArgumentException("Unsupported location type " + appDir);
+      String fsUser = System.getenv(EnvKeys.TWILL_FS_USER);
+      if (fsUser == null) {
+        throw new IllegalStateException("Missing environment variable " + EnvKeys.TWILL_FS_USER);
+      }
+      return new HDFSLocationFactory(FileSystem.get(appDir, conf, fsUser)).create(appDir);
 
     } catch (Exception e) {
       LOG.error("Failed to create application location for {}.", appDir);
@@ -160,12 +157,16 @@ public abstract class ServiceMain {
   /**
    * Creates a {@link ZKClientService}.
    */
-  protected static ZKClientService createZKClient(String zkConnectStr) {
+  protected static ZKClientService createZKClient(String zkConnectStr, String appName) {
     return ZKClientServices.delegate(
-      ZKClients.reWatchOnExpire(
-        ZKClients.retryOnFailure(
-          ZKClientService.Builder.of(zkConnectStr).build(),
-          RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
+      ZKClients.namespace(
+        ZKClients.reWatchOnExpire(
+          ZKClients.retryOnFailure(
+            ZKClientService.Builder.of(zkConnectStr).build(),
+            RetryStrategies.fixDelay(1, TimeUnit.SECONDS)
+          )
+        ), "/" + appName
+      ));
   }
 
   private void configureLogger() {
@@ -259,10 +260,11 @@ public abstract class ServiceMain {
   /**
    * A simple service for creating/remove ZK paths needed for {@link AbstractTwillService}.
    */
-  protected static final class TwillZKPathService extends AbstractIdleService {
+  protected static class TwillZKPathService extends AbstractIdleService {
+
+    protected static final long TIMEOUT_SECONDS = 5L;
 
     private static final Logger LOG = LoggerFactory.getLogger(TwillZKPathService.class);
-    private static final long TIMEOUT_SECONDS = 5L;
 
     private final ZKClient zkClient;
     private final String path;

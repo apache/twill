@@ -17,13 +17,23 @@
  */
 package org.apache.twill.filesystem;
 
+import com.google.common.base.Charsets;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.io.CharStreams;
 import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 
 /**
@@ -34,10 +44,60 @@ public abstract class LocationTestBase {
   @ClassRule
   public static TemporaryFolder tmpFolder = new TemporaryFolder();
 
+  private final LoadingCache<String, LocationFactory> locationFactoryCache = CacheBuilder.newBuilder()
+    .build(new CacheLoader<String, LocationFactory>() {
+      @Override
+      public LocationFactory load(String key) throws Exception {
+        return createLocationFactory(key);
+      }
+    });
+
+  @Test
+  public void testBasic() throws Exception {
+    LocationFactory factory = locationFactoryCache.getUnchecked("basic");
+    URI baseURI = factory.create("/").toURI();
+
+    // Test basic location construction
+    Assert.assertEquals(factory.create("/file"), factory.create("/file"));
+    Assert.assertEquals(factory.create("/file2"),
+                        factory.create(URI.create(baseURI.getScheme() + ":" + baseURI.getPath() + "/file2")));
+    Assert.assertEquals(factory.create("/file3"),
+                        factory.create(
+                          new URI(baseURI.getScheme(), baseURI.getAuthority(),
+                                  baseURI.getPath() + "/file3", null, null)));
+    Assert.assertEquals(factory.create("/"), factory.create("/"));
+    Assert.assertEquals(factory.create("/"), factory.create(URI.create(baseURI.getScheme() + ":" + baseURI.getPath())));
+
+    Assert.assertEquals(factory.create("/"),
+                        factory.create(new URI(baseURI.getScheme(), baseURI.getAuthority(),
+                                               baseURI.getPath(), null, null)));
+
+    // Test file creation and rename
+    Location location = factory.create("/file");
+    Assert.assertTrue(location.createNew());
+    Assert.assertTrue(location.exists());
+
+    Location location2 = factory.create("/file2");
+    String message = "Testing Message";
+    try (Writer writer = new OutputStreamWriter(location2.getOutputStream(), Charsets.UTF_8)) {
+      writer.write(message);
+    }
+    long length = location2.length();
+    long lastModified = location2.lastModified();
+
+    location2.renameTo(location);
+
+    Assert.assertFalse(location2.exists());
+    try (Reader reader = new InputStreamReader(location.getInputStream(), Charsets.UTF_8)) {
+      Assert.assertEquals(message, CharStreams.toString(reader));
+    }
+    Assert.assertEquals(length, location.length());
+    Assert.assertEquals(lastModified, location.lastModified());
+  }
 
   @Test
   public void testDelete() throws IOException {
-    LocationFactory factory = getLocationFactory();
+    LocationFactory factory = locationFactoryCache.getUnchecked("delete");
 
     Location base = factory.create("test").getTempFile(".tmp");
     Assert.assertTrue(base.mkdirs());
@@ -57,7 +117,7 @@ public abstract class LocationTestBase {
 
   @Test
   public void testHelper() {
-    LocationFactory factory = LocationFactories.namespace(getLocationFactory(), "testhelper");
+    LocationFactory factory = LocationFactories.namespace(locationFactoryCache.getUnchecked("helper"), "testhelper");
 
     Location location = factory.create("test");
     Assert.assertTrue(location.toURI().getPath().endsWith("testhelper/test"));
@@ -68,7 +128,7 @@ public abstract class LocationTestBase {
 
   @Test
   public void testList() throws IOException {
-    LocationFactory factory = getLocationFactory();
+    LocationFactory factory = locationFactoryCache.getUnchecked("list");
 
     Location dir = factory.create("dir");
 
@@ -107,5 +167,5 @@ public abstract class LocationTestBase {
     }
   }
 
-  protected abstract LocationFactory getLocationFactory();
+  protected abstract LocationFactory createLocationFactory(String pathBase) throws Exception;
 }

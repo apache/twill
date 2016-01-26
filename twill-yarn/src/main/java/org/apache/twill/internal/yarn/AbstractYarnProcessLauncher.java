@@ -26,6 +26,7 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
+import org.apache.twill.internal.ResourceCapability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,7 @@ import java.util.Map;
  *
  * @param <T> Type of the object that contains information about the container that the process is going to launch.
  */
-public abstract class AbstractYarnProcessLauncher<T> implements ProcessLauncher<T> {
+public abstract class AbstractYarnProcessLauncher<T extends ResourceCapability> implements ProcessLauncher<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractYarnProcessLauncher.class);
 

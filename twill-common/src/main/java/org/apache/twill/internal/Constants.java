@@ -37,13 +37,12 @@ public final class Constants {
    */
   public static final int CONSTRAINED_PROVISION_REQUEST_TIMEOUT = 5000;
 
+  public static final double HEAP_MIN_RATIO = 0.7d;
+
   /** Memory size of AM. */
   public static final int APP_MASTER_MEMORY_MB = 512;
 
   public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;
-
-  public static final String STDOUT = "stdout";
-  public static final String STDERR = "stderr";
 
   public static final String CLASSPATH = "classpath";
   public static final String APPLICATION_CLASSPATH = "application-classpath";
@@ -51,6 +50,13 @@ public final class Constants {
   /** Command names for the restart runnable instances. */
   public static final String RESTART_ALL_RUNNABLE_INSTANCES = "restartAllRunnableInstances";
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
+
+  /**
+   * Common ZK paths constants
+   */
+  public static final String DISCOVERY_PATH_PREFIX = "/discoverable";
+  public static final String INSTANCES_PATH_PREFIX = "/instances";
+
 
   /**
    * Constants for names of internal files that are shared between client, AM and containers.
@@ -63,6 +69,7 @@ public final class Constants {
     public static final String LOCALIZE_FILES = "localizeFiles.json";
     public static final String TWILL_SPEC = "twillSpec.json";
     public static final String ARGUMENTS = "arguments.json";
+    public static final String ENVIRONMENTS = "environments.json";
     public static final String LOGBACK_TEMPLATE = "logback-template.xml";
     public static final String JVM_OPTIONS = "jvm.opts";
     public static final String CREDENTIALS = "credentials.store";

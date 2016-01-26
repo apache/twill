@@ -21,6 +21,7 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 
 import java.net.URI;
+import java.util.Map;
 
 /**
  * This interface exposes methods to set up the Twill runtime environment and start a Twill application.
@@ -177,6 +178,25 @@ public interface TwillPreparer {
    * @return This {@link TwillPreparer}
    */
   TwillPreparer withClassPaths(Iterable<String> classPaths);
+
+  /**
+   * Adds the set of environment variables that will be set as container environment variables for all runnables.
+   *
+   * @param env set of environment variables
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withEnv(Map<String, String> env);
+
+  /**
+   * Adds the set of environment variables that will be set as container environment variables for the given runnable.
+   * Environment variables set through this method has higher precedence than the one set through {@link #withEnv(Map)}
+   * if there is a key clash.
+   *
+   * @param runnableName Name of the {@link TwillRunnable}.
+   * @param env set of environment variables
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withEnv(String runnableName, Map<String, String> env);
 
   /**
    * Adds the set of paths to the classpath on the target machine for ApplicationMaster and all runnables.

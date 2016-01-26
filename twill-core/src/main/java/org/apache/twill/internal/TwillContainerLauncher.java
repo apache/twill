@@ -27,6 +27,7 @@ import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.state.Message;
+import org.apache.twill.internal.utils.Resources;
 import org.apache.twill.launcher.FindFreePort;
 import org.apache.twill.launcher.TwillLauncher;
 import org.apache.twill.zookeeper.NodeData;
@@ -46,9 +47,8 @@ public final class TwillContainerLauncher {
 
   private static final Logger LOG = LoggerFactory.getLogger(TwillContainerLauncher.class);
 
-  private static final double HEAP_MIN_RATIO = 0.7d;
-
   private final RuntimeSpecification runtimeSpec;
+  private final ContainerInfo containerInfo;
   private final ProcessLauncher.PrepareLaunchContext launchContext;
   private final ZKClient zkClient;
   private final int instanceCount;
@@ -56,10 +56,12 @@ public final class TwillContainerLauncher {
   private final int reservedMemory;
   private final Location secureStoreLocation;
 
-  public TwillContainerLauncher(RuntimeSpecification runtimeSpec, ProcessLauncher.PrepareLaunchContext launchContext,
+  public TwillContainerLauncher(RuntimeSpecification runtimeSpec, ContainerInfo containerInfo,
+                                ProcessLauncher.PrepareLaunchContext launchContext,
                                 ZKClient zkClient, int instanceCount, JvmOptions jvmOpts, int reservedMemory,
                                 Location secureStoreLocation) {
     this.runtimeSpec = runtimeSpec;
+    this.containerInfo = containerInfo;
     this.launchContext = launchContext;
     this.zkClient = zkClient;
     this.instanceCount = instanceCount;
@@ -98,15 +100,6 @@ public final class TwillContainerLauncher {
       LOG.warn("Failed to launch container with secure store {}.", secureStoreLocation);
     }
 
-    int memory = runtimeSpec.getResourceSpecification().getMemorySize();
-    if (((double) (memory - reservedMemory) / memory) >= HEAP_MIN_RATIO) {
-      // Reduce -Xmx by the reserved memory size.
-      memory = runtimeSpec.getResourceSpecification().getMemorySize() - reservedMemory;
-    } else {
-      // If it is a small VM, just discount it by the min ratio.
-      memory = (int) Math.ceil(memory * HEAP_MIN_RATIO);
-    }
-
     // Currently no reporting is supported for runnable containers
     launchContext
       .addEnvironment(EnvKeys.TWILL_RUN_ID, runId.getId())
@@ -135,6 +128,8 @@ public final class TwillContainerLauncher {
     } else {
       firstCommand = "$JAVA_HOME/bin/java";
     }
+
+    int memory = Resources.computeMaxHeapSize(containerInfo.getMemoryMB(), reservedMemory, Constants.HEAP_MIN_RATIO);
     commandBuilder.add("-Djava.io.tmpdir=tmp",
                        "-Dyarn.container=$" + EnvKeys.YARN_CONTAINER_ID,
                        "-Dtwill.runnable=$" + EnvKeys.TWILL_APP_NAME + ".$" + EnvKeys.TWILL_RUNNABLE_NAME,

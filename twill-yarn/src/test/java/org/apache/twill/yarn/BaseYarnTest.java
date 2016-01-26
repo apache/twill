@@ -109,4 +109,8 @@ public abstract class BaseYarnTest {
   public List<NodeReport> getNodeReports() throws Exception {
     return TWILL_TESTER.getNodeReports();
   }
+
+  public String getZKConnectionString() {
+    return TWILL_TESTER.getZKConnectionString();
+  }
 }

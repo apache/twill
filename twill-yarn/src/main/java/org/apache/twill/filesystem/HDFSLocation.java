@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A concrete implementation of {@link Location} for the HDFS filesystem.
+ * A concrete implementation of {@link Location} for the HDFS filesystem using {@link FileSystem}.
  */
 final class HDFSLocation implements Location {
   private final FileSystem fs;
@@ -121,7 +121,7 @@ final class HDFSLocation implements Location {
   }
 
   /**
-   * @return Returns the name of the file or directory denoteed by this abstract pathname.
+   * @return Returns the name of the file or directory denoted by this abstract pathname.
    */
   @Override
   public String getName() {

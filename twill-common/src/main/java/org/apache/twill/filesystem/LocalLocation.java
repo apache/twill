@@ -25,6 +25,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -67,10 +70,6 @@ final class LocalLocation implements Location {
    */
   @Override
   public InputStream getInputStream() throws IOException {
-    File parent = file.getParentFile();
-    if (!parent.exists()) {
-      parent.mkdirs();
-    }
     return new FileInputStream(file);
   }
 
@@ -176,9 +175,11 @@ final class LocalLocation implements Location {
   @Override
   public Location renameTo(Location destination) throws IOException {
     // destination will always be of the same type as this location
-    boolean success = file.renameTo(((LocalLocation) destination).file);
-    if (success) {
-      return new LocalLocation(locationFactory, ((LocalLocation) destination).file);
+    Path target = Files.move(file.toPath(), ((LocalLocation) destination).file.toPath(),
+                             StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+
+    if (target != null) {
+      return new LocalLocation(locationFactory, target.toFile());
     } else {
       return null;
     }
