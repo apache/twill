@@ -83,8 +83,6 @@ import org.apache.twill.internal.yarn.YarnApplicationReport;
 import org.apache.twill.internal.yarn.YarnUtils;
 import org.apache.twill.launcher.FindFreePort;
 import org.apache.twill.launcher.TwillLauncher;
-import org.apache.twill.zookeeper.ZKClient;
-import org.apache.twill.zookeeper.ZKClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,7 +129,6 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final List<String> applicationClassPaths = Lists.newArrayList();
   private final Credentials credentials;
   private final int reservedMemory;
-  private String user;
   private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
@@ -152,7 +149,6 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.credentials = createCredentials();
     this.reservedMemory = yarnConfig.getInt(Configs.Keys.JAVA_RESERVED_MEMORY_MB,
                                             Configs.Defaults.JAVA_RESERVED_MEMORY_MB);
-    this.user = System.getProperty("user.name");
     this.extraOptions = extraOptions;
     this.logLevel = logLevel;
     this.classAcceptor = new ClassAcceptor();
@@ -166,7 +162,6 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer setUser(String user) {
-    this.user = user;
     return this;
   }
 

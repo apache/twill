@@ -17,14 +17,13 @@
  */
 package org.apache.twill.internal.yarn;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.Credentials;
@@ -39,6 +38,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 import org.apache.twill.api.LocalFile;
+import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.ForwardingLocationFactory;
 import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.LocationFactory;
@@ -50,7 +50,6 @@ import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -68,7 +67,7 @@ public class YarnUtils {
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
-  private static final AtomicReference<HadoopVersions> HADOOP_VERSION = new AtomicReference<HadoopVersions>();
+  private static final AtomicReference<HadoopVersions> HADOOP_VERSION = new AtomicReference<>();
 
   public static YarnLocalResource createLocalResource(LocalFile localFile) {
     Preconditions.checkArgument(localFile.getLastModified() >= 0, "Last modified time should be >= 0.");
@@ -155,19 +154,31 @@ public class YarnUtils {
       return ImmutableList.of();
     }
 
-    FileSystem fileSystem = getFileSystem(locationFactory);
+    LocationFactory factory = unwrap(locationFactory);
+    String renewer = getYarnTokenRenewer(config);
+    List<Token<?>> tokens = ImmutableList.of();
 
-    if (fileSystem == null) {
-      LOG.debug("LocationFactory is not HDFS");
-      return ImmutableList.of();
+    if (factory instanceof HDFSLocationFactory) {
+      FileSystem fs = ((HDFSLocationFactory) factory).getFileSystem();
+      Token<?>[] fsTokens = fs.addDelegationTokens(renewer, credentials);
+      if (fsTokens != null) {
+        tokens = ImmutableList.copyOf(fsTokens);
+      }
+    } else if (factory instanceof FileContextLocationFactory) {
+      FileContext fc = ((FileContextLocationFactory) locationFactory).getFileContext();
+      tokens = fc.getDelegationTokens(new Path(locationFactory.create("/").toURI()), renewer);
     }
 
-    String renewer = getYarnTokenRenewer(config);
+    for (Token<?> token : tokens) {
+      credentials.addToken(token.getService(), token);
+    }
 
-    Token<?>[] tokens = fileSystem.addDelegationTokens(renewer, credentials);
-    return tokens == null ? ImmutableList.<Token<?>>of() : ImmutableList.copyOf(tokens);
+    return ImmutableList.copyOf(tokens);
   }
 
+  /**
+   * Encodes the given {@link Credentials} as bytes.
+   */
   public static ByteBuffer encodeCredentials(Credentials credentials) {
     try {
       DataOutputBuffer out = new DataOutputBuffer();
@@ -268,26 +279,15 @@ public class YarnUtils {
     return localResource;
   }
 
-  private static <T> Map<String, T> transformResource(Map<String, YarnLocalResource> from) {
-    return Maps.transformValues(from, new Function<YarnLocalResource, T>() {
-      @Override
-      public T apply(YarnLocalResource resource) {
-        return resource.getLocalResource();
-      }
-    });
-  }
-
   /**
-   * Gets the Hadoop FileSystem from LocationFactory.
+   * Unwraps the given {@link LocationFactory} and returns the inner most {@link LocationFactory} which is not
+   * a {@link ForwardingLocationFactory}.
    */
-  private static FileSystem getFileSystem(LocationFactory locationFactory) {
-    if (locationFactory instanceof HDFSLocationFactory) {
-      return ((HDFSLocationFactory) locationFactory).getFileSystem();
+  private static LocationFactory unwrap(LocationFactory locationFactory) {
+    while (locationFactory instanceof ForwardingLocationFactory) {
+      locationFactory = ((ForwardingLocationFactory) locationFactory).getDelegate();
     }
-    if (locationFactory instanceof ForwardingLocationFactory) {
-      return getFileSystem(((ForwardingLocationFactory) locationFactory).getDelegate());
-    }
-    return null;
+    return locationFactory;
   }
 
   private YarnUtils() {

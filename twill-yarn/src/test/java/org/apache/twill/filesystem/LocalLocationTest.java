@@ -17,6 +17,8 @@
  */
 package org.apache.twill.filesystem;
 
+import org.junit.Assert;
+
 import java.io.File;
 
 /**
@@ -29,5 +31,11 @@ public class LocalLocationTest extends LocationTestBase {
     File basePath = new File(tmpFolder.newFolder(), pathBase);
     basePath.mkdirs();
     return new LocalLocationFactory(basePath);
+  }
+
+  @Override
+  public void testHomeLocation() throws Exception {
+    // For Local location, UGI won't take an effect.
+    Assert.assertEquals(System.getProperty("user.name"), createLocationFactory("/").getHomeLocation().getName());
   }
 }

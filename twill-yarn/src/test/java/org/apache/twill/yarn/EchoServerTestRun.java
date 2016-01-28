@@ -32,6 +32,7 @@ import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.Threads;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.zookeeper.ZKClientService;
+import org.apache.zookeeper.data.Stat;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -158,7 +160,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
 
   @Test
   public void testZKCleanup() throws Exception {
-    ZKClientService zkClient = ZKClientService.Builder.of(getZKConnectionString() + "/twill").build();
+    final ZKClientService zkClient = ZKClientService.Builder.of(getZKConnectionString() + "/twill").build();
     zkClient.startAndWait();
 
     try {
@@ -177,7 +179,12 @@ public final class EchoServerTestRun extends BaseYarnTest {
       controller.terminate().get();
 
       // Verify the ZK node gets cleanup
-      Assert.assertNull(zkClient.exists("/EchoServer").get());
+      waitFor(null, new Callable<Stat>() {
+        @Override
+        public Stat call() throws Exception {
+          return zkClient.exists("/EchoServer").get();
+        }
+      }, 10000, 100, TimeUnit.MILLISECONDS);
 
       // Start two instances of the application and stop one of it
       List<TwillController> controllers = new ArrayList<>();
@@ -207,7 +214,12 @@ public final class EchoServerTestRun extends BaseYarnTest {
       controllers.get(1).terminate().get();
 
       // Verify the ZK node gets cleanup
-      Assert.assertNull(zkClient.exists("/EchoServer").get());
+      waitFor(null, new Callable<Stat>() {
+        @Override
+        public Stat call() throws Exception {
+          return zkClient.exists("/EchoServer").get();
+        }
+      }, 10000, 100, TimeUnit.MILLISECONDS);
 
     } finally {
       zkClient.stopAndWait();

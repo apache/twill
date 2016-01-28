@@ -50,8 +50,19 @@ public class FileContextLocationFactory implements LocationFactory {
    * @param pathBase base path for all non-absolute location created through this {@link LocationFactory}.
    */
   public FileContextLocationFactory(Configuration configuration, String pathBase) {
+    this(configuration, createFileContext(configuration), pathBase);
+  }
+
+  /**
+   * Creates a new instance with the given {@link FileContext} created from the given {@link Configuration}.
+   *
+   * @param configuration the hadoop configuration
+   * @param fc {@link FileContext} instance created from the given configuration
+   * @param pathBase base path for all non-absolute location created through this (@link LocationFactory}.
+   */
+  public FileContextLocationFactory(Configuration configuration, FileContext fc, String pathBase) {
     this.configuration = configuration;
-    this.fc = createFileContext(configuration);
+    this.fc = fc;
     this.pathBase = new Path(pathBase.startsWith("/") ? pathBase : "/" + pathBase);
   }
 
@@ -92,7 +103,9 @@ public class FileContextLocationFactory implements LocationFactory {
 
   @Override
   public Location getHomeLocation() {
-    return new FileContextLocation(this, fc, fc.getHomeDirectory());
+    // Fix for TWILL-163. FileContext.getHomeDirectory() uses System.getProperty("user.name") instead of UGI
+    return new FileContextLocation(this, fc,
+                                   new Path(fc.getHomeDirectory().getParent(), fc.getUgi().getShortUserName()));
   }
 
   /**
