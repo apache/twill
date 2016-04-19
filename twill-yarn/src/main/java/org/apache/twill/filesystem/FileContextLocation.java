@@ -216,4 +216,9 @@ final class FileContextLocation implements Location {
   public int hashCode() {
     return Objects.hash(path);
   }
+
+  @Override
+  public String toString() {
+    return toURI().toString();
+  }
 }
