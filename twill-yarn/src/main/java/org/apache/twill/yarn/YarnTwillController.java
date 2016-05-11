@@ -17,11 +17,11 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import org.apache.commons.lang.time.StopWatch;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -101,18 +101,18 @@ final class YarnTwillController extends AbstractTwillController implements Twill
       LOG.debug("Application {} with id {} submitted", appName, appId);
 
       YarnApplicationState state = report.getYarnApplicationState();
-      StopWatch stopWatch = new StopWatch();
+      Stopwatch stopWatch = new Stopwatch();
       stopWatch.start();
-      stopWatch.split();
       long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_START_SECONDS, TimeUnit.SECONDS);
 
       LOG.debug("Checking yarn application status for {} {}", appName, appId);
-      while (!hasRun(state) && stopWatch.getSplitTime() < maxTime) {
+      while (!hasRun(state) && stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
         report = processController.getReport();
         state = report.getYarnApplicationState();
         LOG.debug("Yarn application status for {} {}: {}", appName, appId, state);
         TimeUnit.SECONDS.sleep(1);
-        stopWatch.split();
+        stopWatch.reset();
+        stopWatch.start();
       }
       LOG.info("Yarn application {} {} is in state {}", appName, appId, state);
       if (state != YarnApplicationState.RUNNING) {
@@ -155,18 +155,19 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
     // Poll application status from yarn
     try {
-      StopWatch stopWatch = new StopWatch();
+      Stopwatch stopWatch = new Stopwatch();
       stopWatch.start();
-      stopWatch.split();
       long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_STOP_SECONDS, TimeUnit.SECONDS);
 
       YarnApplicationReport report = processController.getReport();
       FinalApplicationStatus finalStatus = report.getFinalApplicationStatus();
       ApplicationId appId = report.getApplicationId();
-      while (finalStatus == FinalApplicationStatus.UNDEFINED && stopWatch.getSplitTime() < maxTime) {
+      while (finalStatus == FinalApplicationStatus.UNDEFINED &&
+          stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
         LOG.debug("Yarn application final status for {} {}: {}", appName, appId, finalStatus);
         TimeUnit.SECONDS.sleep(1);
-        stopWatch.split();
+        stopWatch.reset();
+        stopWatch.start();
         finalStatus = processController.getReport().getFinalApplicationStatus();
       }
       LOG.debug("Yarn application {} {} completed with status {}", appName, appId, finalStatus);
