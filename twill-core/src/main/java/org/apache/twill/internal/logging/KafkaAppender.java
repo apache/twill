@@ -87,10 +87,10 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
   private ScheduledExecutorService scheduler;
 
   public KafkaAppender() {
-    publisher = new AtomicReference<KafkaPublisher.Preparer>();
+    publisher = new AtomicReference<>();
     flushTask = createFlushTask();
     bufferedSize = new AtomicInteger();
-    buffer = new ConcurrentLinkedQueue<String>();
+    buffer = new ConcurrentLinkedQueue<>();
   }
 
   /**

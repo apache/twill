@@ -57,7 +57,7 @@ public final class DefaultResourceReport implements ResourceReport {
     for (Map.Entry<String, Collection<TwillRunResources>> entry : resources.entrySet()) {
       this.usedResources.putAll(entry.getKey(), entry.getValue());
     }
-    this.services = new AtomicReference<List<String>>(services);
+    this.services = new AtomicReference<>(services);
   }
 
   /**
