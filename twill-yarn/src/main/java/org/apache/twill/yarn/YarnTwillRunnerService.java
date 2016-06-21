@@ -42,7 +42,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -62,7 +62,7 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
-import org.apache.twill.filesystem.HDFSLocationFactory;
+import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.filesystem.LocationFactory;
 import org.apache.twill.internal.Constants;
@@ -139,7 +139,7 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
   private volatile String jvmOptions = null;
 
   /**
-   * Creates an instance with a {@link HDFSLocationFactory} created base on the given configuration with the
+   * Creates an instance with a {@link FileContextLocationFactory} created base on the given configuration with the
    * user home directory as the location factory namespace.
    *
    * @param config Configuration of the yarn cluster
@@ -612,8 +612,8 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
 
   private static LocationFactory createDefaultLocationFactory(Configuration configuration) {
     try {
-      FileSystem fs = FileSystem.get(configuration);
-      return new HDFSLocationFactory(fs, fs.getHomeDirectory().toUri().getPath());
+      FileContext fc = FileContext.getFileContext(configuration);
+      return new FileContextLocationFactory(configuration, fc, fc.getHomeDirectory().toUri().getPath());
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

@@ -27,10 +27,12 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.twill.api.RunId;
-import org.apache.twill.filesystem.HDFSLocationFactory;
+import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.LocalLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.logging.KafkaAppender;
@@ -50,6 +52,8 @@ import org.xml.sax.InputSource;
 import java.io.File;
 import java.io.StringReader;
 import java.net.URI;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -127,27 +131,35 @@ public abstract class ServiceMain {
   /**
    * Returns the {@link Location} for the application based on the env {@link EnvKeys#TWILL_APP_DIR}.
    */
-  protected static Location createAppLocation(Configuration conf) {
+  protected static Location createAppLocation(final Configuration conf) {
     // Note: It's a little bit hacky based on the uri schema to create the LocationFactory, refactor it later.
-    URI appDir = URI.create(System.getenv(EnvKeys.TWILL_APP_DIR));
+    final URI appDir = URI.create(System.getenv(EnvKeys.TWILL_APP_DIR));
 
     try {
       if ("file".equals(appDir.getScheme())) {
         return new LocalLocationFactory().create(appDir);
       }
 
-      // If not file, assuming it is a FileSystem, hence construct with HDFSLocationFactory which wraps
-      // a FileSystem created from the Configuration
+      // If not file, assuming it is a FileSystem, hence construct with FileContextLocationFactory
+      UserGroupInformation ugi;
       if (UserGroupInformation.isSecurityEnabled()) {
-        return new HDFSLocationFactory(FileSystem.get(appDir, conf)).create(appDir);
+        ugi = UserGroupInformation.getCurrentUser();
+      } else {
+        String fsUser = System.getenv(EnvKeys.TWILL_FS_USER);
+        if (fsUser == null) {
+          throw new IllegalStateException("Missing environment variable " + EnvKeys.TWILL_FS_USER);
+        }
+        ugi = UserGroupInformation.createRemoteUser(fsUser);
       }
-
-      String fsUser = System.getenv(EnvKeys.TWILL_FS_USER);
-      if (fsUser == null) {
-        throw new IllegalStateException("Missing environment variable " + EnvKeys.TWILL_FS_USER);
-      }
-      return new HDFSLocationFactory(FileSystem.get(appDir, conf, fsUser)).create(appDir);
-
+      return ugi.doAs(new PrivilegedExceptionAction<Location>() {
+        @Override
+        public Location run() throws Exception {
+          Configuration hConf = new Configuration(conf);
+          URI defaultURI = new URI(appDir.getScheme(), appDir.getAuthority(), null, null, null);
+          hConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, defaultURI.toString());
+          return new FileContextLocationFactory(hConf).create(appDir);
+        }
+      });
     } catch (Exception e) {
       LOG.error("Failed to create application location for {}.", appDir);
       throw Throwables.propagate(e);

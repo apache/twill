@@ -22,6 +22,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.io.CharStreams;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -33,7 +34,7 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
 /**
@@ -93,6 +94,25 @@ public abstract class LocationTestBase {
     }
     Assert.assertEquals(length, location.length());
     Assert.assertEquals(lastModified, location.lastModified());
+  }
+
+  @Test
+  public void testHomeLocation() throws Exception {
+    LocationFactory locationFactory = createLocationFactory("/");
+
+    // Without UGI, the home location should be the same as the user
+    Assert.assertEquals(System.getProperty("user.name"), locationFactory.getHomeLocation().getName());
+
+    // With UGI, the home location should be based on the UGI current user
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(System.getProperty("user.name") + "1");
+    locationFactory = ugi.doAs(new PrivilegedExceptionAction<LocationFactory>() {
+      @Override
+      public LocationFactory run() throws Exception {
+        return createLocationFactory("/");
+      }
+    });
+
+    Assert.assertEquals(ugi.getUserName(), locationFactory.getHomeLocation().getName());
   }
 
   @Test

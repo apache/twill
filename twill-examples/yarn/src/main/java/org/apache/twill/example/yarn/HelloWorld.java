@@ -65,9 +65,7 @@ public class HelloWorld {
 
     String zkStr = args[0];
     YarnConfiguration yarnConfiguration = new YarnConfiguration();
-    final TwillRunnerService twillRunner =
-      new YarnTwillRunnerService(
-        yarnConfiguration, zkStr);
+    final TwillRunnerService twillRunner = new YarnTwillRunnerService(yarnConfiguration, zkStr);
     twillRunner.start();
 
     String yarnClasspath =
@@ -75,8 +73,7 @@ public class HelloWorld {
                             Joiner.on(",").join(YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH));
     List<String> applicationClassPaths = Lists.newArrayList();
     Iterables.addAll(applicationClassPaths, Splitter.on(",").split(yarnClasspath));
-    final TwillController controller =
-      twillRunner.prepare(new HelloWorldRunnable())
+    final TwillController controller = twillRunner.prepare(new HelloWorldRunnable())
         .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
         .withApplicationClassPaths(applicationClassPaths)
         .withBundlerClassAcceptor(new HadoopClassExcluder())

@@ -17,6 +17,7 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.TwillController;
@@ -28,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -99,6 +101,24 @@ public abstract class BaseYarnTest {
       size = Iterables.size(iterable);
     }
     return trial < limit;
+  }
+
+  /**
+   * Waits for a task returns the expected value.
+   *
+   * @param expected the expected value
+   * @param callable the task to execute
+   * @param timeout timeout of the wait
+   * @param delay delay between calls to the task to poll for the latest value
+   * @param unit unit for the timeout and delay
+   * @param <T> type of the expected value
+   * @throws Exception if the task through exception or timeout.
+   */
+  public <T> void waitFor(T expected, Callable<T> callable, long timeout, long delay, TimeUnit unit) throws Exception {
+    Stopwatch stopwatch = new Stopwatch().start();
+    while (callable.call() != expected && stopwatch.elapsedTime(unit) < timeout) {
+      unit.sleep(delay);
+    }
   }
 
   @SuppressWarnings("unchecked")
