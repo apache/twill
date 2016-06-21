@@ -46,6 +46,9 @@
     </skin>
 
     <body>
+        <head>
+            <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/styles/default.min.css"/>
+        </head>
         <breadcrumbs position="left">
             <item name="Apache Twill" href="http://twill.incubator.apache.org/index.html"/>
         </breadcrumbs>
@@ -88,6 +91,7 @@
                 and the Apache Twill project logos are trademarks of The Apache Software Foundation.
                 All other marks mentioned may be trademarks or registered trademarks of their respective owners.
             </div>
+            <script src="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/highlight.min.js"></script>
         </footer>
     </body>
 
@@ -95,6 +99,7 @@
         <reflowSkin>
             <theme>bootswatch-flatly</theme>
             <smoothScroll>true</smoothScroll>
+            <markPageHeader>false</markPageHeader>
             <bottomNav maxSpan="9" >
                 <column>Documentation</column>
                 <column>Releases</column>
