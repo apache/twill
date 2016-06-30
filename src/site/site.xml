@@ -21,13 +21,9 @@
     <bannerLeft>
         <name>Apache Twill</name>
         <src>images/ApacheTwill_logo.png</src>
-        <href>http://twill.incubator.apache.org/index.html</href>
+        <href>http://twill.apache.org/index.html</href>
         <alt>Apache Twill</alt>
     </bannerLeft>
-    <bannerRight>
-        <src>http://incubator.apache.org/images/egg-logo.png</src>
-        <href>http://incubator.apache.org/</href>
-    </bannerRight>
 
     <googleAnalyticsAccountId>UA-55698612-1</googleAnalyticsAccountId>
 
@@ -50,12 +46,12 @@
             <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.4.0/styles/default.min.css"/>
         </head>
         <breadcrumbs position="left">
-            <item name="Apache Twill" href="http://twill.incubator.apache.org/index.html"/>
+            <item name="Apache Twill" href="http://twill.apache.org/index.html"/>
         </breadcrumbs>
 
         <menu name="Documentation">
             <item name="Getting Started" href="./GettingStarted.html"/>
-            <item name="API (0.8.0-incubating-SNAPSHOT)" href="./apidocs/index.html"/>
+            <item name="API (0.8.0-SNAPSHOT)" href="./apidocs/index.html"/>
             <item name="API (0.7.0-incubating)" href="./apidocs-0.7.0-incubating/index.html"/>
             <item name="API (0.6.0-incubating)" href="./apidocs-0.6.0-incubating/index.html"/>
             <item name="API (0.5.0-incubating)" href="./apidocs-0.5.0-incubating/index.html"/>
@@ -77,7 +73,6 @@
         </menu>
 
         <menu name="ASF">
-            <item name="Apache Incubator" href="http://incubator.apache.org/"/>
             <item name="Apache Foundation" href="http://www.apache.org/foundation/"/>
             <item name="How Apache Works" href="http://www.apache.org/foundation/how-it-works.html"/>
             <item name="The Apache License" href="http://www.apache.org/licenses/LICENSE-2.0.html"/>
