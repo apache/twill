@@ -10,9 +10,11 @@ Getting Started
 ---------------
 You can build and install the Apache Twill by:
 
+```sh
     git clone https://git-wip-us.apache.org/repos/asf/incubator-twill.git
     cd incubator-twill
     mvn install
+```
 
 After the maven installation completes, you can include the artifact 
 org.apache.twill:twill-yarn as a dependency on your other projects.
@@ -40,5 +42,5 @@ The following provides more details on the included cryptographic software:
 
 Apache Twill uses the built-in java cryptography libraries for unique ID
 generation. See 
-http://www.oracle.com/us/products/export/export-regulations-345813.html
+<http://www.oracle.com/us/products/export/export-regulations-345813.html>
 for more details on Java's cryptography features.
