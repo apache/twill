@@ -29,10 +29,10 @@
 
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-parent</artifactId>
-    <version>0.8.0-incubating-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Apache Twill</name>
-    <url>http://twill.incubator.apache.org</url>
+    <url>http://twill.apache.org</url>
 
     <organization>
         <name>The Apache Software Foundation</name>
@@ -50,51 +50,11 @@
 
     <developers>
         <developer>
-            <id>vinodkv</id>
-            <name>Vinod K</name>
-            <email>vinodkv@apache.org</email>
-            <roles>
-                <role>Mentor</role>
-            </roles>
-        </developer>
-        <developer>
-            <id>tomwhite</id>
-            <name>Thomas White</name>
-            <email>tomwhite@apache.org</email>
-            <roles>
-                <role>Mentor</role>
-            </roles>
-        </developer>
-        <developer>
-            <id>phunt</id>
-            <name>Patrick Hunt</name>
-            <email>phuntv@apache.org</email>
-            <roles>
-                <role>Mentor</role>
-            </roles>
-        </developer>
-        <developer>
-            <id>acmurthy</id>
-            <name>Arun C Murthy</name>
-            <email>acmurthyu@apache.org</email>
-            <roles>
-                <role>Mentor</role>
-            </roles>
-        </developer>
-        <developer>
-            <id>asavu</id>
-            <name>Andrei Savu</name>
-            <email>asavu@apache.org</email>
-            <roles>
-                <role>Mentor</role>
-            </roles>
-        </developer>
-        <developer>
             <id>chtyim</id>
             <name>Terence Yim</name>
             <email>chtyim@apache.org</email>
             <roles>
-                <role>Committer</role>
+                <role>PMC</role>
             </roles>
         </developer>
         <developer>
@@ -102,7 +62,7 @@
             <name>Andreas Neumann</name>
             <email>anew@apache.org</email>
             <roles>
-                <role>Committer</role>
+                <role>PMC</role>
             </roles>
         </developer>
         <developer>
@@ -110,7 +70,7 @@
             <name>Gary Helmling</name>
             <email>garyh@apache.org</email>
             <roles>
-                <role>Committer</role>
+                <role>PMC</role>
             </roles>
         </developer>
         <developer>
@@ -118,7 +78,7 @@
             <name>Albert Shau</name>
             <email>ashau@apache.org</email>
             <roles>
-                <role>Committer</role>
+                <role>PMC</role>
             </roles>
         </developer>
         <developer>
@@ -126,7 +86,7 @@
             <name>Poorna Chandra</name>
             <email>poorna@apache.org</email>
             <roles>
-                <role>Committer</role>
+                <role>PMC</role>
             </roles>
         </developer>
         <developer>
@@ -134,7 +94,7 @@
             <name>Henry Saputra</name>
             <email>hsaputra@apache.org</email>
             <roles>
-                <role>Committer</role>
+                <role>PMC</role>
             </roles>
         </developer>
     </developers>
@@ -158,9 +118,9 @@
     <mailingLists>
         <mailingList>
             <name>Development</name>
-            <post>dev@twill.incubator.apache.org</post>
-            <subscribe>dev-subscribe@twill.incubator.apache.org</subscribe>
-            <unsubscribe>dev-unsubscribe@twill.incubator.apache.org</unsubscribe>
+            <post>dev@twill.apache.org</post>
+            <subscribe>dev-subscribe@twill.apache.org</subscribe>
+            <unsubscribe>dev-unsubscribe@twill.apache.org</unsubscribe>
             <archive>http://mail-archives.apache.org/mod_mbox/twill-dev/</archive>
             <otherArchives>
                 <otherArchive>http://twill-dev.markmail.org</otherArchive>
@@ -168,9 +128,9 @@
         </mailingList>
         <mailingList>
             <name>Commits</name>
-            <post>commits@twill.incubator.apache.org</post>
-            <subscribe>commits-subscribe@twill.incubator.apache.org</subscribe>
-            <unsubscribe>commits-unsubscribe@twill.incubator.apache.org</unsubscribe>
+            <post>commits@twill.apache.org</post>
+            <subscribe>commits-subscribe@twill.apache.org</subscribe>
+            <unsubscribe>commits-unsubscribe@twill.apache.org</unsubscribe>
             <archive>http://mail-archives.apache.org/mod_mbox/twill-commits/</archive>
             <otherArchives>
                 <otherArchive>http://twill-commits.markmail.org</otherArchive>
