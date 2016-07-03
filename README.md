@@ -1,3 +1,21 @@
+<!--
+ Licensed to the Apache Software Foundation (ASF) under one
+ or more contributor license agreements.  See the NOTICE file
+ distributed with this work for additional information
+ regarding copyright ownership.  The ASF licenses this file
+ to you under the Apache License, Version 2.0 (the
+ "License"); you may not use this file except in compliance
+ with the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
 What is Apache Twill?
 ---------------------
 Twill is an abstraction over Apache Hadoop® YARN that reduces the complexity 
@@ -10,9 +28,11 @@ Getting Started
 ---------------
 You can build and install the Apache Twill by:
 
+```sh
     git clone https://git-wip-us.apache.org/repos/asf/incubator-twill.git
     cd incubator-twill
     mvn install
+```
 
 After the maven installation completes, you can include the artifact 
 org.apache.twill:twill-yarn as a dependency on your other projects.
@@ -40,5 +60,5 @@ The following provides more details on the included cryptographic software:
 
 Apache Twill uses the built-in java cryptography libraries for unique ID
 generation. See 
-http://www.oracle.com/us/products/export/export-regulations-345813.html
+<http://www.oracle.com/us/products/export/export-regulations-345813.html>
 for more details on Java's cryptography features.
