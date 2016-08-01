@@ -32,7 +32,7 @@ Apache Twill dramatically simplifies and reduces development efforts, enabling y
 easily develop and manage distributed applications through its simple abstraction layer on top of YARN.
 YARN, although originally designed for MapReduce v2, can be used as a generic cluster resource management framework
 that can run almost any type of applications on a Hadoop® cluster. With its powerful capabilities, YARN can 
-introduce complexities for developers. In contrast, Twills' abstraction model over YARN closely resembles 
+introduce complexities for developers. In contrast, Twill's abstraction model over YARN closely resembles 
 the Java thread model, with which many developers are familiar. Moreover, Twill provides application lifecycle management, 
 service discovery, distributed process coordination and resiliency to failure, which are required by many distributed applications.
 
