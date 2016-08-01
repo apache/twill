@@ -29,8 +29,8 @@ Getting Started
 You can build and install the Apache Twill by:
 
 ```sh
-    git clone https://git-wip-us.apache.org/repos/asf/incubator-twill.git
-    cd incubator-twill
+    git clone https://git-wip-us.apache.org/repos/asf/twill.git
+    cd twill
     mvn install
 ```
 
