@@ -159,9 +159,9 @@
     </properties>
 
     <scm>
-        <connection>scm:git:https://git-wip-us.apache.org/repos/asf/incubator-twill.git</connection>
-        <url>https://git-wip-us.apache.org/repos/asf?p=incubator-twill.git;a=summary</url>
-        <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/incubator-twill.git</developerConnection>
+        <connection>scm:git:https://git-wip-us.apache.org/repos/asf/twill.git</connection>
+        <url>https://git-wip-us.apache.org/repos/asf?p=twill.git;a=summary</url>
+        <developerConnection>scm:git:https://git-wip-us.apache.org/repos/asf/twill.git</developerConnection>
     </scm>
 
     <build>
