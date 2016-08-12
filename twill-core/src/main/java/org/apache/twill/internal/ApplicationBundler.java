@@ -215,8 +215,21 @@ public final class ApplicationBundler {
   private void putEntry(String className, URL classUrl, URL classPathUrl, Set<String> entries, JarOutputStream jarOut) {
     String classPath = classPathUrl.getFile();
     if (classPath.endsWith(".jar")) {
+      String entryName = classPath.substring(classPath.lastIndexOf('/') + 1);
+      /* need unique name or else we lose classes (TWILL-181) we know the classPath is unique because it is
+       * coming from a set, preserve as much as possible of it by prepending elements of the path until it is
+       * unique. */
+      if (entries.contains(SUBDIR_LIB + entryName)) {
+        String[] parts = classPath.split("/");
+        for (int i = parts.length - 2; i >= 0; i--) {
+          entryName = parts[i] + "-" + entryName;
+          if (!entries.contains(SUBDIR_LIB + entryName)) {
+            break;
+          }
+        }
+      }
       saveDirEntry(SUBDIR_LIB, entries, jarOut);
-      saveEntry(SUBDIR_LIB + classPath.substring(classPath.lastIndexOf('/') + 1), classPathUrl, entries, jarOut, false);
+      saveEntry(SUBDIR_LIB + entryName, classPathUrl, entries, jarOut, false);
     } else {
       // Class file, put it under the classes directory
       saveDirEntry(SUBDIR_CLASSES, entries, jarOut);
