@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
@@ -68,6 +69,38 @@ public class ApplicationBundlerTest {
     Assert.assertNotSame(classLoader, clz.getClassLoader());
   }
 
+  @Test
+  public void testSameJar() throws IOException, ClassNotFoundException {
+    File j1 = new File("src/test/resources/jar1/samename.jar");
+    File j2 = new File("src/test/resources/jar2/samename.jar");
+    
+    ClassLoader currentClassLoader = Thread.currentThread().getContextClassLoader();
+    try {
+      List<URL> urls = new ArrayList<>();
+      urls.add(j1.toURI().toURL());
+      urls.add(j2.toURI().toURL());
+      Thread.currentThread().setContextClassLoader(createClassLoader(urls));
+
+      // create bundle
+      Location location = new LocalLocationFactory(tmpDir.newFolder()).create("test.jar");
+      ApplicationBundler bundler = new ApplicationBundler(ImmutableList.<String> of());
+      bundler.createBundle(location, Class1.class, Class2.class);
+
+      File targetDir = tmpDir.newFolder();
+      unjar(new File(location.toURI()), targetDir);
+
+      // should be able to load both classes
+      ClassLoader classLoader = createClassLoader(targetDir);
+      Class<?> c1 = classLoader.loadClass(Class1.class.getName());
+      Class<?> c2 = classLoader.loadClass(Class2.class.getName());
+      Assert.assertSame(classLoader, c1.getClassLoader());
+      Assert.assertSame(classLoader, c2.getClassLoader());
+
+    } finally {
+      Thread.currentThread().setContextClassLoader(currentClassLoader);
+    }
+  }
+
   private void unjar(File jarFile, File targetDir) throws IOException {
     try (JarInputStream jarInput = new JarInputStream(new FileInputStream(jarFile))) {
       JarEntry jarEntry = jarInput.getNextJarEntry();
@@ -94,7 +127,32 @@ public class ApplicationBundlerTest {
         urls.add(file.toURI().toURL());
       }
     }
+    return createClassLoader(urls);
+  }
+
+  /**
+   * @param urls
+   * @return
+   */
+  private ClassLoader createClassLoader(final List<URL> urls) {
     return new URLClassLoader(urls.toArray(new URL[0])) {
+      /** {@inheritDoc} */
+      @Override
+      public synchronized URL getResource(String name) {
+        /* hard coding this because super.getResource prefers parent loader */
+        try {
+          if (name.contains("Class1")) {
+            return new URL("jar", null, urls.get(0).toExternalForm() + "!/" + name);
+          } else if (name.contains("Class2")) {
+            return new URL("jar", null, urls.get(1).toExternalForm() + "!/" + name);
+          } else {
+            return super.getResource(name);
+          }
+        } catch (MalformedURLException e) {
+          return null;
+        }
+      }
+
       @Override
       protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         // Load class from the given URLs first before delegating to parent.
