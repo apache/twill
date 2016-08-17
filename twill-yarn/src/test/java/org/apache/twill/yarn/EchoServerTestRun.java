@@ -102,17 +102,17 @@ public final class EchoServerTestRun extends BaseYarnTest {
     }
 
     // Increase number of instances
-    controller.changeInstances("EchoServer", 3);
+    controller.changeInstances("EchoServer", 3).get(60, TimeUnit.SECONDS);
     Assert.assertTrue(waitForSize(echoServices, 3, 120));
 
     echoServices = controller.discoverService("echo2");
 
     // Decrease number of instances
-    controller.changeInstances("EchoServer", 1);
+    controller.changeInstances("EchoServer", 1).get(60, TimeUnit.SECONDS);
     Assert.assertTrue(waitForSize(echoServices, 1, 120));
 
     // Increase number of instances again
-    controller.changeInstances("EchoServer", 2);
+    controller.changeInstances("EchoServer", 2).get(60, TimeUnit.SECONDS);
     Assert.assertTrue(waitForSize(echoServices, 2, 120));
 
     // Test restart on instances for runnable
@@ -125,7 +125,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
       instanceIdToContainerId.put(twillRunResources.getInstanceId(), twillRunResources.getContainerId());
     }
 
-    controller.restartAllInstances("EchoServer");
+    controller.restartAllInstances("EchoServer").get(60, TimeUnit.SECONDS);
     Assert.assertTrue(waitForSize(echoServices, 2, 120));
 
     report = waitForAfterRestartResourceReport(controller, "EchoServer", 15L, TimeUnit.MINUTES, 2,

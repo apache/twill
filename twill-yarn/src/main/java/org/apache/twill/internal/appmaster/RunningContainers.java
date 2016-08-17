@@ -23,6 +23,7 @@ import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
@@ -55,10 +56,11 @@ import org.apache.twill.zookeeper.ZKOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Deque;
-import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -180,56 +182,66 @@ final class RunningContainers {
 
   /**
    * Stops and removes the last running container of the given runnable.
+   * This method blocks until handleCompleted() is run for the runnable or a timeout occurs.
    */
-  void removeLast(String runnableName) {
+  void stopLastAndWait(String runnableName) {
+    int maxInstanceId;
     containerLock.lock();
     try {
-      int maxInstanceId = getMaxInstanceId(runnableName);
+      maxInstanceId = getMaxInstanceId(runnableName);
       if (maxInstanceId < 0) {
         LOG.warn("No running container found for {}", runnableName);
         return;
       }
-      removeInstanceById(runnableName, maxInstanceId);
     } finally {
       containerLock.unlock();
     }
+    stopByIdAndWait(runnableName, maxInstanceId);
   }
 
   /**
-   * Stop and remove a container for a runnable on an id.
+   * Stop and removes a container for a runnable on an id.
+   * This method blocks until handleCompleted() is run for the runnable or a timeout occurs.
+   * Hence this call should not be made within a containerLock
    */
-  void removeById(String runnableName, int instanceId) {
+  void stopByIdAndWait(String runnableName, int instanceId) {
+    String containerId = null;
+    TwillContainerController controller = null;
     containerLock.lock();
     try {
-      removeInstanceById(runnableName, instanceId);
+      // Find the controller with particular instance id.
+      for (Map.Entry<String, TwillContainerController> entry : containers.row(runnableName).entrySet()) {
+        if (getInstanceId(entry.getValue().getRunId()) == instanceId) {
+          containerId = entry.getKey();
+          controller = entry.getValue();
+          break;
+        }
+      }
+
+      Preconditions.checkState(containerId != null,
+                               "No container found for {} with instanceId = {}", runnableName, instanceId);
+      Preconditions.checkState(controller != null,
+                               "Null controller found for {} with instanceId = {}", runnableName, instanceId);
     } finally {
       containerLock.unlock();
     }
-  }
-
-  private void removeInstanceById(String runnableName, int instanceId) {
-    String containerId = null;
-    TwillContainerController controller = null;
-
-    // Find the controller with particular instance id.
-    for (Map.Entry<String, TwillContainerController> entry : containers.row(runnableName).entrySet()) {
-      if (getInstanceId(entry.getValue().getRunId()) == instanceId) {
-        containerId = entry.getKey();
-        controller = entry.getValue();
-        break;
-      }
-    }
-
-    Preconditions.checkState(containerId != null,
-                             "No container found for {} with instanceId = {}", runnableName, instanceId);
 
     LOG.info("Stopping service: {} {}", runnableName, controller.getRunId());
+    // This call will block until handleCompleted() method runs or a timeout occurs
     controller.stopAndWait();
-    containers.remove(runnableName, containerId);
-    removeContainerInfo(containerId);
-    removeInstanceId(runnableName, instanceId);
-    resourceReport.removeRunnableResources(runnableName, containerId);
-    containerChange.signalAll();
+
+    // Remove the stopped container state if it exists (in the case of killing the container due to timeout)
+    containerLock.lock();
+    try {
+      if (removeContainerInfo(containerId)) {
+        containers.remove(runnableName, containerId);
+        removeInstanceId(runnableName, instanceId);
+        resourceReport.removeRunnableResources(runnableName, containerId);
+        containerChange.signalAll();
+      }
+    } finally {
+      containerLock.unlock();
+    }
   }
 
   /**
@@ -302,19 +314,21 @@ final class RunningContainers {
   }
 
   void sendToRunnable(String runnableName, Message message, Runnable completion) {
+    List<TwillContainerController> controllers;
     containerLock.lock();
     try {
-      Collection<TwillContainerController> controllers = containers.row(runnableName).values();
-      if (controllers.isEmpty()) {
-        completion.run();
-      }
-
-      AtomicInteger count = new AtomicInteger(controllers.size());
-      for (TwillContainerController controller : controllers) {
-        sendMessage(runnableName, message, controller, count, completion);
-      }
+      controllers = new ArrayList<>(containers.row(runnableName).values());
     } finally {
       containerLock.unlock();
+    }
+
+    if (controllers.isEmpty()) {
+      completion.run();
+    }
+
+    AtomicInteger count = new AtomicInteger(controllers.size());
+    for (TwillContainerController controller : controllers) {
+      sendMessage(runnableName, message, controller, count, completion);
     }
   }
 
@@ -323,24 +337,38 @@ final class RunningContainers {
    */
   void stopAll() {
     containerLock.lock();
+    // Stop the runnables one by one in reverse order of start sequence
+    List<String> reverseRunnables = new LinkedList<>();
     try {
-      // Stop it one by one in reverse order of start sequence
-      Iterator<String> itor = startSequence.descendingIterator();
-      List<ListenableFuture<Service.State>> futures = Lists.newLinkedList();
-      while (itor.hasNext()) {
-        String runnableName = itor.next();
-        LOG.info("Stopping all instances of " + runnableName);
+      Iterators.addAll(reverseRunnables, startSequence.descendingIterator());
+    } finally {
+      containerLock.unlock();
+    }
 
-        futures.clear();
-        // Parallel stops all running containers of the current runnable.
+    List<ListenableFuture<Service.State>> futures = Lists.newLinkedList();
+    for (String runnableName : reverseRunnables) {
+      LOG.info("Stopping all instances of " + runnableName);
+
+      futures.clear();
+      // Parallel stops all running containers of the current runnable.
+      containerLock.lock();
+      try {
         for (TwillContainerController controller : containers.row(runnableName).values()) {
           futures.add(controller.stop());
         }
-        // Wait for containers to stop. Assumes the future returned by Futures.successfulAsList won't throw exception.
-        Futures.getUnchecked(Futures.successfulAsList(futures));
-
-        LOG.info("Terminated all instances of " + runnableName);
+      } finally {
+        containerLock.unlock();
       }
+      // Wait for containers to stop. Assumes the future returned by Futures.successfulAsList won't throw exception.
+      // This will block until handleCompleted() is run for the runnables or a timeout occurs.
+      Futures.getUnchecked(Futures.successfulAsList(futures));
+
+      LOG.info("Terminated all instances of " + runnableName);
+    }
+
+    // When we acquire this lock, all stopped runnables should have been cleaned up by handleCompleted() method
+    containerLock.lock();
+    try {
       containers.clear();
       runnableInstances.clear();
       containerStats.clear();
@@ -374,7 +402,7 @@ final class RunningContainers {
       removeContainerInfo(containerId);
       Map<String, TwillContainerController> lookup = containers.column(containerId);
       if (lookup.isEmpty()) {
-        // It's OK because if a container is stopped through removeLast, this would be empty.
+        // It's OK because if a container is stopped through stopByIdAndWait(), this would be empty.
         return;
       }
 
@@ -382,20 +410,16 @@ final class RunningContainers {
         LOG.warn("More than one controller found for container {}", containerId);
       }
 
-      if (exitStatus != ContainerExitCodes.SUCCESS) {
-        LOG.warn("Container {} exited abnormally with state {}, exit code {}.",
-                 containerId, state, exitStatus);
-        if (shouldRetry(exitStatus)) {
-          LOG.info("Re-request the container {} for exit code {}.", containerId, exitStatus);
-          restartRunnables.add(lookup.keySet().iterator().next());
-        }
-      } else {
-        LOG.info("Container {} exited normally with state {}", containerId, state);
-      }
-
+      boolean containerStopped = false;
       for (Map.Entry<String, TwillContainerController> completedEntry : lookup.entrySet()) {
         String runnableName = completedEntry.getKey();
         TwillContainerController controller = completedEntry.getValue();
+
+        // TODO: Can there be multiple controllers for a single container?
+        // TODO: What is the best way to determine whether to restart container when there are multiple controllers?
+        // See if the controller is stopped (this is to decide whether to retry the failed containers or not)
+        // In case of multiple controllers, even if one is stopped we will not re-request the container
+        containerStopped = containerStopped || isControllerStopped(controller);
         controller.completed(exitStatus);
 
         if (exitStatus == ContainerExitCodes.SUCCESS) {
@@ -404,8 +428,23 @@ final class RunningContainers {
           }
           completedContainerCount.put(runnableName, completedContainerCount.get(runnableName) + 1);
         }
+        // TODO: should we remove the completed instance from instanceId and resource report even on failures?
+        // TODO: won't they get added back when the container is re-requested?
         removeInstanceId(runnableName, getInstanceId(controller.getRunId()));
         resourceReport.removeRunnableResources(runnableName, containerId);
+      }
+
+      if (exitStatus != ContainerExitCodes.SUCCESS) {
+        LOG.warn("Container {} exited abnormally with state {}, exit code {}.",
+                 containerId, state, exitStatus);
+        if (!containerStopped && shouldRetry(exitStatus)) {
+          LOG.info("Re-request the container {} for exit code {}.", containerId, exitStatus);
+          restartRunnables.add(lookup.keySet().iterator().next());
+        } else if (containerStopped) {
+          LOG.info("Container {} is being stopped, will not re-request", containerId);
+        }
+      } else {
+        LOG.info("Container {} exited normally with state {}", containerId, state);
       }
 
       lookup.clear();
@@ -419,6 +458,10 @@ final class RunningContainers {
     return exitCode != ContainerExitCodes.SUCCESS
       && exitCode != ContainerExitCodes.DISKS_FAILED
       && exitCode != ContainerExitCodes.INIT_FAILED;
+  }
+
+  private boolean isControllerStopped(TwillContainerController controller) {
+    return controller.state() == Service.State.STOPPING || controller.state() == Service.State.TERMINATED;
   }
 
   /**

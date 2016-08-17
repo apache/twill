@@ -249,7 +249,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     }
 
     // Decrease number of instances of echo1 from 2 to 1
-    controller.changeInstances("echo1", 1);
+    controller.changeInstances("echo1", 1).get(60, TimeUnit.SECONDS);
     echoServices = controller.discoverService("echo1");
     Assert.assertTrue(waitForSize(echoServices, 1, 60));
     report = controller.getResourceReport();
