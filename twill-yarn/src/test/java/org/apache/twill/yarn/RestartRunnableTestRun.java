@@ -1,0 +1,221 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.twill.yarn;
+
+import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.yarn.api.records.NodeReport;
+import org.apache.twill.api.AbstractTwillRunnable;
+import org.apache.twill.api.Command;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.TwillApplication;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.junit.Assert;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.PrintWriter;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Test restarting of Twill Runnables.
+ */
+public class RestartRunnableTestRun extends BaseYarnTest {
+  private static final Logger LOG = LoggerFactory.getLogger(RestartRunnableTestRun.class);
+  private static final String HANGING_RUNNABLE = HangingRunnable.class.getSimpleName();
+  private static final String STOPPING_RUNNABLE = StoppingRunnable.class.getSimpleName();
+  private static final String HANGING_RUNNABLE_STOP_SECS = "hanging.runnable.stop.secs";
+
+  /**
+   * This runnable hangs when it gets a stop message.
+   */
+  public static final class HangingRunnable extends AbstractTwillRunnable {
+    private volatile Thread runThread;
+    private final AtomicInteger sleepTime = new AtomicInteger(1000);
+
+    @Override
+    public void run() {
+      this.runThread = Thread.currentThread();
+      LOG.info("Starting Runnable {}", HANGING_RUNNABLE);
+      while (!Thread.interrupted()) {
+        try {
+          TimeUnit.MILLISECONDS.sleep(200);
+        } catch (InterruptedException e) {
+          break;
+        }
+      }
+      LOG.info("Stopping Runnable {}", HANGING_RUNNABLE);
+    }
+
+    @Override
+    public void stop() {
+      // Do not stop the thread until sleepTime to simulate hanging of the runnable.
+      LOG.info("Using sleep time = {} secs", sleepTime);
+      try {
+        TimeUnit.SECONDS.sleep(sleepTime.get());
+      } catch (InterruptedException e) {
+        LOG.error("Got exception: ", e);
+      }
+      if (runThread != null) {
+        runThread.interrupt();
+      }
+    }
+
+    @Override
+    public void handleCommand(Command command) throws Exception {
+      super.handleCommand(command);
+      if (HANGING_RUNNABLE_STOP_SECS.equals(command.getCommand())) {
+        int time = Integer.parseInt(command.getOptions().get(HANGING_RUNNABLE_STOP_SECS));
+        LOG.info("Got sleep time from message = {} secs", time);
+        sleepTime.set(time);
+      }
+    }
+  }
+
+  /**
+   * This runnable stops immediately when it gets a stop message.
+   */
+  public static final class StoppingRunnable extends AbstractTwillRunnable {
+    private volatile Thread runThread;
+
+    @Override
+    public void run() {
+      this.runThread = Thread.currentThread();
+      LOG.info("Starting Runnable {}", STOPPING_RUNNABLE);
+      while (!Thread.interrupted()) {
+        try {
+          TimeUnit.MILLISECONDS.sleep(200);
+        } catch (InterruptedException e) {
+          break;
+        }
+      }
+      LOG.info("Stopping Runnable {}", STOPPING_RUNNABLE);
+    }
+
+    @Override
+    public void stop() {
+      // Interrupt the thread to stop the runnable
+      if (runThread != null) {
+        runThread.interrupt();
+      }
+    }
+  }
+
+  /**
+   * A test TwillApplication to test restarting runnables.
+   */
+  public static final class RestartTestApplication implements TwillApplication {
+
+    @Override
+    public TwillSpecification configure() {
+      return TwillSpecification.Builder.with()
+        .setName(RestartTestApplication.class.getSimpleName())
+        .withRunnable()
+        .add(HANGING_RUNNABLE, new HangingRunnable()).noLocalFiles()
+        .add(STOPPING_RUNNABLE, new StoppingRunnable()).noLocalFiles()
+        .withOrder()
+        .begin(HANGING_RUNNABLE)
+        .nextWhenStarted(STOPPING_RUNNABLE)
+        .build();
+    }
+  }
+
+  @Test
+  public void testRestartRunnable() throws Exception {
+    YarnTwillRunnerService runner = getTwillRunner();
+    runner.start();
+
+    LOG.info("Starting application {}", RestartTestApplication.class.getSimpleName());
+    TwillController controller = runner.prepare(new RestartTestApplication())
+      .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
+      .start();
+
+    // Lets wait until all runnables have started
+    waitForInstance(controller, HANGING_RUNNABLE, "002", 120, TimeUnit.SECONDS);
+    waitForInstance(controller, STOPPING_RUNNABLE, "003", 120, TimeUnit.SECONDS);
+    Assert.assertEquals(3, getNumContainersUsed());
+
+    // Now restart HangingRunnable
+    LOG.info("Restarting runnable {}", HANGING_RUNNABLE);
+    controller.restartAllInstances(HANGING_RUNNABLE);
+    waitForInstance(controller, HANGING_RUNNABLE, "004", 120, TimeUnit.SECONDS);
+    Assert.assertEquals(3, getNumContainersUsed());
+
+    // Send command to HANGING_RUNNABLE to stop immediately next time
+    controller.sendCommand(HANGING_RUNNABLE, new Command() {
+      @Override
+      public String getCommand() {
+        return HANGING_RUNNABLE_STOP_SECS;
+      }
+
+      @Override
+      public Map<String, String> getOptions() {
+        return ImmutableMap.of(HANGING_RUNNABLE_STOP_SECS, "0");
+      }
+    }).get();
+
+    // Now restart StoppingRunnable
+    LOG.info("Restarting runnable {}", STOPPING_RUNNABLE);
+    // TODO: test restart some instances of a runnable
+    controller.restartAllInstances(STOPPING_RUNNABLE);
+    waitForInstance(controller, STOPPING_RUNNABLE, "005", 120, TimeUnit.SECONDS);
+    Assert.assertEquals(3, getNumContainersUsed());
+
+    LOG.info("Stopping application {}", RestartTestApplication.class.getSimpleName());
+    controller.terminate().get(120, TimeUnit.SECONDS);
+
+    // Sleep a bit for full cleanup
+    TimeUnit.SECONDS.sleep(2);
+  }
+
+  private int getNumContainersUsed() throws Exception {
+    int numContainers = 0;
+    for (NodeReport nodeReport : getNodeReports()) {
+      numContainers += nodeReport.getNumContainers();
+    }
+    return numContainers;
+  }
+
+  private void waitForInstance(TwillController controller, String runnable, String yarnInstanceId,
+                               long timeout, TimeUnit timeoutUnit) throws InterruptedException, TimeoutException {
+    Stopwatch stopwatch = new Stopwatch();
+    stopwatch.start();
+    do {
+      ResourceReport report = controller.getResourceReport();
+      if (report != null && report.getRunnableResources(runnable) != null) {
+        for (TwillRunResources resources : report.getRunnableResources(runnable)) {
+          if (resources.getContainerId().endsWith(yarnInstanceId)) {
+            return;
+          }
+        }
+      }
+      TimeUnit.SECONDS.sleep(5);
+    } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
+
+    throw new TimeoutException("Timeout reached while waiting for runnable " +
+                                 runnable + " instance " + yarnInstanceId);
+  }
+}

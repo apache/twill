@@ -38,6 +38,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class helps launching a container.
@@ -153,7 +155,8 @@ public final class TwillContainerLauncher {
       .addCommand(firstCommand, command.toArray(new String[command.size()]))
       .launch();
 
-    TwillContainerControllerImpl controller = new TwillContainerControllerImpl(zkClient, runId, processController);
+    TwillContainerControllerImpl controller =
+      new TwillContainerControllerImpl(zkClient, runId, runtimeSpec.getName(), instanceId, processController);
     controller.start();
     return controller;
   }
@@ -161,13 +164,20 @@ public final class TwillContainerLauncher {
   private static final class TwillContainerControllerImpl extends AbstractZKServiceController
                                                           implements TwillContainerController {
 
+    private final String runnable;
+    private final int instanceId;
     private final ProcessController<Void> processController;
+    // This latch can be used to wait for container shutdown
+    private final CountDownLatch shutdownLatch;
     private volatile ContainerLiveNodeData liveData;
 
-    protected TwillContainerControllerImpl(ZKClient zkClient, RunId runId,
+    protected TwillContainerControllerImpl(ZKClient zkClient, RunId runId, String runnable, int instanceId,
                                            ProcessController<Void> processController) {
       super(runId, zkClient);
+      this.runnable = runnable;
+      this.instanceId = instanceId;
       this.processController = processController;
+      this.shutdownLatch = new CountDownLatch(1);
     }
 
     @Override
@@ -177,7 +187,22 @@ public final class TwillContainerLauncher {
 
     @Override
     protected void doShutDown() {
-      // No-op
+      // Wait for sometime for the container to stop
+      // TODO: Use configurable value for stop time
+      int maxWaitSecs = Constants.APPLICATION_MAX_STOP_SECONDS;
+      try {
+        if (shutdownLatch.await(maxWaitSecs, TimeUnit.SECONDS)) {
+          return;
+        }
+      } catch (InterruptedException e) {
+        LOG.error("Got exception while waiting for runnable {}, instance {} to stop", runnable, instanceId);
+        // TODO: how do we handle the InterruptedException? Should we restore the interrupted status?
+        return;
+      }
+      // Container has not shutdown even after maxWaitSecs after sending stop message,
+      // we'll need to kill the container
+      LOG.warn("Killing runnable {}, instance {} after waiting {} secs", runnable, instanceId, maxWaitSecs);
+      kill();
     }
 
     @Override
@@ -212,8 +237,12 @@ public final class TwillContainerLauncher {
     }
 
     @Override
-    public synchronized void completed(int exitStatus) {
-      forceShutDown();
+    public void completed(int exitStatus) {
+      // count down the shutdownLatch to inform any waiting threads that this container is complete
+      shutdownLatch.countDown();
+      synchronized (this) {
+        forceShutDown();
+      }
     }
 
     @Override

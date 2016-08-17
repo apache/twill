@@ -26,6 +26,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -88,6 +89,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -247,7 +249,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     // For checking if all containers are stopped.
     final Set<String> ids = Sets.newHashSet(runningContainers.getContainerIds());
-    YarnAMClient.AllocateHandler handler = new YarnAMClient.AllocateHandler() {
+    final YarnAMClient.AllocateHandler handler = new YarnAMClient.AllocateHandler() {
       @Override
       public void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers) {
         // no-op
@@ -256,20 +258,38 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       @Override
       public void completed(List<YarnContainerStatus> completed) {
         for (YarnContainerStatus status : completed) {
+          handleCompleted(completed);
           ids.remove(status.getContainerId());
         }
       }
     };
 
+    // Handle heartbeats during shutdown because runningContainers.stopAll() waits until
+    // handleCompleted() is called for every stopped runnable
+    ExecutorService stopPoller = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("stopPoller"));
+    stopPoller.execute(new Runnable() {
+      @Override
+      public void run() {
+        while (!ids.isEmpty()) {
+          try {
+            amClient.allocate(0.0f, handler);
+            TimeUnit.SECONDS.sleep(1);
+          } catch (InterruptedException e) {
+            // Exit on an interrupt
+            LOG.info("Exiting stop poller on an interrupt", e);
+          } catch (Exception e) {
+            LOG.error("Got exception while getting heartbeat", e);
+          }
+        }
+      }
+    });
+
+    // This will wait for all the running runnables to stop
+    // This wait also ensures that handleCompleted() method for all runnables will complete execution,
+    // except for the last runnable, for which handleCompleted() can still be in progress.
     runningContainers.stopAll();
-
-    // Poll for 5 seconds to wait for containers to stop.
-    int count = 0;
-    while (!ids.isEmpty() && count++ < 5) {
-      amClient.allocate(0.0f, handler);
-      TimeUnit.SECONDS.sleep(1);
-    }
-
+    // Since all the runnables are now stopped, it is okay to stop the poller.
+    stopPoller.shutdownNow();
     cleanupDir();
   }
 
@@ -728,7 +748,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
             if (newCount < oldCount) {
               // Shutdown some running containers
               for (int i = 0; i < oldCount - newCount; i++) {
-                runningContainers.removeLast(runnableName);
+                runningContainers.stopLastAndWait(runnableName);
               }
             } else {
               // Increase the number of instances
@@ -822,21 +842,27 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     LOG.debug("Processing restart runnable instances message {}.", message);
 
-    if (!Strings.isNullOrEmpty(message.getRunnableName()) && message.getScope() == Message.Scope.RUNNABLE) {
-      // ... for a runnable ...
-      String runnableName = message.getRunnableName();
-      LOG.debug("Start restarting all runnable {} instances.", runnableName);
-      restartRunnableInstances(runnableName, null);
-    } else {
-      // ... or maybe some runnables
-      for (Map.Entry<String, String> option : requestCommand.getOptions().entrySet()) {
-        String runnableName = option.getKey();
-        Set<Integer> restartedInstanceIds = GSON.fromJson(option.getValue(),
-                                                           new TypeToken<Set<Integer>>() {}.getType());
+    try {
+      if (!Strings.isNullOrEmpty(message.getRunnableName()) && message.getScope() == Message.Scope.RUNNABLE) {
+        // ... for a runnable ...
+        String runnableName = message.getRunnableName();
+        LOG.debug("Start restarting all runnable {} instances.", runnableName);
+        restartRunnableInstances(runnableName, null);
+      } else {
+        // ... or maybe some runnables
+        for (Map.Entry<String, String> option : requestCommand.getOptions().entrySet()) {
+          String runnableName = option.getKey();
+          Set<Integer> restartedInstanceIds = GSON.fromJson(option.getValue(),
+                                                             new TypeToken<Set<Integer>>() {}.getType());
 
-        LOG.debug("Start restarting runnable {} instances {}", runnableName, restartedInstanceIds);
-        restartRunnableInstances(runnableName, restartedInstanceIds);
+          LOG.debug("Start restarting runnable {} instances {}", runnableName, restartedInstanceIds);
+          restartRunnableInstances(runnableName, restartedInstanceIds);
+        }
       }
+    } catch (InterruptedException e) {
+      // TODO: is it okay to ignore the message on an InterruptedException?
+      LOG.error("Got interrupted exception when restarting runnable message {}", message, e);
+      // TODO: how do we handle the InterruptedException? Should we restore the interrupted status?
     }
 
     completion.run();
@@ -846,24 +872,30 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   /**
    * Helper method to restart instances of runnables.
    */
-  private void restartRunnableInstances(String runnableName, @Nullable Set<Integer> instanceIds) {
+  private void restartRunnableInstances(String runnableName, @Nullable Set<Integer> instanceIds)
+    throws InterruptedException {
     LOG.debug("Begin restart runnable {} instances.", runnableName);
 
-    Set<Integer> instancesToRemove = instanceIds;
+    int runningCount = runningContainers.count(runnableName);
+    Set<Integer> instancesToRemove = instanceIds == null ? null : ImmutableSet.copyOf(instanceIds);
     if (instancesToRemove == null) {
-      instancesToRemove = Ranges.closedOpen(0, runningContainers.count(runnableName)).asSet(DiscreteDomains.integers());
+      instancesToRemove = Ranges.closedOpen(0, runningCount).asSet(DiscreteDomains.integers());
     }
 
     for (int instanceId : instancesToRemove) {
-      LOG.debug("Remove instance {} for runnable {}", instanceId, runnableName);
+      LOG.debug("Stop instance {} for runnable {}", instanceId, runnableName);
       try {
-        runningContainers.removeById(runnableName, instanceId);
+        runningContainers.stopByIdAndWait(runnableName, instanceId);
       } catch (Exception ex) {
         // could be thrown if the container already stopped.
         LOG.info("Exception thrown when stopping instance {} probably already stopped.", instanceId);
       }
     }
+    runningContainers.waitForCount(runnableName, runningCount - instancesToRemove.size());
     LOG.info("Restarting instances {} for runnable {}", instancesToRemove, runnableName);
     runnableContainerRequests.add(createRunnableContainerRequest(runnableName, instancesToRemove.size()));
+    // For all runnables that needs to re-request for containers, update the expected count timestamp
+    // so that the EventHandler would be triggered with the right expiration timestamp.
+    expectedContainers.updateRequestTime(Collections.singleton(runnableName));
   }
 }

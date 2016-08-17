@@ -120,4 +120,16 @@ public class DefaultTwillRunResources implements TwillRunResources {
     return hash;
   }
 
+  @Override
+  public String toString() {
+    return "DefaultTwillRunResources{" +
+      "containerId='" + containerId + '\'' +
+      ", instanceId=" + instanceId +
+      ", virtualCores=" + virtualCores +
+      ", memoryMB=" + memoryMB +
+      ", host='" + host + '\'' +
+      ", debugPort=" + debugPort +
+      ", logLevel=" + logLevel +
+      '}';
+  }
 }
