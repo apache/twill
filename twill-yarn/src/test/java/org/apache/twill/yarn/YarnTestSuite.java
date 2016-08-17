@@ -40,7 +40,8 @@ import org.junit.runners.Suite;
   ResourceReportTestRun.class,
   ServiceDiscoveryTestRun.class,
   SessionExpireTestRun.class,
-  TaskCompletedTestRun.class
+  TaskCompletedTestRun.class,
+  RestartRunnableTestRun.class
 })
 public final class YarnTestSuite extends BaseYarnTest {
 

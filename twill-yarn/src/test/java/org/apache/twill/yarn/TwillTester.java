@@ -17,13 +17,21 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
+import org.apache.hadoop.yarn.server.resourcemanager.ClientRMService;
+import org.apache.hadoop.yarn.util.Records;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.internal.yarn.VersionDetectYarnAppClientFactory;
@@ -162,6 +170,19 @@ public class TwillTester extends ExternalResource {
 
   public String getZKConnectionString() {
     return zkServer.getConnectionStr();
+  }
+
+  public ApplicationResourceUsageReport getApplicationResourceReport(String appId) throws Exception {
+    List<String> splits = Lists.newArrayList(Splitter.on('_').split(appId));
+    Preconditions.checkArgument(splits.size() == 3, "Invalid application id - " + appId);
+    ApplicationId applicationId =
+      YarnUtils.createApplicationId(Long.parseLong(splits.get(1)), Integer.parseInt(splits.get(2)));
+
+    ClientRMService clientRMService = cluster.getResourceManager().getClientRMService();
+    GetApplicationReportRequest request = Records.newRecord(GetApplicationReportRequest.class);
+    request.setApplicationId(applicationId);
+    return clientRMService.getApplicationReport(request)
+      .getApplicationReport().getApplicationResourceUsageReport();
   }
 
   private void stopQuietly(Service service) {
