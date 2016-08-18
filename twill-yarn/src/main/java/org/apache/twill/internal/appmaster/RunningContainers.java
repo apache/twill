@@ -182,68 +182,66 @@ final class RunningContainers {
   }
 
   /**
-   * Stops the last running container of the given runnable.
-   * The container information is removed by {@link #handleCompleted(YarnContainerStatus, Multiset)} method.
+   * Stops and removes the last running container of the given runnable.
    * This method blocks until handleCompleted() is run for the runnable or a timeout occurs.
    */
   void stopLastAndWait(String runnableName) {
-    TwillContainerController controller;
+    int maxInstanceId;
     containerLock.lock();
     try {
-      int maxInstanceId = getMaxInstanceId(runnableName);
+      maxInstanceId = getMaxInstanceId(runnableName);
       if (maxInstanceId < 0) {
         LOG.warn("No running container found for {}", runnableName);
         return;
       }
-      controller = getController(runnableName, maxInstanceId);
     } finally {
       containerLock.unlock();
     }
-    stopInstanceAndWait(runnableName, controller);
+    stopByIdAndWait(runnableName, maxInstanceId);
   }
 
   /**
-   * Stop a container for a runnable on an id.
-   * The container information is removed by {@link #handleCompleted(YarnContainerStatus, Multiset)} method.
+   * Stop and removes a container for a runnable on an id.
    * This method blocks until handleCompleted() is run for the runnable or a timeout occurs.
    */
   void stopByIdAndWait(String runnableName, int instanceId) {
-    TwillContainerController controller;
+    String containerId = null;
+    TwillContainerController controller = null;
     containerLock.lock();
     try {
-      controller = getController(runnableName, instanceId);
+      // Find the controller with particular instance id.
+      for (Map.Entry<String, TwillContainerController> entry : containers.row(runnableName).entrySet()) {
+        if (getInstanceId(entry.getValue().getRunId()) == instanceId) {
+          containerId = entry.getKey();
+          controller = entry.getValue();
+          break;
+        }
+      }
+
+      Preconditions.checkState(containerId != null,
+                               "No container found for {} with instanceId = {}", runnableName, instanceId);
+      Preconditions.checkState(controller != null,
+                               "Null controller found for {} with instanceId = {}", runnableName, instanceId);
     } finally {
       containerLock.unlock();
     }
-    stopInstanceAndWait(runnableName, controller);
-  }
 
-  private TwillContainerController getController(String runnableName, int instanceId) {
-    String containerId = null;
-    TwillContainerController controller = null;
-
-    // Find the controller with particular instance id.
-    for (Map.Entry<String, TwillContainerController> entry : containers.row(runnableName).entrySet()) {
-      if (getInstanceId(entry.getValue().getRunId()) == instanceId) {
-        containerId = entry.getKey();
-        controller = entry.getValue();
-        break;
-      }
-    }
-
-    Preconditions.checkState(containerId != null,
-                             "No container found for {} with instanceId = {}", runnableName, instanceId);
-    return controller;
-  }
-
-  // This method only stops a runnable using the controller.
-  // The cleanup of the state happens when handleCompleted() method runs for the runnable after the stop
-  // This method will block until handleCompleted() method runs or a timeout occurs
-  // Hence this method should not be called with a containerLock taken
-  private void stopInstanceAndWait(String runnableName, TwillContainerController controller) {
     LOG.info("Stopping service: {} {}", runnableName, controller.getRunId());
     // This call will block until handleCompleted() method runs or a timeout occurs
+    // Hence this call should not be made within a containerLock
     controller.stopAndWait();
+
+    // Remove the stopped container state (needed in case of a timeout)
+    containerLock.lock();
+    try {
+      containers.remove(runnableName, containerId);
+      removeContainerInfo(containerId);
+      removeInstanceId(runnableName, instanceId);
+      resourceReport.removeRunnableResources(runnableName, containerId);
+      containerChange.signalAll();
+    } finally {
+      containerLock.unlock();
+    }
   }
 
   /**

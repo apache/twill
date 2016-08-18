@@ -279,7 +279,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
             TimeUnit.SECONDS.sleep(1);
           } catch (InterruptedException e) {
             // Exit on an interrupt
-            LOG.info("Exiting stop poller on an interrupt", e);
+            LOG.info("Exiting stop poller on an interrupt");
           } catch (Exception e) {
             LOG.error("Got exception while getting heartbeat", e);
           }
@@ -287,9 +287,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       }
     });
 
-    // This will wait for all the running runnables to stop
+    // runningContainers.stopAll() will wait for all the running runnables to stop
     // This wait also ensures that handleCompleted() method for all runnables will complete execution,
-    // except for the last runnable, for which handleCompleted() can still be in progress.
     runningContainers.stopAll();
     // Since all the runnables are now stopped, it is okay to stop the poller.
     stopPoller.shutdownNow();
