@@ -29,7 +29,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
-import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,13 +155,13 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     // Lets wait until all runnables have started
     waitForInstance(controller, HANGING_RUNNABLE, "002", 120, TimeUnit.SECONDS);
     waitForInstance(controller, STOPPING_RUNNABLE, "003", 120, TimeUnit.SECONDS);
-    Assert.assertEquals(3, getNumContainersUsed());
+    waitForContainers(3, 60, TimeUnit.SECONDS);
 
     // Now restart HangingRunnable
     LOG.info("Restarting runnable {}", HANGING_RUNNABLE);
     controller.restartAllInstances(HANGING_RUNNABLE);
     waitForInstance(controller, HANGING_RUNNABLE, "004", 120, TimeUnit.SECONDS);
-    Assert.assertEquals(3, getNumContainersUsed());
+    waitForContainers(3, 60, TimeUnit.SECONDS);
 
     // Send command to HANGING_RUNNABLE to stop immediately next time
     controller.sendCommand(HANGING_RUNNABLE, new Command() {
@@ -182,7 +181,7 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     // TODO: test restart some instances of a runnable
     controller.restartAllInstances(STOPPING_RUNNABLE);
     waitForInstance(controller, STOPPING_RUNNABLE, "005", 120, TimeUnit.SECONDS);
-    Assert.assertEquals(3, getNumContainersUsed());
+    waitForContainers(3, 60, TimeUnit.SECONDS);
 
     LOG.info("Stopping application {}", RestartTestApplication.class.getSimpleName());
     controller.terminate().get(120, TimeUnit.SECONDS);
@@ -199,6 +198,19 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     return numContainers;
   }
 
+  private void waitForContainers(int count, long timeout, TimeUnit timeoutUnit) throws Exception {
+    Stopwatch stopwatch = new Stopwatch();
+    stopwatch.start();
+    do {
+      if (getNumContainersUsed() == count) {
+        return;
+      }
+      TimeUnit.SECONDS.sleep(1);
+    } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
+
+    throw new TimeoutException("Timeout reached while waiting for num containers to be " +  count);
+  }
+
   private void waitForInstance(TwillController controller, String runnable, String yarnInstanceId,
                                long timeout, TimeUnit timeoutUnit) throws InterruptedException, TimeoutException {
     Stopwatch stopwatch = new Stopwatch();
@@ -212,7 +224,7 @@ public class RestartRunnableTestRun extends BaseYarnTest {
           }
         }
       }
-      TimeUnit.SECONDS.sleep(5);
+      TimeUnit.SECONDS.sleep(1);
     } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
 
     throw new TimeoutException("Timeout reached while waiting for runnable " +
