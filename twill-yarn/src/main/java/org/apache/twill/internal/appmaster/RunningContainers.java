@@ -60,7 +60,6 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -231,7 +230,7 @@ final class RunningContainers {
     // Hence this call should not be made within a containerLock
     controller.stopAndWait();
 
-    // Remove the stopped container state (needed in case of a timeout)
+    // Remove the stopped container state
     containerLock.lock();
     try {
       containers.remove(runnableName, containerId);
@@ -402,7 +401,7 @@ final class RunningContainers {
       removeContainerInfo(containerId);
       Map<String, TwillContainerController> lookup = containers.column(containerId);
       if (lookup.isEmpty()) {
-        LOG.error("Cannot find controller for container {}", containerId);
+        // It's OK because if a container is stopped through stopByIdAndWait(), this would be empty.
         return;
       }
 
@@ -411,11 +410,9 @@ final class RunningContainers {
       }
 
       boolean containerStopped = false;
-      Set<TwillContainerController> completedControllers = new HashSet<>();
       for (Map.Entry<String, TwillContainerController> completedEntry : lookup.entrySet()) {
         String runnableName = completedEntry.getKey();
         TwillContainerController controller = completedEntry.getValue();
-        completedControllers.add(controller);
 
         // TODO: Can there be multiple controllers for a single container?
         // TODO: What is the best way to determine whether to restart container when there are multiple controllers?
@@ -451,12 +448,6 @@ final class RunningContainers {
 
       lookup.clear();
       containerChange.signalAll();
-
-      // Calling controller.completed() will unblock any thread that is waiting for a runnable to stop.
-      // We need to do this after all the state cleanup is done for the completed container
-      for (TwillContainerController controller : completedControllers) {
-        controller.completed(exitStatus);
-      }
     } finally {
       containerLock.unlock();
     }

@@ -896,7 +896,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         LOG.info("Exception thrown when stopping instance {} probably already stopped.", instanceId);
       }
     }
-    runningContainers.waitForCount(runnableName, runningCount - instancesToRemove.size());
     LOG.info("Restarting instances {} for runnable {}", instancesToRemove, runnableName);
     runnableContainerRequests.add(createRunnableContainerRequest(runnableName, instancesToRemove.size()));
     // For all runnables that needs to re-request for containers, update the expected count timestamp
