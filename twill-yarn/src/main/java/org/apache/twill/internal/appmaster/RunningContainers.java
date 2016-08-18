@@ -56,9 +56,11 @@ import org.apache.twill.zookeeper.ZKOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -314,19 +316,21 @@ final class RunningContainers {
   }
 
   void sendToRunnable(String runnableName, Message message, Runnable completion) {
+    List<TwillContainerController> controllers;
     containerLock.lock();
     try {
-      Collection<TwillContainerController> controllers = containers.row(runnableName).values();
-      if (controllers.isEmpty()) {
-        completion.run();
-      }
-
-      AtomicInteger count = new AtomicInteger(controllers.size());
-      for (TwillContainerController controller : controllers) {
-        sendMessage(runnableName, message, controller, count, completion);
-      }
+      controllers = new ArrayList<>(containers.row(runnableName).values());
     } finally {
       containerLock.unlock();
+    }
+
+    if (controllers.isEmpty()) {
+      completion.run();
+    }
+
+    AtomicInteger count = new AtomicInteger(controllers.size());
+    for (TwillContainerController controller : controllers) {
+      sendMessage(runnableName, message, controller, count, completion);
     }
   }
 
@@ -409,9 +413,11 @@ final class RunningContainers {
       }
 
       boolean containerStopped = false;
+      Set<TwillContainerController> completedControllers = new HashSet<>();
       for (Map.Entry<String, TwillContainerController> completedEntry : lookup.entrySet()) {
         String runnableName = completedEntry.getKey();
         TwillContainerController controller = completedEntry.getValue();
+        completedControllers.add(controller);
 
         // TODO: Can there be multiple controllers for a single container?
         // TODO: What is the best way to determine whether to restart container when there are multiple controllers?
@@ -426,6 +432,8 @@ final class RunningContainers {
           }
           completedContainerCount.put(runnableName, completedContainerCount.get(runnableName) + 1);
         }
+        // TODO: should we remove the completed instance from instanceId and resource report even on failures?
+        // TODO: won't they get added back when the container is re-requested?
         removeInstanceId(runnableName, getInstanceId(controller.getRunId()));
         resourceReport.removeRunnableResources(runnableName, containerId);
       }
@@ -445,6 +453,12 @@ final class RunningContainers {
 
       lookup.clear();
       containerChange.signalAll();
+
+      // Calling controller.completed() will unblock any thread that is waiting for a runnable to stop.
+      // We need to do this after all the state cleanup is done for the completed container
+      for (TwillContainerController controller : completedControllers) {
+        controller.completed(exitStatus);
+      }
     } finally {
       containerLock.unlock();
     }
