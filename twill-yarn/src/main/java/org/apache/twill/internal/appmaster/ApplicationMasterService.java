@@ -287,8 +287,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       }
     });
 
-    // runningContainers.stopAll() will wait for all the running runnables to stop
-    // This wait also ensures that handleCompleted() method for all runnables will complete execution,
+    // runningContainers.stopAll() will wait for all the running runnables to stop or kill them after a timeout
     runningContainers.stopAll();
     // Since all the runnables are now stopped, it is okay to stop the poller.
     stopPoller.shutdownNow();

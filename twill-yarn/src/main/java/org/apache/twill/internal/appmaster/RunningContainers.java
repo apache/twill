@@ -202,6 +202,7 @@ final class RunningContainers {
   /**
    * Stop and removes a container for a runnable on an id.
    * This method blocks until handleCompleted() is run for the runnable or a timeout occurs.
+   * Hence this call should not be made within a containerLock
    */
   void stopByIdAndWait(String runnableName, int instanceId) {
     String containerId = null;
@@ -227,7 +228,6 @@ final class RunningContainers {
 
     LOG.info("Stopping service: {} {}", runnableName, controller.getRunId());
     // This call will block until handleCompleted() method runs or a timeout occurs
-    // Hence this call should not be made within a containerLock
     controller.stopAndWait();
 
     // Remove the stopped container state
@@ -365,7 +365,7 @@ final class RunningContainers {
       LOG.info("Terminated all instances of " + runnableName);
     }
 
-    // When we acquire this lock, all runnables should have been cleaned up by handleCompleted() method
+    // When we acquire this lock, all stopped runnables should have been cleaned up by handleCompleted() method
     containerLock.lock();
     try {
       containers.clear();
