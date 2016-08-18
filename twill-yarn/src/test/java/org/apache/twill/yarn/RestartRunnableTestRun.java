@@ -49,11 +49,33 @@ public class RestartRunnableTestRun extends BaseYarnTest {
   private static final String HANGING_RUNNABLE_STOP_SECS = "hanging.runnable.stop.secs";
 
   /**
+   * Command that can be sent to HangingRunnable to make it sleep while stopping.
+   */
+  private static class SleepCommand implements Command {
+    private final int sleepTime;
+
+    public SleepCommand(int sleepTime) {
+      this.sleepTime = sleepTime;
+    }
+
+    @Override
+    public String getCommand() {
+      return HANGING_RUNNABLE_STOP_SECS;
+    }
+
+    @Override
+    public Map<String, String> getOptions() {
+      return ImmutableMap.of(HANGING_RUNNABLE_STOP_SECS, Integer.toString(sleepTime));
+    }
+  }
+
+  /**
    * This runnable hangs when it gets a stop message.
    */
   public static final class HangingRunnable extends AbstractTwillRunnable {
     private volatile Thread runThread;
-    private final AtomicInteger sleepTime = new AtomicInteger(1000);
+    // Send SleepCommand to update sleepTime to simulate hanging
+    private final AtomicInteger sleepTime = new AtomicInteger(1);
 
     @Override
     public void run() {
@@ -142,6 +164,50 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     }
   }
 
+  /**
+   * A test TwillApplication with a single runnable
+   */
+  public static final class SingleRunnableApp implements TwillApplication {
+
+    @Override
+    public TwillSpecification configure() {
+      return TwillSpecification.Builder.with()
+        .setName(RestartTestApplication.class.getSimpleName())
+        .withRunnable()
+        .add(HANGING_RUNNABLE, new HangingRunnable()).noLocalFiles()
+        .anyOrder()
+        .build();
+    }
+  }
+
+  @Test
+  public void testRestartSingleRunnable() throws Exception {
+    YarnTwillRunnerService runner = getTwillRunner();
+    runner.start();
+
+    LOG.info("Starting application {}", SingleRunnableApp.class.getSimpleName());
+    TwillController controller = runner.prepare(new SingleRunnableApp())
+      .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
+      .start();
+
+    // Lets wait until all runnables have started
+    waitForInstance(controller, HANGING_RUNNABLE, "002", 120, TimeUnit.SECONDS);
+    waitForContainers(controller, 2, 60, TimeUnit.SECONDS);
+
+    // Now restart runnable
+    LOG.info("Restarting runnable {}", HANGING_RUNNABLE);
+    controller.restartAllInstances(HANGING_RUNNABLE);
+    waitForInstance(controller, HANGING_RUNNABLE, "003", 120, TimeUnit.SECONDS);
+    waitForContainers(controller, 2, 60, TimeUnit.SECONDS);
+
+    // Send command to HANGING_RUNNABLE to hang when stopped
+    controller.sendCommand(HANGING_RUNNABLE, new SleepCommand(1000)).get();
+    LOG.info("Restarting runnable {}", HANGING_RUNNABLE);
+    controller.restartAllInstances(HANGING_RUNNABLE);
+    waitForInstance(controller, HANGING_RUNNABLE, "004", 120, TimeUnit.SECONDS);
+    waitForContainers(controller, 2, 60, TimeUnit.SECONDS);
+  }
+
   @Test
   public void testRestartRunnable() throws Exception {
     YarnTwillRunnerService runner = getTwillRunner();
@@ -159,22 +225,11 @@ public class RestartRunnableTestRun extends BaseYarnTest {
 
     // Now restart HangingRunnable
     LOG.info("Restarting runnable {}", HANGING_RUNNABLE);
+    // Send command to HANGING_RUNNABLE to hang when stopped
+    controller.sendCommand(HANGING_RUNNABLE, new SleepCommand(1000)).get();
     controller.restartAllInstances(HANGING_RUNNABLE);
     waitForInstance(controller, HANGING_RUNNABLE, "004", 120, TimeUnit.SECONDS);
     waitForContainers(controller, 3, 60, TimeUnit.SECONDS);
-
-    // Send command to HANGING_RUNNABLE to stop immediately next time
-    controller.sendCommand(HANGING_RUNNABLE, new Command() {
-      @Override
-      public String getCommand() {
-        return HANGING_RUNNABLE_STOP_SECS;
-      }
-
-      @Override
-      public Map<String, String> getOptions() {
-        return ImmutableMap.of(HANGING_RUNNABLE_STOP_SECS, "0");
-      }
-    }).get();
 
     // Now restart StoppingRunnable
     LOG.info("Restarting runnable {}", STOPPING_RUNNABLE);
