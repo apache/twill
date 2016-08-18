@@ -20,7 +20,6 @@ package org.apache.twill.yarn;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
@@ -34,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -155,13 +155,13 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     // Lets wait until all runnables have started
     waitForInstance(controller, HANGING_RUNNABLE, "002", 120, TimeUnit.SECONDS);
     waitForInstance(controller, STOPPING_RUNNABLE, "003", 120, TimeUnit.SECONDS);
-    waitForContainers(3, 60, TimeUnit.SECONDS);
+    waitForContainers(controller, 3, 60, TimeUnit.SECONDS);
 
     // Now restart HangingRunnable
     LOG.info("Restarting runnable {}", HANGING_RUNNABLE);
     controller.restartAllInstances(HANGING_RUNNABLE);
     waitForInstance(controller, HANGING_RUNNABLE, "004", 120, TimeUnit.SECONDS);
-    waitForContainers(3, 60, TimeUnit.SECONDS);
+    waitForContainers(controller, 3, 60, TimeUnit.SECONDS);
 
     // Send command to HANGING_RUNNABLE to stop immediately next time
     controller.sendCommand(HANGING_RUNNABLE, new Command() {
@@ -178,10 +178,10 @@ public class RestartRunnableTestRun extends BaseYarnTest {
 
     // Now restart StoppingRunnable
     LOG.info("Restarting runnable {}", STOPPING_RUNNABLE);
-    // TODO: test restart some instances of a runnable
+    // TODO: test restarting only some instances of a runnable
     controller.restartAllInstances(STOPPING_RUNNABLE);
     waitForInstance(controller, STOPPING_RUNNABLE, "005", 120, TimeUnit.SECONDS);
-    waitForContainers(3, 60, TimeUnit.SECONDS);
+    waitForContainers(controller, 3, 60, TimeUnit.SECONDS);
 
     LOG.info("Stopping application {}", RestartTestApplication.class.getSimpleName());
     controller.terminate().get(120, TimeUnit.SECONDS);
@@ -190,25 +190,26 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     TimeUnit.SECONDS.sleep(2);
   }
 
-  private int getNumContainersUsed() throws Exception {
-    int numContainers = 0;
-    for (NodeReport nodeReport : getNodeReports()) {
-      numContainers += nodeReport.getNumContainers();
-    }
-    return numContainers;
-  }
-
-  private void waitForContainers(int count, long timeout, TimeUnit timeoutUnit) throws Exception {
+  private void waitForContainers(TwillController controller, int count, long timeout, TimeUnit timeoutUnit)
+    throws Exception {
     Stopwatch stopwatch = new Stopwatch();
     stopwatch.start();
+    int yarnContainers = 0;
+    int twillContainers = 0;
     do {
-      if (getNumContainersUsed() == count) {
-        return;
+      if (controller.getResourceReport() != null) {
+        yarnContainers =
+          getApplicationResourceReport(controller.getResourceReport().getApplicationId()).getNumUsedContainers();
+        twillContainers = getTwillContainersUsed(controller);
+        if (yarnContainers == count && twillContainers == count) {
+          return;
+        }
       }
       TimeUnit.SECONDS.sleep(1);
     } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
 
-    throw new TimeoutException("Timeout reached while waiting for num containers to be " +  count);
+    throw new TimeoutException("Timeout reached while waiting for num containers to be " +  count +
+                                 ". Yarn containers = " + yarnContainers + ", Twill containers = " + twillContainers);
   }
 
   private void waitForInstance(TwillController controller, String runnable, String yarnInstanceId,
@@ -229,5 +230,18 @@ public class RestartRunnableTestRun extends BaseYarnTest {
 
     throw new TimeoutException("Timeout reached while waiting for runnable " +
                                  runnable + " instance " + yarnInstanceId);
+  }
+
+  private int getTwillContainersUsed(TwillController controller) {
+    if (controller.getResourceReport() == null) {
+      return 0;
+    }
+
+    int count = 1; // 1 for app master container
+    ResourceReport resourceReport = controller.getResourceReport();
+    for (Collection<TwillRunResources> resources : resourceReport.getResources().values()) {
+      count += resources.size();
+    }
+    return count;
   }
 }

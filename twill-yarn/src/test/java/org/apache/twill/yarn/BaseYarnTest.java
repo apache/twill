@@ -18,6 +18,7 @@
 package org.apache.twill.yarn;
 
 import com.google.common.collect.Iterables;
+import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
@@ -108,5 +109,9 @@ public abstract class BaseYarnTest {
 
   public List<NodeReport> getNodeReports() throws Exception {
     return TWILL_TESTER.getNodeReports();
+  }
+
+  public ApplicationResourceUsageReport getApplicationResourceReport(String appId) throws Exception {
+    return TWILL_TESTER.getApplicationResourceReport(appId);
   }
 }
