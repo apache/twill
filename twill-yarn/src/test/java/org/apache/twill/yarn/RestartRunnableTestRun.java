@@ -19,7 +19,11 @@
 package org.apache.twill.yarn;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.JdkFutureAdapters;
+import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
@@ -34,7 +38,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -208,6 +215,7 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     waitForContainers(controller, 2, 60, TimeUnit.SECONDS);
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void testRestartRunnable() throws Exception {
     YarnTwillRunnerService runner = getTwillRunner();
@@ -223,19 +231,48 @@ public class RestartRunnableTestRun extends BaseYarnTest {
     waitForInstance(controller, STOPPING_RUNNABLE, "003", 120, TimeUnit.SECONDS);
     waitForContainers(controller, 3, 60, TimeUnit.SECONDS);
 
-    // Now restart HangingRunnable
-    LOG.info("Restarting runnable {}", HANGING_RUNNABLE);
-    // Send command to HANGING_RUNNABLE to hang when stopped
+    // Send command to first instance of HANGING_RUNNABLE to hang when stopped
     controller.sendCommand(HANGING_RUNNABLE, new SleepCommand(1000)).get();
-    controller.restartAllInstances(HANGING_RUNNABLE);
-    waitForInstance(controller, HANGING_RUNNABLE, "004", 120, TimeUnit.SECONDS);
-    waitForContainers(controller, 3, 60, TimeUnit.SECONDS);
 
-    // Now restart StoppingRunnable
-    LOG.info("Restarting runnable {}", STOPPING_RUNNABLE);
-    // TODO: test restarting only some instances of a runnable
-    controller.restartAllInstances(STOPPING_RUNNABLE);
-    waitForInstance(controller, STOPPING_RUNNABLE, "005", 120, TimeUnit.SECONDS);
+    // Increase instances of both runnables
+    LOG.info("Increasing instances of both runnables");
+    allAsList(controller.changeInstances(HANGING_RUNNABLE, 3),
+              controller.changeInstances(STOPPING_RUNNABLE, 2)
+    ).get(120, TimeUnit.SECONDS);
+    waitForInstance(controller, HANGING_RUNNABLE, "005", 120, TimeUnit.SECONDS); // +2 containers
+    waitForInstance(controller, STOPPING_RUNNABLE, "006", 120, TimeUnit.SECONDS); // +1 container
+    waitForContainers(controller, 6, 60, TimeUnit.SECONDS);
+
+    // Now restart both runnables (002 instance of HANGING_RUNNABLE will be killed)
+    LOG.info("Restarting all instances of runnables {} and {}", HANGING_RUNNABLE, STOPPING_RUNNABLE);
+    allAsList(
+      controller.restartAllInstances(HANGING_RUNNABLE),
+      controller.restartAllInstances(STOPPING_RUNNABLE)
+    ).get(120, TimeUnit.SECONDS);
+    waitForInstance(controller, HANGING_RUNNABLE, "009", 120, TimeUnit.SECONDS);
+    waitForInstance(controller, STOPPING_RUNNABLE, "011", 120, TimeUnit.SECONDS);
+    waitForContainers(controller, 6, 60, TimeUnit.SECONDS);
+
+    // Restart a single runnable from both
+    LOG.info("Restarting a single runnable of both");
+    allAsList(
+      controller.restartInstances(HANGING_RUNNABLE, 1),
+      controller.restartInstances(ImmutableMap.of(STOPPING_RUNNABLE, Collections.singleton(0)))
+    ).get(120, TimeUnit.SECONDS);
+    waitForInstance(controller, HANGING_RUNNABLE, "012", 120, TimeUnit.SECONDS);
+    waitForInstance(controller, STOPPING_RUNNABLE, "013", 120, TimeUnit.SECONDS);
+    waitForContainers(controller, 6, 60, TimeUnit.SECONDS);
+
+    // Send command to all instances of HANGING_RUNNABLE to wait for 10 seconds when stopped
+    controller.sendCommand(HANGING_RUNNABLE, new SleepCommand(10)).get();
+
+    // Reduce instances of both runnables to 1
+    LOG.info("Decreasing instances of both runnables");
+    allAsList(controller.changeInstances(HANGING_RUNNABLE, 1),
+              controller.changeInstances(STOPPING_RUNNABLE, 1)
+    ).get(120, TimeUnit.SECONDS);
+    waitForInstance(controller, HANGING_RUNNABLE, "007", 120, TimeUnit.SECONDS);
+    waitForInstance(controller, STOPPING_RUNNABLE, "013", 120, TimeUnit.SECONDS); // instance 0 is 013 due to restart
     waitForContainers(controller, 3, 60, TimeUnit.SECONDS);
 
     LOG.info("Stopping application {}", RestartTestApplication.class.getSimpleName());
@@ -298,5 +335,14 @@ public class RestartRunnableTestRun extends BaseYarnTest {
       count += resources.size();
     }
     return count;
+  }
+
+  @SafeVarargs
+  private final <V> ListenableFuture<List<V>> allAsList(Future<? extends V>... futures) {
+    ImmutableList.Builder<ListenableFuture<? extends V>> listBuilder = ImmutableList.builder();
+    for (Future<? extends V> future : futures) {
+      listBuilder.add(JdkFutureAdapters.listenInPoolThread(future));
+    }
+    return Futures.allAsList(listBuilder.build());
   }
 }
