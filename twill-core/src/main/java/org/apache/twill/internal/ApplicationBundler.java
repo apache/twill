@@ -17,23 +17,6 @@
  */
 package org.apache.twill.internal;
 
-import com.google.common.base.Function;
-import com.google.common.base.Splitter;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Closeables;
-import com.google.common.io.Files;
-import org.apache.twill.api.ClassAcceptor;
-import org.apache.twill.filesystem.Location;
-import org.apache.twill.internal.utils.Dependencies;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -50,6 +33,24 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.zip.CRC32;
 import java.util.zip.CheckedOutputStream;
+
+import org.apache.twill.api.ClassAcceptor;
+import org.apache.twill.filesystem.Location;
+import org.apache.twill.internal.utils.Dependencies;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Function;
+import com.google.common.base.Splitter;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Closeables;
+import com.google.common.io.Files;
 
 /**
  * This class builds jar files based on class dependencies.
@@ -216,7 +217,8 @@ public final class ApplicationBundler {
     String classPath = classPathUrl.getFile();
     if (classPath.endsWith(".jar")) {
       String entryName = classPath.substring(classPath.lastIndexOf('/') + 1);
-      // need unique name or else we lose classes (TWILL-181)
+      /* need unique name or else we lose classes (TWILL-181) we know the classPath is unique because it is coming from a set,
+       * preserve as much as possible of it by prepending elements of the path until it is unique. */
       if (entries.contains(SUBDIR_LIB + entryName)) {
         String[] parts = classPath.split("/");
         for (int i = parts.length - 2; i >= 0; i--) {
