@@ -230,14 +230,15 @@ final class RunningContainers {
     // This call will block until handleCompleted() method runs or a timeout occurs
     controller.stopAndWait();
 
-    // Remove the stopped container state
+    // Remove the stopped container state if it exists (in the case of killing the container due to timeout)
     containerLock.lock();
     try {
-      containers.remove(runnableName, containerId);
-      removeContainerInfo(containerId);
-      removeInstanceId(runnableName, instanceId);
-      resourceReport.removeRunnableResources(runnableName, containerId);
-      containerChange.signalAll();
+      if (removeContainerInfo(containerId)) {
+        containers.remove(runnableName, containerId);
+        removeInstanceId(runnableName, instanceId);
+        resourceReport.removeRunnableResources(runnableName, containerId);
+        containerChange.signalAll();
+      }
     } finally {
       containerLock.unlock();
     }

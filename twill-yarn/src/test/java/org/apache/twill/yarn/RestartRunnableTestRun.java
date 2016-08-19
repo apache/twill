@@ -165,7 +165,7 @@ public class RestartRunnableTestRun extends BaseYarnTest {
   }
 
   /**
-   * A test TwillApplication with a single runnable
+   * A test TwillApplication with a single runnable.
    */
   public static final class SingleRunnableApp implements TwillApplication {
 
