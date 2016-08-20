@@ -18,9 +18,11 @@
 package org.apache.twill.internal;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import org.apache.twill.api.RunId;
@@ -38,6 +40,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class helps launching a container.
@@ -153,7 +157,8 @@ public final class TwillContainerLauncher {
       .addCommand(firstCommand, command.toArray(new String[command.size()]))
       .launch();
 
-    TwillContainerControllerImpl controller = new TwillContainerControllerImpl(zkClient, runId, processController);
+    TwillContainerControllerImpl controller =
+      new TwillContainerControllerImpl(zkClient, runId, runtimeSpec.getName(), instanceId, processController);
     controller.start();
     return controller;
   }
@@ -161,13 +166,20 @@ public final class TwillContainerLauncher {
   private static final class TwillContainerControllerImpl extends AbstractZKServiceController
                                                           implements TwillContainerController {
 
+    private final String runnable;
+    private final int instanceId;
     private final ProcessController<Void> processController;
+    // This latch can be used to wait for container shutdown
+    private final CountDownLatch shutdownLatch;
     private volatile ContainerLiveNodeData liveData;
 
-    protected TwillContainerControllerImpl(ZKClient zkClient, RunId runId,
+    protected TwillContainerControllerImpl(ZKClient zkClient, RunId runId, String runnable, int instanceId,
                                            ProcessController<Void> processController) {
       super(runId, zkClient);
+      this.runnable = runnable;
+      this.instanceId = instanceId;
       this.processController = processController;
+      this.shutdownLatch = new CountDownLatch(1);
     }
 
     @Override
@@ -177,7 +189,20 @@ public final class TwillContainerLauncher {
 
     @Override
     protected void doShutDown() {
-      // No-op
+      // Wait for sometime for the container to stop
+      // TODO: Use configurable value for stop time
+      int maxWaitSecs = Constants.APPLICATION_MAX_STOP_SECONDS;
+      try {
+        if (Uninterruptibles.awaitUninterruptibly(shutdownLatch, maxWaitSecs, TimeUnit.SECONDS)) {
+          return;
+        }
+      } catch (Exception e) {
+        LOG.error("Got exception while trying to stop runnable {}, instance {}", runnable, instanceId, e);
+      }
+      // Container has not shutdown even after maxWaitSecs after sending stop message,
+      // we'll need to kill the container
+      LOG.warn("Killing runnable {}, instance {} after waiting {} secs", runnable, instanceId, maxWaitSecs);
+      killAndWait(maxWaitSecs);
     }
 
     @Override
@@ -212,8 +237,12 @@ public final class TwillContainerLauncher {
     }
 
     @Override
-    public synchronized void completed(int exitStatus) {
-      forceShutDown();
+    public void completed(int exitStatus) {
+      // count down the shutdownLatch to inform any waiting threads that this container is complete
+      shutdownLatch.countDown();
+      synchronized (this) {
+        forceShutDown();
+      }
     }
 
     @Override
@@ -224,6 +253,32 @@ public final class TwillContainerLauncher {
     @Override
     public void kill() {
       processController.cancel();
+    }
+
+    private void killAndWait(int maxWaitSecs) {
+      Stopwatch watch = new Stopwatch();
+      watch.start();
+      int tries = 0;
+      while (watch.elapsedTime(TimeUnit.SECONDS) < maxWaitSecs) {
+        // Kill the application
+        try {
+          ++tries;
+          kill();
+        } catch (Exception e) {
+          LOG.error("Exception while killing runnable {}, instance {}", runnable, instanceId, e);
+        }
+
+        // Wait on the shutdownLatch,
+        // if the runnable has stopped then the latch will be count down by completed() method
+        if (Uninterruptibles.awaitUninterruptibly(shutdownLatch, 10, TimeUnit.SECONDS)) {
+          // Runnable has stopped now
+          return;
+        }
+      }
+
+      // Timeout reached, runnable has not stopped
+      LOG.error("Failed to kill runnable {}, instance {} after {} tries", runnable, instanceId, tries);
+      // TODO: should we throw exception here?
     }
   }
 }

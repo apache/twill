@@ -38,7 +38,8 @@ import org.junit.runners.Suite;
                       ServiceDiscoveryTestRun.class,
                       DebugTestRun.class,
                       ContainerSizeTestRun.class,
-                      InitializeFailTestRun.class
+                      InitializeFailTestRun.class,
+                      RestartRunnableTestRun.class
                     })
 public final class YarnTestSuite extends BaseYarnTest {
 

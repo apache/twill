@@ -185,20 +185,20 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 2);
 
       // Spawning a new instance for DISTRIBUTED runnable Alice, which should get a different node.
-      controller.changeInstances("Alice", 2);
+      controller.changeInstances("Alice", 2).get(60, TimeUnit.SECONDS);
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(waitForSize(serviceDiscovered, 4, 60));
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 3);
 
       // Spawning a new instance for DEFAULT runnable Eve,
       // which should not be affected by placement policies of previous runnables.
-      controller.changeInstances("Eve", 2);
+      controller.changeInstances("Eve", 2).get(60, TimeUnit.SECONDS);
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(waitForSize(serviceDiscovered, 5, 60));
 
       // Spawning a new instance for DISTRIBUTED runnable Bob,
       // which will be forced to give up it's placement policy restrictions, since there are only three nodes.
-      controller.changeInstances("Bob", 2);
+      controller.changeInstances("Bob", 2).get(60, TimeUnit.SECONDS);
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(waitForSize(serviceDiscovered, 6, 60));
       Assert.assertTrue(getProvisionedNodeManagerCount() >= 3);
@@ -272,22 +272,22 @@ public class PlacementPolicyTestRun extends BaseYarnTest {
       Assert.assertTrue(waitForSize(serviceDiscovered, 4, 60));
 
       // Increasing the instance count for runnable Alice by 2.
-      controller.changeInstances("Alice", 4);
+      controller.changeInstances("Alice", 4).get(60, TimeUnit.SECONDS);
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(waitForSize(serviceDiscovered, 6, 60));
 
       // Decreasing instance count for runnable Alice by 3.
-      controller.changeInstances("Alice", 1);
+      controller.changeInstances("Alice", 1).get(60, TimeUnit.SECONDS);
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(waitForSize(serviceDiscovered, 3, 60));
 
       // Increasing instance count for runnable Bob by 2.
-      controller.changeInstances("Bob", 3);
+      controller.changeInstances("Bob", 3).get(60, TimeUnit.SECONDS);
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(waitForSize(serviceDiscovered, 5, 60));
 
       // Increasing instance count for runnable Eve by 2.
-      controller.changeInstances("Eve", 3);
+      controller.changeInstances("Eve", 3).get(60, TimeUnit.SECONDS);
       serviceDiscovered = controller.discoverService("DistributedTest");
       Assert.assertTrue(waitForSize(serviceDiscovered, 7, 60));
     } finally {
