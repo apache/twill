@@ -22,6 +22,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import org.apache.twill.api.RunId;
@@ -192,13 +193,9 @@ public final class TwillContainerLauncher {
       // TODO: Use configurable value for stop time
       int maxWaitSecs = Constants.APPLICATION_MAX_STOP_SECONDS;
       try {
-        if (shutdownLatch.await(maxWaitSecs, TimeUnit.SECONDS)) {
+        if (Uninterruptibles.awaitUninterruptibly(shutdownLatch, maxWaitSecs, TimeUnit.SECONDS)) {
           return;
         }
-      } catch (InterruptedException e) {
-        LOG.error("Got exception while waiting for runnable {}, instance {} to stop", runnable, instanceId);
-        // TODO: how do we handle the InterruptedException? Should we restore the interrupted status?
-        return;
       } catch (Exception e) {
         LOG.error("Got exception while trying to stop runnable {}, instance {}", runnable, instanceId, e);
       }
@@ -259,33 +256,29 @@ public final class TwillContainerLauncher {
     }
 
     private void killAndWait(int maxWaitSecs) {
-      try {
-        Stopwatch watch = new Stopwatch();
-        watch.start();
-        int tries = 0;
-        while (watch.elapsedTime(TimeUnit.SECONDS) < maxWaitSecs) {
-          // Kill the application
-          try {
-            ++tries;
-            kill();
-          } catch (Exception e) {
-            LOG.error("Exception while killing runnable {}, instance {}", runnable, instanceId, e);
-          }
-
-          // Wait on the shutdownLatch,
-          // if the runnable has stopped then the latch will be count down by completed() method
-          if (shutdownLatch.await(10, TimeUnit.SECONDS)) {
-            // Runnable has stopped now
-            return;
-          }
+      Stopwatch watch = new Stopwatch();
+      watch.start();
+      int tries = 0;
+      while (watch.elapsedTime(TimeUnit.SECONDS) < maxWaitSecs) {
+        // Kill the application
+        try {
+          ++tries;
+          kill();
+        } catch (Exception e) {
+          LOG.error("Exception while killing runnable {}, instance {}", runnable, instanceId, e);
         }
 
-        // Timeout reached, runnable has not stopped
-        LOG.error("Failed to kill runnable {}, instance {} after {} tries", runnable, instanceId, tries);
-        // TODO: should we throw exception here?
-      } catch (InterruptedException e) {
-        LOG.error("Got exception while killing runnable {}, instance {}", runnable, instanceId, e);
+        // Wait on the shutdownLatch,
+        // if the runnable has stopped then the latch will be count down by completed() method
+        if (Uninterruptibles.awaitUninterruptibly(shutdownLatch, 10, TimeUnit.SECONDS)) {
+          // Runnable has stopped now
+          return;
+        }
       }
+
+      // Timeout reached, runnable has not stopped
+      LOG.error("Failed to kill runnable {}, instance {} after {} tries", runnable, instanceId, tries);
+      // TODO: should we throw exception here?
     }
   }
 }

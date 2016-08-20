@@ -277,9 +277,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
           try {
             amClient.allocate(0.0f, handler);
             TimeUnit.SECONDS.sleep(1);
-          } catch (InterruptedException e) {
-            // Exit on an interrupt
-            LOG.info("Exiting stop poller on an interrupt");
           } catch (Exception e) {
             LOG.error("Got exception while getting heartbeat", e);
           }
@@ -845,27 +842,21 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     LOG.debug("Processing restart runnable instances message {}.", message);
 
-    try {
-      if (!Strings.isNullOrEmpty(message.getRunnableName()) && message.getScope() == Message.Scope.RUNNABLE) {
-        // ... for a runnable ...
-        String runnableName = message.getRunnableName();
-        LOG.debug("Start restarting all runnable {} instances.", runnableName);
-        restartRunnableInstances(runnableName, null);
-      } else {
-        // ... or maybe some runnables
-        for (Map.Entry<String, String> option : requestCommand.getOptions().entrySet()) {
-          String runnableName = option.getKey();
-          Set<Integer> restartedInstanceIds = GSON.fromJson(option.getValue(),
-                                                             new TypeToken<Set<Integer>>() {}.getType());
+    if (!Strings.isNullOrEmpty(message.getRunnableName()) && message.getScope() == Message.Scope.RUNNABLE) {
+      // ... for a runnable ...
+      String runnableName = message.getRunnableName();
+      LOG.debug("Start restarting all runnable {} instances.", runnableName);
+      restartRunnableInstances(runnableName, null);
+    } else {
+      // ... or maybe some runnables
+      for (Map.Entry<String, String> option : requestCommand.getOptions().entrySet()) {
+        String runnableName = option.getKey();
+        Set<Integer> restartedInstanceIds = GSON.fromJson(option.getValue(),
+                                                           new TypeToken<Set<Integer>>() {}.getType());
 
-          LOG.debug("Start restarting runnable {} instances {}", runnableName, restartedInstanceIds);
-          restartRunnableInstances(runnableName, restartedInstanceIds);
-        }
+        LOG.debug("Start restarting runnable {} instances {}", runnableName, restartedInstanceIds);
+        restartRunnableInstances(runnableName, restartedInstanceIds);
       }
-    } catch (InterruptedException e) {
-      // TODO: is it okay to ignore the message on an InterruptedException?
-      LOG.error("Got interrupted exception when restarting runnable message {}", message, e);
-      // TODO: how do we handle the InterruptedException? Should we restore the interrupted status?
     }
 
     completion.run();
@@ -875,8 +866,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   /**
    * Helper method to restart instances of runnables.
    */
-  private void restartRunnableInstances(String runnableName, @Nullable Set<Integer> instanceIds)
-    throws InterruptedException {
+  private void restartRunnableInstances(String runnableName, @Nullable Set<Integer> instanceIds) {
     LOG.debug("Begin restart runnable {} instances.", runnableName);
 
     int runningCount = runningContainers.count(runnableName);
