@@ -49,7 +49,7 @@ to find out more.
 
 ### Is it Building?
 
-Status of CI build at Travis CI: [![Build Status](https://travis-ci.org/apache/incubator-twill.svg?branch=master)](https://travis-ci.org/apache/incubator-twill)
+Status of CI build at Travis CI: [![Build Status](https://travis-ci.org/apache/twill.svg?branch=master)](https://travis-ci.org/apache/twill)
 
 ### Apache Twill Presentation in Apache: Big Data North America 2016
 
