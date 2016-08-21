@@ -17,13 +17,7 @@
  */
 package org.apache.twill.internal.utils;
 
-/**
- * After compilation, this class is packaged into "samename.jar" under the resources/jar1 directory.
- * 
- * <pre>
- * jar -cvf ../../src/test/resources/jar1/samename.jar org/apache/twill/internal/utils/Class1.class
- * </pre>
- */
+/** Dummy class used in ApplicationBundlerTest. */
 public class Class1 {
 
 }

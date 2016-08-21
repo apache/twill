@@ -17,19 +17,10 @@
  */
 package org.apache.twill.internal.utils;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
-import java.util.jar.JarOutputStream;
-
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.twill.filesystem.LocalLocationFactory;
 import org.apache.twill.filesystem.Location;
@@ -39,10 +30,17 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Files;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.List;
+import java.util.jar.JarEntry;
+import java.util.jar.JarInputStream;
+import java.util.jar.JarOutputStream;
 
 /**
  *
@@ -87,12 +85,8 @@ public class ApplicationBundlerTest {
     Location location;
 
     try {
-      List<URL> urls = new ArrayList<>();
-      urls.add(j1.toURI().toURL());
-      urls.add(j2.toURI().toURL());
-
-      URL[] Urls = new URL[] { j1.toURI().toURL(), j2.toURI().toURL() };
-      Thread.currentThread().setContextClassLoader(new URLClassLoader(Urls, null));
+      URL[] urls = new URL[] { j1.toURI().toURL(), j2.toURI().toURL() };
+      Thread.currentThread().setContextClassLoader(new URLClassLoader(urls, null));
 
       // create bundle
       location = new LocalLocationFactory(tmpDir.newFolder()).create("test.jar");
