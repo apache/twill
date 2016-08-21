@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.twill.filesystem.LocalLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.ApplicationBundler;
@@ -34,6 +33,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -114,10 +114,12 @@ public class ApplicationBundlerTest {
   private void createJar(Class<?> clazz, File jarFile) throws IOException {
     try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jarFile))) {
       String pathname = clazz.getName().replace(".", "/") + ".class";
-      JarEntry entry = new JarEntry(pathname);
-      jos.putNextEntry(entry);
-      IOUtils.copy(clazz.getClassLoader().getResourceAsStream(pathname), jos);
-      jos.closeEntry();
+      try (InputStream is = clazz.getClassLoader().getResourceAsStream(pathname)) {
+        JarEntry entry = new JarEntry(pathname);
+        jos.putNextEntry(entry);
+        ByteStreams.copy(is, jos);
+        jos.closeEntry();
+      }
     }
   }
 
