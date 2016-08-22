@@ -33,7 +33,7 @@ To report bugs or request new features, please open an issue in the
 
 ### Contributing Code
 
-We prefer contributions through [GitHub](https://github.com/apache/incubator-twill) pull requests. Please follow
+We prefer contributions through [GitHub](https://github.com/apache/twill) pull requests. Please follow
 these steps to get your contributions in:
 
 1. Open a new issue or pick up an existing one in the [Apache Twill JIRA](https://issues.apache.org/jira/browse/TWILL)
@@ -42,13 +42,17 @@ these steps to get your contributions in:
   can also use the [dev mailing list](mail-lists.html) to discuss it first. This will help us understand your needs
   and best guide your solution in a way that fits the project.
 3. [Fork](https://help.github.com/articles/fork-a-repo) the
-  [Apache Twill GitHub repo.](https://github.com/apache/incubator-twill)
+  [Apache Twill GitHub repo.](https://github.com/apache/twill)
 4. Make the changes and send a [pull request](https://help.github.com/articles/using-pull-requests) from your
   forked repo to the Apache Twill repo.
 5. Please prefix your pull request title with the JIRA issue ID; for example, `(TWILL-87) Adding container placement policy`.
 6. Please complete the pull request description with additional details as appropriate.
 7. Once sent, code review will be done through the pull request.
 8. Once all review issues are resolved, we will merge the changes into the `master` branch of the Apache Twill repo.
+
+### Coding Style
+
+* IntelliJ IDEA 2016 [settings](twill-idea-settings.jar)
 
 ### How to Merge Code Changes
 
@@ -58,7 +62,7 @@ Committer can merge code changes that are already reviewed into the `master` bra
         
 2. Download the patch file from GitHub. You can append `.patch` to the end of the GitHub pull request URL to get the patch file.
 
-        curl -L -O https://github.com/apache/incubator-twill/pull/${PR_NUMBER}.patch
+        curl -L -O https://github.com/apache/twill/pull/${PR_NUMBER}.patch
 3. Edit the patch file and add the following line in the commit message for closing the pull request.
 
         This closes #${PR_NUMBER} from GitHub.
