@@ -31,13 +31,16 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
+import java.util.jar.JarOutputStream;
 
 /**
  *
@@ -66,6 +69,58 @@ public class ApplicationBundlerTest {
     // For system classes, they shouldn't be packaged, hence loaded by different classloader.
     clz = classLoader.loadClass(Object.class.getName());
     Assert.assertNotSame(classLoader, clz.getClassLoader());
+  }
+
+  @Test
+  public void testSameJar() throws IOException, ClassNotFoundException {
+    File dir1 = tmpDir.newFolder();
+    File dir2 = tmpDir.newFolder();
+    File j1 = new File(dir1, "samename.jar");
+    File j2 = new File(dir2, "samename.jar");
+
+    createJar(Class1.class, j1);
+    createJar(Class2.class, j2);
+    
+    ClassLoader currentClassLoader = Thread.currentThread().getContextClassLoader();
+    Location location;
+
+    try {
+      URL[] urls = new URL[] { j1.toURI().toURL(), j2.toURI().toURL() };
+      Thread.currentThread().setContextClassLoader(new URLClassLoader(urls, null));
+
+      // create bundle
+      location = new LocalLocationFactory(tmpDir.newFolder()).create("test.jar");
+      ApplicationBundler bundler = new ApplicationBundler(ImmutableList.<String> of());
+      bundler.createBundle(location, Class1.class, Class2.class);
+
+    } finally {
+      Thread.currentThread().setContextClassLoader(currentClassLoader);
+    }
+
+    File targetDir = tmpDir.newFolder();
+    unjar(new File(location.toURI()), targetDir);
+
+    // should be able to load both classes
+    ClassLoader classLoader = createClassLoader(targetDir);
+    Class<?> c1 = classLoader.loadClass(Class1.class.getName());
+    Class<?> c2 = classLoader.loadClass(Class2.class.getName());
+
+    // make sure we are loading them from the correct class loader (not defaulting back to some classloader
+    // from the test
+    Assert.assertSame(classLoader, c1.getClassLoader());
+    Assert.assertSame(classLoader, c2.getClassLoader());
+  }
+
+  private void createJar(Class<?> clazz, File jarFile) throws IOException {
+    try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jarFile))) {
+      String pathname = clazz.getName().replace(".", "/") + ".class";
+      try (InputStream is = clazz.getClassLoader().getResourceAsStream(pathname)) {
+        JarEntry entry = new JarEntry(pathname);
+        jos.putNextEntry(entry);
+        ByteStreams.copy(is, jos);
+        jos.closeEntry();
+      }
+    }
   }
 
   private void unjar(File jarFile, File targetDir) throws IOException {
@@ -107,4 +162,5 @@ public class ApplicationBundlerTest {
       }
     };
   }
+
 }
