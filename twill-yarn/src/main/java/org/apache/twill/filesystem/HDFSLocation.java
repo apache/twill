@@ -19,7 +19,8 @@ package org.apache.twill.filesystem;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -85,14 +87,17 @@ final class HDFSLocation implements Location {
 
   @Override
   public OutputStream getOutputStream(String permission) throws IOException {
-    Configuration conf = fs.getConf();
-    return fs.create(path,
-                     new FsPermission(permission),
-                     true,
-                     conf.getInt("io.file.buffer.size", 4096),
-                     fs.getDefaultReplication(path),
-                     fs.getDefaultBlockSize(path),
-                     null);
+    FsPermission fsPermission = parsePermissions(permission);
+    OutputStream os = fs.create(path,
+                                fsPermission,
+                                true,
+                                fs.getConf().getInt("io.file.buffer.size", 4096),
+                                fs.getDefaultReplication(path),
+                                fs.getDefaultBlockSize(path),
+                                null);
+    // Set the permission explicitly again to skip the umask
+    fs.setPermission(path, fsPermission);
+    return os;
   }
 
   /**
@@ -131,6 +136,34 @@ final class HDFSLocation implements Location {
   @Override
   public boolean createNew() throws IOException {
     return fs.createNewFile(path);
+  }
+
+  @Override
+  public boolean createNew(String permission) throws IOException {
+    try {
+      FsPermission fsPermission = parsePermissions(permission);
+      fs.create(path, fsPermission, EnumSet.of(CreateFlag.CREATE),
+                fs.getConf().getInt("io.file.buffer.size", 4096),
+                fs.getDefaultReplication(path),
+                fs.getDefaultBlockSize(path),
+                null).close();
+      // Set the permission explicitly again to skip the umask
+      fs.setPermission(path, fsPermission);
+      return true;
+    } catch (FileAlreadyExistsException e) {
+      return false;
+    }
+  }
+
+  @Override
+  public String getPermissions() throws IOException {
+    FsPermission permission = fs.getFileStatus(path).getPermission();
+    return permission.getUserAction().SYMBOL + permission.getGroupAction().SYMBOL + permission.getOtherAction().SYMBOL;
+  }
+
+  @Override
+  public void setPermissions(String permission) throws IOException {
+    fs.setPermission(path, parsePermissions(permission));
   }
 
   /**
@@ -242,5 +275,25 @@ final class HDFSLocation implements Location {
   @Override
   public String toString() {
     return path.toString();
+  }
+
+  /**
+   * Parses the given permission to {@link FsPermission}. Since the {@link HDFSLocationFactory} and this class are
+   * deprecated, this method is copied from {@link FileContextLocation} instead of creating an extra library to share.
+   *
+   * @param permission the permission as passed to the {@link #createNew(String)} or {@link #getOutputStream(String)}
+   *                   methods.
+   * @return a new {@link FsPermission}.
+   */
+  private FsPermission parsePermissions(String permission) {
+    if (permission.length() == 3) {
+      return new FsPermission(permission);
+    } else if (permission.length() == 9) {
+      // The FsPermission expect a 10 characters string, which it will ignore the first character
+      return FsPermission.valueOf("-" + permission);
+    } else {
+      throw new IllegalArgumentException("Invalid permission " + permission +
+                                           ". Permission should either be a three digit or nine character string.");
+    }
   }
 }

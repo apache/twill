@@ -25,14 +25,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -79,19 +87,21 @@ final class LocalLocation implements Location {
    */
   @Override
   public OutputStream getOutputStream() throws IOException {
-    File parent = file.getParentFile();
-    if (!parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureDirectory(file.getParentFile());
     return new FileOutputStream(file);
   }
 
-  /**
-   * Local location doesn't supports permission. It's the same as calling {@link #getOutputStream()}.
-   */
   @Override
   public OutputStream getOutputStream(String permission) throws IOException {
-    return getOutputStream();
+    ensureDirectory(file.getParentFile());
+    Set<PosixFilePermission> permissions = parsePermissions(permission);
+    Path path = file.toPath();
+    WritableByteChannel channel = Files.newByteChannel(path,
+                                                       EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE),
+                                                       PosixFilePermissions.asFileAttribute(permissions));
+    // Set the permission explicitly again to skip the umask
+    Files.setPosixFilePermissions(path, permissions);
+    return Channels.newOutputStream(channel);
   }
 
   /**
@@ -105,6 +115,29 @@ final class LocalLocation implements Location {
   @Override
   public boolean createNew() throws IOException {
     return file.createNewFile();
+  }
+
+  @Override
+  public boolean createNew(String permission) throws IOException {
+    Set<PosixFilePermission> permissions = parsePermissions(permission);
+    try {
+      Path path = Files.createFile(file.toPath(), PosixFilePermissions.asFileAttribute(permissions));
+      // Set the permission explicitly again to skip the umask
+      Files.setPosixFilePermissions(path, permissions);
+      return true;
+    } catch (FileAlreadyExistsException e) {
+      return false;
+    }
+  }
+
+  @Override
+  public String getPermissions() throws IOException {
+    return PosixFilePermissions.toString(Files.getPosixFilePermissions(file.toPath()));
+  }
+
+  @Override
+  public void setPermissions(String permission) throws IOException {
+    Files.setPosixFilePermissions(file.toPath(), parsePermissions(permission));
   }
 
   /**
@@ -254,5 +287,54 @@ final class LocalLocation implements Location {
   @Override
   public String toString() {
     return file.toString();
+  }
+
+  /**
+   * Ensures the given {@link File} is a directory. If it doesn't exist, it will be created.
+   */
+  private void ensureDirectory(File dir) throws IOException {
+    // Check, create, check to resolve race conditions if there are concurrent creation of the directory.
+    if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
+      throw new IOException("Failed to create directory " + dir);
+    }
+  }
+
+  /**
+   * Parses the given permission to a set of {@link PosixFilePermission}.
+   *
+   * @param permission the permission as passed to the {@link #createNew(String)} or {@link #getOutputStream(String)}
+   *                   methods.
+   * @return a new set of {@link PosixFilePermission}.
+   */
+  private Set<PosixFilePermission> parsePermissions(String permission) {
+    Set<PosixFilePermission> permissions;
+    if (permission.length() == 3) {
+      permissions = parseNumericPermissions(permission);
+    } else if (permission.length() == 9) {
+      permissions = PosixFilePermissions.fromString(permission);
+    } else {
+      throw new IllegalArgumentException("Invalid permission " + permission +
+                                           ". Permission should either be a three digit or nine character string.");
+    }
+
+    return permissions;
+  }
+
+  /**
+   * Parses a three digit UNIX numeric permission representation to a set of {@link PosixFilePermission}.
+   */
+  private Set<PosixFilePermission> parseNumericPermissions(String permission) {
+    String posixPermission = "";
+    for (int i = 0; i < 3; i++) {
+      int digit = permission.charAt(i) - '0';
+      if (digit < 0 || digit > 7) {
+        throw new IllegalArgumentException("Invalid permission " + permission +
+                                             ". Only digits between 0-7 are allowed.");
+      }
+      posixPermission += ((digit & 4) != 0) ? "r" : "-";
+      posixPermission += ((digit & 2) != 0) ? "w" : "-";
+      posixPermission += ((digit & 1) != 0) ? "x" : "-";
+    }
+    return PosixFilePermissions.fromString(posixPermission);
   }
 }
