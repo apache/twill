@@ -187,5 +187,78 @@ public abstract class LocationTestBase {
     }
   }
 
+  @Test
+  public void testPermissions() throws IOException {
+    LocationFactory factory = locationFactoryCache.getUnchecked("permission1");
+
+    // Test permissions setting on createNew calls
+    Location location = factory.create("test400-1");
+    Assert.assertTrue(location.createNew("400"));
+    Assert.assertEquals("r--------", location.getPermissions());
+    location = factory.create("test400-2");
+    Assert.assertTrue(location.createNew("r--------"));
+    Assert.assertEquals("r--------", location.getPermissions());
+    Assert.assertFalse(location.createNew("600"));
+
+    location = factory.create("test660-1");
+    Assert.assertTrue(location.createNew("660"));
+    Assert.assertEquals("rw-rw----", location.getPermissions());
+    location = factory.create("test660-2");
+    Assert.assertTrue(location.createNew("rw-rw----"));
+    Assert.assertEquals("rw-rw----", location.getPermissions());
+    Assert.assertFalse(location.createNew("600"));
+
+    location = factory.create("test755-1");
+    Assert.assertTrue(location.createNew("755"));
+    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
+    location = factory.create("test755-2");
+    Assert.assertTrue(location.createNew("rwxr-xr-x"));
+    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
+    Assert.assertFalse(location.createNew("600"));
+
+    // Test permissions setting on getOutputStream calls
+    factory = locationFactoryCache.getUnchecked("permission2");
+
+    location = factory.create("test400-1");
+    location.getOutputStream("400").close();
+    Assert.assertEquals("r--------", location.getPermissions());
+    location = factory.create("test400-2");
+    location.getOutputStream("r--------").close();
+    Assert.assertEquals("r--------", location.getPermissions());
+
+    location = factory.create("test660-1");
+    location.getOutputStream("660").close();
+    Assert.assertEquals("rw-rw----", location.getPermissions());
+    location = factory.create("test660-2");
+    location.getOutputStream("rw-rw----").close();
+    Assert.assertEquals("rw-rw----", location.getPermissions());
+
+    location = factory.create("test755-1");
+    location.getOutputStream("755").close();
+    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
+    location = factory.create("test755-2");
+    location.getOutputStream("rwxr-xr-x").close();
+    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
+
+    // Test permissions setting on setPermission method
+    factory = locationFactoryCache.getUnchecked("permission3");
+
+    // Setting permission on non-existed file should have IOException thrown
+    location = factory.create("somefile");
+    try {
+      location.setPermissions("400");
+      Assert.fail("IOException expected on setting permission on non-existing Location.");
+    } catch (IOException e) {
+      // expected
+    }
+
+    // Create file with read only permission
+    Assert.assertTrue(location.createNew("444"));
+    Assert.assertEquals("r--r--r--", location.getPermissions());
+    // Change the permission to write only
+    location.setPermissions("222");
+    Assert.assertEquals("-w--w--w-", location.getPermissions());
+  }
+
   protected abstract LocationFactory createLocationFactory(String pathBase) throws Exception;
 }
