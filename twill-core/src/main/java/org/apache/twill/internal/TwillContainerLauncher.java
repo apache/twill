@@ -185,8 +185,9 @@ public final class TwillContainerLauncher {
     @Override
     protected void doShutDown() {
       // Wait for sometime for the container to stop
-      // TODO: Use configurable value for stop time
-      int maxWaitSecs = Constants.APPLICATION_MAX_STOP_SECONDS;
+      // TODO: Use configurable value for stop time (TWILL-192)
+      int maxWaitSecs = Constants.APPLICATION_MAX_STOP_SECONDS - 30;
+      maxWaitSecs = maxWaitSecs < 15 ? 15 : maxWaitSecs;
       try {
         if (Uninterruptibles.awaitUninterruptibly(shutdownLatch, maxWaitSecs, TimeUnit.SECONDS)) {
           return;
