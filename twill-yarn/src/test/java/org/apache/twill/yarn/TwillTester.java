@@ -110,12 +110,10 @@ public class TwillTester extends ExternalResource {
     twillRunner.start();
 
     yarnAppClient = new VersionDetectYarnAppClientFactory().create(conf);
-    yarnAppClient.startAndWait();
   }
 
   @Override
   protected void after() {
-    stopQuietly(yarnAppClient);
     try {
       twillRunner.stop();
     } catch (Exception e) {
