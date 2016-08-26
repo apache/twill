@@ -254,11 +254,9 @@ public final class TwillContainerLauncher {
     private void killAndWait(int maxWaitSecs) {
       Stopwatch watch = new Stopwatch();
       watch.start();
-      int tries = 0;
       while (watch.elapsedTime(TimeUnit.SECONDS) < maxWaitSecs) {
         // Kill the application
         try {
-          ++tries;
           kill();
         } catch (Exception e) {
           LOG.error("Exception while killing runnable {}, instance {}", runnable, instanceId, e);
@@ -273,7 +271,8 @@ public final class TwillContainerLauncher {
       }
 
       // Timeout reached, runnable has not stopped
-      LOG.error("Failed to kill runnable {}, instance {} after {} tries", runnable, instanceId, tries);
+      LOG.error("Failed to kill runnable {}, instance {} after {} seconds", runnable, instanceId,
+                watch.elapsedTime(TimeUnit.SECONDS));
       // TODO: should we throw exception here?
     }
   }

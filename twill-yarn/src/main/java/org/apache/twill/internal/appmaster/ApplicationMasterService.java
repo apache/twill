@@ -285,7 +285,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         while (!ids.isEmpty()) {
           try {
             amClient.allocate(0.0f, handler);
-            TimeUnit.SECONDS.sleep(1);
+            if (!ids.isEmpty()) {
+              TimeUnit.SECONDS.sleep(1);
+            }
           } catch (Exception e) {
             LOG.error("Got exception while getting heartbeat", e);
           }
