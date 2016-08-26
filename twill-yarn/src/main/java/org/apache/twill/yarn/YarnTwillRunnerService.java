@@ -65,6 +65,7 @@ import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.filesystem.LocationFactory;
+import org.apache.twill.internal.Configs;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.RunIds;
@@ -329,8 +330,9 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     watchCancellable = watchLiveApps();
     liveInfos = createLiveInfos();
 
+    boolean enableSecureStoreUpdate = yarnConfig.getBoolean(Configs.Keys.SECURE_STORE_UPDATE_LOCATION_ENABLED, true);
     // Schedule an updater for updating HDFS delegation tokens
-    if (UserGroupInformation.isSecurityEnabled()) {
+    if (UserGroupInformation.isSecurityEnabled() && enableSecureStoreUpdate) {
       long renewalInterval = yarnConfig.getLong(DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
                                                 DFSConfigKeys.DFS_NAMENODE_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT);
       // Schedule it five minutes before it expires.
