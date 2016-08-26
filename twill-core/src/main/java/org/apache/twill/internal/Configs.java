@@ -31,6 +31,11 @@ public final class Configs {
      */
     public static final String JAVA_RESERVED_MEMORY_MB = "twill.java.reserved.memory.mb";
 
+    /**
+     * Set this to false to disable the secure store updates done by default.
+     */
+    public static final String SECURE_STORE_UPDATE_LOCATION_ENABLED = "twill.secure.store.update.location.enabled";
+
     private Keys() {
     }
   }
