@@ -208,12 +208,12 @@ public abstract class LocationTestBase {
     Assert.assertEquals("rw-rw----", location.getPermissions());
     Assert.assertFalse(location.createNew("600"));
 
-    location = factory.create("test755-1");
-    Assert.assertTrue(location.createNew("755"));
-    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
-    location = factory.create("test755-2");
-    Assert.assertTrue(location.createNew("rwxr-xr-x"));
-    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
+    location = factory.create("test644-1");
+    Assert.assertTrue(location.createNew("644"));
+    Assert.assertEquals("rw-r--r--", location.getPermissions());
+    location = factory.create("test644-2");
+    Assert.assertTrue(location.createNew("rw-r--r--"));
+    Assert.assertEquals("rw-r--r--", location.getPermissions());
     Assert.assertFalse(location.createNew("600"));
 
     // Test permissions setting on getOutputStream calls
@@ -233,12 +233,12 @@ public abstract class LocationTestBase {
     location.getOutputStream("rw-rw----").close();
     Assert.assertEquals("rw-rw----", location.getPermissions());
 
-    location = factory.create("test755-1");
-    location.getOutputStream("755").close();
-    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
-    location = factory.create("test755-2");
-    location.getOutputStream("rwxr-xr-x").close();
-    Assert.assertEquals("rwxr-xr-x", location.getPermissions());
+    location = factory.create("test644-1");
+    location.getOutputStream("644").close();
+    Assert.assertEquals("rw-r--r--", location.getPermissions());
+    location = factory.create("test644-2");
+    location.getOutputStream("rw-r--r--").close();
+    Assert.assertEquals("rw-r--r--", location.getPermissions());
 
     // Test permissions setting on setPermission method
     factory = locationFactoryCache.getUnchecked("permission3");
