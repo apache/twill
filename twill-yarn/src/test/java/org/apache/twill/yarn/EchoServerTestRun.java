@@ -197,7 +197,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
       }
 
       // There should be two instances up and running.
-      echoServices = controller.discoverService("echo");
+      echoServices = controllers.get(1).discoverService("echo");
       Assert.assertTrue(waitForSize(echoServices, 2, 120));
 
       // Stop one instance of the app
@@ -207,7 +207,7 @@ public final class EchoServerTestRun extends BaseYarnTest {
       Assert.assertNotNull(zkClient.exists("/EchoServer").get());
 
       // We should still be able to do discovery, which depends on the ZK node.
-      echoServices = controller.discoverService("echo");
+      echoServices = controllers.get(1).discoverService("echo");
       Assert.assertTrue(waitForSize(echoServices, 1, 120));
 
       // Stop second instance of the app

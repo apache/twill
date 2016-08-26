@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import org.apache.twill.api.ElectionHandler;
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.zookeeper.NodeChildren;
 import org.apache.twill.zookeeper.NodeData;
@@ -70,6 +71,7 @@ public final class LeaderElection extends AbstractService {
   private ExecutorService executor;
   private String zkNodePath;
   private State state;
+  private Cancellable watcherCancellable;
 
   public LeaderElection(ZKClient zkClient, String prefix, ElectionHandler handler) {
     this.guid = UUID.randomUUID().toString();
@@ -89,7 +91,7 @@ public final class LeaderElection extends AbstractService {
       @Override
       public void run() {
         register();
-        LeaderElection.this.zkClient.addConnectionWatcher(wrapWatcher(new ConnectionWatcher()));
+        watcherCancellable = zkClient.addConnectionWatcher(wrapWatcher(new ConnectionWatcher()));
       }
     });
     notifyStarted();
@@ -121,6 +123,9 @@ public final class LeaderElection extends AbstractService {
     executor.execute(new Runnable() {
       @Override
       public void run() {
+        if (watcherCancellable != null) {
+          watcherCancellable.cancel();
+        }
         if (state != State.CANCELLED) {
           // becomeFollower has to be called before deleting node to make sure no two active leader.
           if (state == State.LEADER) {
