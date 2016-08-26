@@ -59,21 +59,29 @@ import javax.annotation.Nullable;
  * Apache Hadoop 2.0.
  * </p>
  */
-public final class Hadoop20YarnAppClient extends AbstractIdleService implements YarnAppClient {
+public final class Hadoop20YarnAppClient implements YarnAppClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(Hadoop20YarnAppClient.class);
-  private final YarnClient yarnClient;
+  private final Configuration configuration;
   private String user;
 
   public Hadoop20YarnAppClient(Configuration configuration) {
-    this.yarnClient = new YarnClientImpl();
-    yarnClient.init(configuration);
+    this.configuration = configuration;
     this.user = System.getProperty("user.name");
+  }
+
+  // Creates and starts a yarn client
+  private YarnClient createYarnClient() {
+    YarnClient yarnClient = new YarnClientImpl();
+    yarnClient.init(configuration);
+    yarnClient.start();
+    return yarnClient;
   }
 
   @Override
   public ProcessLauncher<ApplicationMasterInfo> createLauncher(TwillSpecification twillSpec,
                                                                @Nullable String schedulerQueue) throws Exception {
+    final YarnClient yarnClient = createYarnClient();
     // Request for new application
     final GetNewApplicationResponse response = yarnClient.getNewApplication();
     final ApplicationId appId = response.getApplicationId();
@@ -100,7 +108,7 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
       @Override
       public ProcessController<YarnApplicationReport> submit(YarnLaunchContext launchContext) {
         ContainerLaunchContext context = launchContext.getLaunchContext();
-        addRMToken(context);
+        addRMToken(context, yarnClient);
         context.setUser(appSubmissionContext.getUser());
         context.setResource(adjustMemory(response, capability));
         appSubmissionContext.setAMContainerSpec(context);
@@ -131,7 +139,7 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
     return capability;
   }
 
-  private void addRMToken(ContainerLaunchContext context) {
+  private void addRMToken(ContainerLaunchContext context, YarnClient yarnClient) {
     if (!UserGroupInformation.isSecurityEnabled()) {
       return;
     }
@@ -176,22 +184,17 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
 
   @Override
   public ProcessController<YarnApplicationReport> createProcessController(ApplicationId appId) {
-    return new ProcessControllerImpl(yarnClient, appId);
+    return new ProcessControllerImpl(createYarnClient(), appId);
   }
 
   @Override
   public List<NodeReport> getNodeReports() throws Exception {
-    return this.yarnClient.getNodeReports();
-  }
-
-  @Override
-  protected void startUp() throws Exception {
-    yarnClient.start();
-  }
-
-  @Override
-  protected void shutDown() throws Exception {
-    yarnClient.stop();
+    YarnClient yarnClient = createYarnClient();
+    try {
+      return yarnClient.getNodeReports();
+    } finally {
+      yarnClient.stop();
+    }
   }
 
   private static final class ProcessControllerImpl implements ProcessController<YarnApplicationReport> {
@@ -221,6 +224,11 @@ public final class Hadoop20YarnAppClient extends AbstractIdleService implements 
         LOG.error("Failed to kill application {}", appId, e);
         throw Throwables.propagate(e);
       }
+    }
+
+    @Override
+    public void close() throws Exception {
+      yarnClient.stop();
     }
   }
 }

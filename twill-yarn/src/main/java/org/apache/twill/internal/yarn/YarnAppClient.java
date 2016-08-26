@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal.yarn;
 
-import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.TwillSpecification;
@@ -31,7 +30,7 @@ import javax.annotation.Nullable;
 /**
  * Interface for launching Yarn application from client.
  */
-public interface YarnAppClient extends Service {
+public interface YarnAppClient {
 
   /**
    * Creates a {@link ProcessLauncher} for launching the application represented by the given spec. If scheduler queue
