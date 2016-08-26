@@ -44,5 +44,4 @@ import org.junit.runners.Suite;
   RestartRunnableTestRun.class
 })
 public final class YarnTestSuite extends BaseYarnTest {
-
 }

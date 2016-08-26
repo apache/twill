@@ -23,7 +23,6 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
-import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.junit.Assert;
 import org.junit.Test;
@@ -48,15 +47,8 @@ public class InitializeFailTestRun extends BaseYarnTest {
     LogHandler logVerifyHandler = new LogHandler() {
       @Override
       public void onLog(LogEntry logEntry) {
-        LogThrowable logThrowable = logEntry.getThrowable();
-        if (logThrowable != null) {
-          while (logThrowable.getCause() != null) {
-            logThrowable = logThrowable.getCause();
-          }
-          if (IllegalStateException.class.getName().equals(logThrowable.getClassName())
-            && logThrowable.getMessage().contains("Fail to init")) {
-            logLatch.countDown();
-          }
+        if (logEntry.getMessage().endsWith("exited abnormally with state COMPLETE, exit code 10.")) {
+          logLatch.countDown();
         }
       }
     };

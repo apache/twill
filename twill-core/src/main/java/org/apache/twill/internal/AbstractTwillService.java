@@ -27,6 +27,7 @@ import com.google.common.util.concurrent.Service;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.apache.twill.api.RunId;
+import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.state.MessageCallback;
@@ -88,6 +89,7 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
   protected final ZKClient zkClient;
   protected final RunId runId;
   private ExecutorService messageCallbackExecutor;
+  private Cancellable watcherCancellable;
 
   protected AbstractTwillService(final ZKClient zkClient, RunId runId) {
     this.zkClient = zkClient;
@@ -145,7 +147,7 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
                                                      new ThreadPoolExecutor.DiscardPolicy());
 
     // Watch for session expiration, recreate the live node if reconnected after expiration.
-    zkClient.addConnectionWatcher(new Watcher() {
+    watcherCancellable = zkClient.addConnectionWatcher(new Watcher() {
       private boolean expired = false;
 
       @Override
@@ -181,6 +183,10 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
 
   @Override
   protected final void shutDown() throws Exception {
+    if (watcherCancellable != null) {
+      watcherCancellable.cancel();
+    }
+
     messageCallbackExecutor.shutdownNow();
     try {
       doStop();

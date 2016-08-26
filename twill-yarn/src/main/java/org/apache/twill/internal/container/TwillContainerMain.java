@@ -20,6 +20,7 @@ package org.apache.twill.internal.container;
 import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.AbstractService;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
@@ -102,9 +103,11 @@ public final class TwillContainerMain extends ServiceMain {
                                                 createAppLocation(conf));
     new TwillContainerMain().doMain(
       service,
-      new LogFlushService(),
       zkClientService,
-      new TwillZKPathService(containerZKClient, runId));
+      new LogFlushService(),
+      new TwillZKPathService(containerZKClient, runId),
+      new CloseableServiceWrapper(discoveryService)
+    );
   }
 
   @Override
@@ -194,6 +197,29 @@ public final class TwillContainerMain extends ServiceMain {
     protected void doStop() {
       Loggings.forceFlush();
       notifyStopped();
+    }
+  }
+
+  /**
+   * A wrapper to adapt a {@link AutoCloseable} to a {@link ServiceMain}. The service has no-op during start up
+   * and will call the {@link AutoCloseable#close()} on shutdown.
+   */
+  private static final class CloseableServiceWrapper extends AbstractIdleService {
+
+    private final AutoCloseable closeable;
+
+    private CloseableServiceWrapper(AutoCloseable closeable) {
+      this.closeable = closeable;
+    }
+
+    @Override
+    protected void startUp() throws Exception {
+      // no-op
+    }
+
+    @Override
+    protected void shutDown() throws Exception {
+      closeable.close();
     }
   }
 }

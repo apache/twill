@@ -66,80 +66,86 @@ public class ZKDiscoveryServiceTest extends DiscoveryServiceTestBase {
   @Test (timeout = 30000)
   public void testDoubleRegister() throws Exception {
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
-    DiscoveryService discoveryService = entry.getKey();
-    DiscoveryServiceClient discoveryServiceClient = entry.getValue();
-
-    // Register on the same host port, it shouldn't fail.
-    Cancellable cancellable = register(discoveryService, "test_double_reg", "localhost", 54321);
-    Cancellable cancellable2 = register(discoveryService, "test_double_reg", "localhost", 54321);
-
-    ServiceDiscovered discoverables = discoveryServiceClient.discover("test_double_reg");
-
-    Assert.assertTrue(waitTillExpected(1, discoverables));
-
-    cancellable.cancel();
-    cancellable2.cancel();
-
-    // Register again with two different clients, but killing session of the first one.
-    final ZKClientService zkClient2 = ZKClientServices.delegate(
-      ZKClients.retryOnFailure(
-        ZKClients.reWatchOnExpire(
-          ZKClientService.Builder.of(zkServer.getConnectionStr()).build()),
-        RetryStrategies.fixDelay(1, TimeUnit.SECONDS)));
-    zkClient2.startAndWait();
-
     try {
-      DiscoveryService discoveryService2 = new ZKDiscoveryService(zkClient2);
-      cancellable2 = register(discoveryService2, "test_multi_client", "localhost", 54321);
+      DiscoveryService discoveryService = entry.getKey();
+      DiscoveryServiceClient discoveryServiceClient = entry.getValue();
 
-      // Schedule a thread to shutdown zkClient2.
-      new Thread() {
-        @Override
-        public void run() {
-          try {
-            TimeUnit.SECONDS.sleep(2);
-            zkClient2.stopAndWait();
-          } catch (InterruptedException e) {
-            LOG.error(e.getMessage(), e);
-          }
-        }
-      }.start();
+      // Register on the same host port, it shouldn't fail.
+      Cancellable cancellable = register(discoveryService, "test_double_reg", "localhost", 54321);
+      Cancellable cancellable2 = register(discoveryService, "test_double_reg", "localhost", 54321);
 
-      // This call would block until zkClient2 is shutdown.
-      cancellable = register(discoveryService, "test_multi_client", "localhost", 54321);
+      ServiceDiscovered discoverables = discoveryServiceClient.discover("test_double_reg");
+
+      Assert.assertTrue(waitTillExpected(1, discoverables));
+
       cancellable.cancel();
+      cancellable2.cancel();
 
+      // Register again with two different clients, but killing session of the first one.
+      final ZKClientService zkClient2 = ZKClientServices.delegate(
+        ZKClients.retryOnFailure(
+          ZKClients.reWatchOnExpire(
+            ZKClientService.Builder.of(zkServer.getConnectionStr()).build()),
+          RetryStrategies.fixDelay(1, TimeUnit.SECONDS)));
+      zkClient2.startAndWait();
+
+      try (ZKDiscoveryService discoveryService2 = new ZKDiscoveryService(zkClient2)) {
+        cancellable2 = register(discoveryService2, "test_multi_client", "localhost", 54321);
+
+        // Schedule a thread to shutdown zkClient2.
+        new Thread() {
+          @Override
+          public void run() {
+            try {
+              TimeUnit.SECONDS.sleep(2);
+              zkClient2.stopAndWait();
+            } catch (InterruptedException e) {
+              LOG.error(e.getMessage(), e);
+            }
+          }
+        }.start();
+
+        // This call would block until zkClient2 is shutdown.
+        cancellable = register(discoveryService, "test_multi_client", "localhost", 54321);
+        cancellable.cancel();
+      } finally {
+        zkClient2.stopAndWait();
+      }
     } finally {
-      zkClient2.stopAndWait();
+      closeServices(entry);
     }
   }
 
   @Test
   public void testSessionExpires() throws Exception {
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
-    DiscoveryService discoveryService = entry.getKey();
-    DiscoveryServiceClient discoveryServiceClient = entry.getValue();
+    try {
+      DiscoveryService discoveryService = entry.getKey();
+      DiscoveryServiceClient discoveryServiceClient = entry.getValue();
 
-    Cancellable cancellable = register(discoveryService, "test_expires", "localhost", 54321);
+      Cancellable cancellable = register(discoveryService, "test_expires", "localhost", 54321);
 
-    ServiceDiscovered discoverables = discoveryServiceClient.discover("test_expires");
+      ServiceDiscovered discoverables = discoveryServiceClient.discover("test_expires");
 
-    // Discover that registered host:port.
-    Assert.assertTrue(waitTillExpected(1, discoverables));
+      // Discover that registered host:port.
+      Assert.assertTrue(waitTillExpected(1, discoverables));
 
-    KillZKSession.kill(zkClient.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 10000);
+      KillZKSession.kill(zkClient.getZooKeeperSupplier().get(), zkServer.getConnectionStr(), 10000);
 
-    // Register one more endpoint to make sure state has been reflected after reconnection
-    Cancellable cancellable2 = register(discoveryService, "test_expires", "localhost", 54322);
+      // Register one more endpoint to make sure state has been reflected after reconnection
+      Cancellable cancellable2 = register(discoveryService, "test_expires", "localhost", 54322);
 
-    // Reconnection would trigger re-registration.
-    Assert.assertTrue(waitTillExpected(2, discoverables));
+      // Reconnection would trigger re-registration.
+      Assert.assertTrue(waitTillExpected(2, discoverables));
 
-    cancellable.cancel();
-    cancellable2.cancel();
+      cancellable.cancel();
+      cancellable2.cancel();
 
-    // Verify that both are now gone.
-    Assert.assertTrue(waitTillExpected(0, discoverables));
+      // Verify that both are now gone.
+      Assert.assertTrue(waitTillExpected(0, discoverables));
+    } finally {
+      closeServices(entry);
+    }
   }
 
   @Override
