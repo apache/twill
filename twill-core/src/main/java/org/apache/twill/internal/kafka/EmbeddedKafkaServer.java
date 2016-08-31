@@ -17,16 +17,21 @@
  */
 package org.apache.twill.internal.kafka;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AbstractIdleService;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
 import kafka.utils.Time;
 import org.I0Itec.zkclient.exception.ZkTimeoutException;
+import org.apache.twill.internal.utils.Networks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.BindException;
 import java.util.Properties;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link com.google.common.util.concurrent.Service} implementation for running an instance of Kafka server in
@@ -34,25 +39,27 @@ import java.util.Properties;
  */
 public final class EmbeddedKafkaServer extends AbstractIdleService {
 
-  public static final String START_TIMEOUT_RETRIES = "twill.kafka.start.timeout.retries";
+  public static final String START_RETRIES = "twill.kafka.start.timeout.retries";
 
   private static final Logger LOG = LoggerFactory.getLogger(EmbeddedKafkaServer.class);
-  private static final String DEFAULT_START_TIMEOUT_RETRIES = "5";
+  private static final String DEFAULT_START_RETRIES = "5";
 
   private final int startTimeoutRetries;
-  private final KafkaConfig kafkaConfig;
+  private final Properties properties;
   private KafkaServer server;
 
   public EmbeddedKafkaServer(Properties properties) {
-    this.startTimeoutRetries = Integer.parseInt(properties.getProperty(START_TIMEOUT_RETRIES,
-                                                                       DEFAULT_START_TIMEOUT_RETRIES));
-    this.kafkaConfig = new KafkaConfig(properties);
+    this.startTimeoutRetries = Integer.parseInt(properties.getProperty(START_RETRIES,
+                                                                       DEFAULT_START_RETRIES));
+    this.properties = new Properties();
+    this.properties.putAll(properties);
   }
 
   @Override
   protected void startUp() throws Exception {
     int tries = 0;
     do {
+      KafkaConfig kafkaConfig = new KafkaConfig(properties);
       KafkaServer kafkaServer = createKafkaServer(kafkaConfig);
       try {
         kafkaServer.startup();
@@ -65,9 +72,19 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
         if (rootCause instanceof ZkTimeoutException) {
           // Potentially caused by race condition bug described in TWILL-139.
           LOG.warn("Timeout when connecting to ZooKeeper from KafkaServer. Attempt number {}.", tries, rootCause);
+        } else if (rootCause instanceof BindException) {
+          LOG.warn("Kafka failed to bind to port {}. Attempt number {}.", kafkaConfig.port(), tries, rootCause);
         } else {
           throw e;
         }
+
+        // Do a random sleep of < 200ms
+        TimeUnit.MILLISECONDS.sleep(new Random().nextInt(200) + 1L);
+
+        // Generate a new port for the Kafka
+        int port = Networks.getRandomPort();
+        Preconditions.checkState(port > 0, "Failed to get random port.");
+        properties.setProperty("port", Integer.toString(port));
       }
     } while (server == null && ++tries < startTimeoutRetries);
 
