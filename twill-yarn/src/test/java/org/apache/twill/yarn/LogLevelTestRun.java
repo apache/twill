@@ -112,7 +112,7 @@ public class LogLevelTestRun extends BaseYarnTest {
     }, Threads.SAME_THREAD_EXECUTOR);
     Assert.assertTrue(running.await(200, TimeUnit.SECONDS));
 
-    LogEntry.Level logLevel = waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(), 5L,
+    LogEntry.Level logLevel = waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(), 30L,
                                               TimeUnit.SECONDS);
 
     // Verify we got DEBUG log level.
