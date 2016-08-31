@@ -59,7 +59,7 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
   protected void startUp() throws Exception {
     int tries = 0;
     do {
-      KafkaConfig kafkaConfig = new KafkaConfig(properties);
+      KafkaConfig kafkaConfig = createKafkaConfig(properties);
       KafkaServer kafkaServer = createKafkaServer(kafkaConfig);
       try {
         kafkaServer.startup();
@@ -80,11 +80,6 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
 
         // Do a random sleep of < 200ms
         TimeUnit.MILLISECONDS.sleep(new Random().nextInt(200) + 1L);
-
-        // Generate a new port for the Kafka
-        int port = Networks.getRandomPort();
-        Preconditions.checkState(port > 0, "Failed to get random port.");
-        properties.setProperty("port", Integer.toString(port));
       }
     } while (server == null && ++tries < startTimeoutRetries);
 
@@ -123,5 +118,23 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
         }
       }
     });
+  }
+
+  /**
+   * Creates a new {@link KafkaConfig} from the given {@link Properties}. If the {@code "port"} property is missing
+   * or is equals to {@code "0"}, a random port will be generated.
+   */
+  private KafkaConfig createKafkaConfig(Properties properties) {
+    Properties prop = new Properties();
+    prop.putAll(properties);
+
+    String port = prop.getProperty("port");
+    if (port == null || "0".equals(port)) {
+      int randomPort = Networks.getRandomPort();
+      Preconditions.checkState(randomPort > 0, "Failed to get random port.");
+      prop.setProperty("port", Integer.toString(randomPort));
+    }
+
+    return new KafkaConfig(prop);
   }
 }
