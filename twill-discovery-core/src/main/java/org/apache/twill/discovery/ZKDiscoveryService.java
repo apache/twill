@@ -146,23 +146,22 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
    */
   @Override
   public Cancellable register(final Discoverable discoverable) {
-    final Discoverable wrapper = new DiscoverableWrapper(discoverable);
     final SettableFuture<String> future = SettableFuture.create();
-    final DiscoveryCancellable cancellable = new DiscoveryCancellable(wrapper);
+    final DiscoveryCancellable cancellable = new DiscoveryCancellable(discoverable);
 
     // Create the zk ephemeral node.
-    Futures.addCallback(doRegister(wrapper), new FutureCallback<String>() {
+    Futures.addCallback(doRegister(discoverable), new FutureCallback<String>() {
       @Override
       public void onSuccess(String result) {
         // Set the sequence node path to cancellable for future cancellation.
         cancellable.setPath(result);
         lock.lock();
         try {
-          discoverables.put(wrapper, cancellable);
+          discoverables.put(discoverable, cancellable);
         } finally {
           lock.unlock();
         }
-        LOG.debug("Service registered: {} {}", wrapper, result);
+        LOG.debug("Service registered: {} {}", discoverable, result);
         future.set(result);
       }
 
@@ -171,7 +170,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
         if (t instanceof KeeperException.NodeExistsException) {
           handleRegisterFailure(discoverable, future, this, t);
         } else {
-          LOG.warn("Failed to register: {}", wrapper, t);
+          LOG.warn("Failed to register: {}", discoverable, t);
           future.setException(t);
         }
       }
