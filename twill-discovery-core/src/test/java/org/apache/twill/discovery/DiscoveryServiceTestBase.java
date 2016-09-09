@@ -45,28 +45,19 @@ public abstract class DiscoveryServiceTestBase {
 
   @Test
   public void simpleDiscoverable() throws Exception {
+    final String payload = "data";
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
     DiscoveryService discoveryService = entry.getKey();
     DiscoveryServiceClient discoveryServiceClient = entry.getValue();
 
     // Register one service running on one host:port
-    Cancellable cancellable = register(discoveryService, "foo", "localhost", 8090);
+    Cancellable cancellable = register(discoveryService, "foo", "localhost", 8090, payload.getBytes());
 
     // Discover that registered host:port.
     ServiceDiscovered serviceDiscovered = discoveryServiceClient.discover("foo");
     Assert.assertTrue(waitTillExpected(1, serviceDiscovered));
 
-    Discoverable discoverable = new Discoverable() {
-      @Override
-      public String getName() {
-        return "foo";
-      }
-
-      @Override
-      public InetSocketAddress getSocketAddress() {
-        return new InetSocketAddress("localhost", 8090);
-      }
-    };
+    Discoverable discoverable = new Discoverable("foo", new InetSocketAddress("localhost", 8090), payload.getBytes());
 
     // Check it exists.
     Assert.assertTrue(serviceDiscovered.contains(discoverable));
@@ -259,17 +250,7 @@ public abstract class DiscoveryServiceTestBase {
     Thread t = new Thread() {
       @Override
       public void run() {
-        service.register(new Discoverable() {
-          @Override
-          public String getName() {
-            return serviceName;
-          }
-
-          @Override
-          public InetSocketAddress getSocketAddress() {
-            return new InetSocketAddress(12345);
-          }
-        });
+        service.register(new Discoverable(serviceName, new InetSocketAddress(12345), new byte[]{}));
       }
     };
 
@@ -282,17 +263,12 @@ public abstract class DiscoveryServiceTestBase {
   }
 
   protected Cancellable register(DiscoveryService service, final String name, final String host, final int port) {
-    return service.register(new Discoverable() {
-      @Override
-      public String getName() {
-        return name;
-      }
+    return register(service, name, host, port, new byte[]{});
+  }
 
-      @Override
-      public InetSocketAddress getSocketAddress() {
-        return new InetSocketAddress(host, port);
-      }
-    });
+  protected Cancellable register(DiscoveryService service, final String name, final String host, final int port,
+                                 final byte[] payload) {
+    return service.register(new Discoverable(name, new InetSocketAddress(host, port), payload));
   }
 
   protected boolean waitTillExpected(final int expected, ServiceDiscovered serviceDiscovered) {

@@ -96,17 +96,7 @@ final class DefaultServiceDiscovered implements ServiceDiscovered {
   @Override
   public boolean contains(Discoverable discoverable) {
     // If the name doesn't match, it shouldn't be in the list.
-    if (!discoverable.getName().equals(name)) {
-      return false;
-    }
-
-    // Wrap it if necessary for hashCode/equals comparison.
-    Discoverable target = discoverable;
-    if (!(target instanceof DiscoverableWrapper)) {
-      target = new DiscoverableWrapper(target);
-    }
-
-    return discoverables.get().contains(target);
+    return discoverable.getName().equals(name) && discoverables.get().contains(discoverable);
   }
 
   @Override

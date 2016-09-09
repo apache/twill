@@ -19,19 +19,70 @@
 package org.apache.twill.discovery;
 
 import java.net.InetSocketAddress;
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Discoverable defines the attributes of service to be discovered.
  */
-public interface Discoverable {
+public class Discoverable {
+  private final String name;
+  private final InetSocketAddress address;
+  private final byte[] payload;
+
+  public Discoverable(String name, InetSocketAddress address, byte[] payload) {
+    this.name = name;
+    this.address = address;
+    this.payload = payload;
+  }
+
+  public Discoverable(String name, InetSocketAddress address) {
+    this(name, address, new byte[]{});
+  }
 
   /**
    * @return Name of the service
    */
-  String getName();
+  public String getName() {
+    return name;
+  }
 
   /**
    * @return An {@link InetSocketAddress} representing the host+port of the service.
    */
-  InetSocketAddress getSocketAddress();
+  public InetSocketAddress getSocketAddress() {
+    return address;
+  }
+
+  /**
+   * @return A payload represented as a byte array
+   */
+  public byte[] getPayload() {
+    return payload;
+  }
+
+  @Override
+  public String toString() {
+    return "{name=" + name + ", address=" + address + ", payload=" + payload + "}";
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    Discoverable other = (Discoverable) o;
+
+    return name.equals(other.getName()) && address.equals(other.getSocketAddress()) &&
+      Arrays.equals(payload, other.getPayload());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(name, address, payload);
+  }
 }

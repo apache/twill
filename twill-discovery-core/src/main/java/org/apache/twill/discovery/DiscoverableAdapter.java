@@ -18,6 +18,7 @@
 package org.apache.twill.discovery;
 
 import com.google.common.base.Charsets;
+import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
@@ -38,6 +39,7 @@ final class DiscoverableAdapter {
 
   private static final Gson GSON =
     new GsonBuilder().registerTypeAdapter(Discoverable.class, new DiscoverableCodec()).create();
+  private static final Type BYTE_ARRAY_TYPE = new TypeToken<byte[]>() { }.getType();
 
   /**
    * Helper function for encoding an instance of {@link Discoverable} into array of bytes.
@@ -73,21 +75,12 @@ final class DiscoverableAdapter {
     public Discoverable deserialize(JsonElement json, Type typeOfT,
                                     JsonDeserializationContext context) throws JsonParseException {
       JsonObject jsonObj = json.getAsJsonObject();
-      final String service = jsonObj.get("service").getAsString();
+      String service = jsonObj.get("service").getAsString();
       String hostname = jsonObj.get("hostname").getAsString();
       int port = jsonObj.get("port").getAsInt();
-      final InetSocketAddress address = new InetSocketAddress(hostname, port);
-      return new DiscoverableWrapper(new Discoverable() {
-        @Override
-        public String getName() {
-          return service;
-        }
-
-        @Override
-        public InetSocketAddress getSocketAddress() {
-          return address;
-        }
-      });
+      byte[] payload = context.deserialize(jsonObj.get("payload"), BYTE_ARRAY_TYPE);
+      InetSocketAddress address = new InetSocketAddress(hostname, port);
+      return new Discoverable(service, address, payload);
     }
 
     @Override
@@ -96,6 +89,7 @@ final class DiscoverableAdapter {
       jsonObj.addProperty("service", src.getName());
       jsonObj.addProperty("hostname", src.getSocketAddress().getHostName());
       jsonObj.addProperty("port", src.getSocketAddress().getPort());
+      jsonObj.add("payload", context.serialize(src.getPayload()));
       return jsonObj;
     }
   }
