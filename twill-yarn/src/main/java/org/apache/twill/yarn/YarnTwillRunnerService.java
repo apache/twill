@@ -273,6 +273,13 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
   }
 
   @Override
+  public TwillPreparer prepare(TwillRunnable runnable,
+                               ResourceSpecification amResourceSpecification,
+                               ResourceSpecification resourceSpecification) {
+    return prepare(new SingleRunnableApplication(runnable, amResourceSpecification, resourceSpecification));
+  }
+
+  @Override
   public TwillPreparer prepare(TwillApplication application) {
     Preconditions.checkState(serviceDelegate.isRunning(), "Service not start. Please call start() first.");
     final TwillSpecification twillSpec = application.configure();

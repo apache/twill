@@ -525,7 +525,8 @@ final class YarnTwillPreparer implements TwillPreparer {
       }
 
       TwillSpecificationAdapter.create().toJson(
-        new DefaultTwillSpecification(spec.getName(), runtimeSpec, spec.getOrders(), spec.getPlacementPolicies(),
+        new DefaultTwillSpecification(spec.getName(), spec.getAmResourceSpecification(),
+                runtimeSpec, spec.getOrders(), spec.getPlacementPolicies(),
                                       eventHandler), writer);
     }
     LOG.debug("Done {}", Constants.Files.TWILL_SPEC);

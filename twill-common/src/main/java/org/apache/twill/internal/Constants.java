@@ -42,6 +42,9 @@ public final class Constants {
   /** Memory size of AM. */
   public static final int APP_MASTER_MEMORY_MB = 512;
 
+  /** CPUs for the AM. */
+  public static final int APP_MASTER_CPU_VCORES = 1;
+
   public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;
 
   public static final String CLASSPATH = "classpath";

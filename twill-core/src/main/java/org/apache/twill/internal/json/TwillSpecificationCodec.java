@@ -28,9 +28,11 @@ import com.google.gson.JsonSerializer;
 import org.apache.twill.api.EventHandlerSpecification;
 import org.apache.twill.api.Hosts;
 import org.apache.twill.api.Racks;
+import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.internal.DefaultEventHandlerSpecification;
+import org.apache.twill.internal.DefaultResourceSpecification;
 import org.apache.twill.internal.DefaultTwillSpecification;
 
 import java.lang.reflect.Type;
@@ -48,6 +50,8 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
   public JsonElement serialize(TwillSpecification src, Type typeOfSrc, JsonSerializationContext context) {
     JsonObject json = new JsonObject();
     json.addProperty("name", src.getName());
+    json.addProperty("am.vcores", src.getAmResourceSpecification().getVirtualCores());
+    json.addProperty("am.mb", src.getAmResourceSpecification().getMemorySize());
     json.add("runnables", context.serialize(src.getRunnables(),
                                             new TypeToken<Map<String, RuntimeSpecification>>() { }.getType()));
     json.add("orders", context.serialize(src.getOrders(),
@@ -68,6 +72,10 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
     JsonObject jsonObj = json.getAsJsonObject();
 
     String name = jsonObj.get("name").getAsString();
+    ResourceSpecification amResrouceSpec = new DefaultResourceSpecification(
+            jsonObj.get("am.vcores").getAsInt(),
+            jsonObj.get("am.mb").getAsInt(), 1, -1, -1
+    );
     Map<String, RuntimeSpecification> runnables = context.deserialize(
       jsonObj.get("runnables"), new TypeToken<Map<String, RuntimeSpecification>>() { }.getType());
     List<TwillSpecification.Order> orders = context.deserialize(
@@ -81,7 +89,7 @@ final class TwillSpecificationCodec implements JsonSerializer<TwillSpecification
       eventHandler = context.deserialize(handler, EventHandlerSpecification.class);
     }
 
-    return new DefaultTwillSpecification(name, runnables, orders, placementPolicies, eventHandler);
+    return new DefaultTwillSpecification(name, amResrouceSpec, runnables, orders, placementPolicies, eventHandler);
   }
 
   static final class TwillSpecificationOrderCoder implements JsonSerializer<TwillSpecification.Order>,

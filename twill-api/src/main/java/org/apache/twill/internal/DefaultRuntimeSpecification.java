@@ -36,15 +36,15 @@ public final class DefaultRuntimeSpecification implements RuntimeSpecification {
   private final ResourceSpecification resourceSpec;
   private final Collection<LocalFile> localFiles;
 
-  public DefaultRuntimeSpecification(String name,
-                                     TwillRunnableSpecification runnableSpec,
+  public DefaultRuntimeSpecification(String name, TwillRunnableSpecification runnableSpec,
                                      ResourceSpecification resourceSpec,
                                      Collection<LocalFile> localFiles) {
     this.name = name;
     this.runnableSpec = runnableSpec;
     this.resourceSpec = resourceSpec;
-    this.localFiles = Collections.unmodifiableList(new ArrayList<LocalFile>(localFiles));
+    this.localFiles = localFiles;
   }
+
 
   @Override
   public String getName() {

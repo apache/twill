@@ -103,6 +103,11 @@ public interface TwillSpecification {
   String getName();
 
   /**
+   * @return Resource specifications for the Application Master
+   */
+  ResourceSpecification getAmResourceSpecification();
+
+  /**
    * @return A map from {@link TwillRunnable} name to {@link RuntimeSpecification}.
    */
   Map<String, RuntimeSpecification> getRunnables();
@@ -130,6 +135,7 @@ public interface TwillSpecification {
   final class Builder {
 
     private String name;
+    private ResourceSpecification amResourceSpec = ResourceSpecification.BASIC;
     private Map<String, RuntimeSpecification> runnables = new HashMap<String, RuntimeSpecification>();
     private List<Order> orders = new ArrayList<Order>();
     private List<PlacementPolicy> placementPolicies = new ArrayList<PlacementPolicy>();
@@ -144,13 +150,27 @@ public interface TwillSpecification {
         Builder.this.name = name;
         return new AfterName();
       }
+
+      public NameSetter withAMResources(ResourceSpecification amResSpec) {
+        Builder.this.amResourceSpec = amResSpec;
+        return new NameSetter();
+      }
+
     }
 
     public final class AfterName {
       public MoreRunnable withRunnable() {
         return new RunnableSetter();
       }
+
+      public AfterName withAMResources(ResourceSpecification amResSpec) {
+        Builder.this.amResourceSpec = amResSpec;
+        return new AfterName();
+      }
+
     }
+
+
 
     public interface MoreRunnable {
       RuntimeSpecificationAdder add(TwillRunnable runnable);
@@ -201,7 +221,8 @@ public interface TwillSpecification {
         return new RuntimeSpecificationAdder(new LocalFileCompleter() {
           @Override
           public RunnableSetter complete(Collection<LocalFile> files) {
-            runnables.put(spec.getName(), new DefaultRuntimeSpecification(spec.getName(), spec, resourceSpec, files));
+            runnables.put(spec.getName(), new DefaultRuntimeSpecification(spec.getName(), spec,
+                    resourceSpec, files));
             return RunnableSetter.this;
           }
         });
@@ -480,7 +501,7 @@ public interface TwillSpecification {
 
         // For all unordered runnables, add it to the end of orders list
         orders.add(new DefaultTwillSpecification.DefaultOrder(runnableNames, Order.Type.STARTED));
-        return new DefaultTwillSpecification(name, runnables, orders, placementPolicies, eventHandler);
+        return new DefaultTwillSpecification(name, amResourceSpec, runnables, orders, placementPolicies, eventHandler);
       }
 
       private void addOrder(final Order.Type type, String name, String...names) {

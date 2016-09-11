@@ -38,4 +38,8 @@ public interface TwillRunnerService extends TwillRunner {
    * @throws RuntimeException if the service failed to start.
    */
   void stop();
+
+    TwillPreparer prepare(TwillRunnable runnable,
+                          ResourceSpecification amResourceSpecification,
+                          ResourceSpecification resourceSpecification);
 }

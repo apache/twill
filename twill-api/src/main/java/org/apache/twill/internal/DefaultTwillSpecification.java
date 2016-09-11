@@ -17,20 +17,20 @@
  */
 package org.apache.twill.internal;
 
+
 import org.apache.twill.api.EventHandlerSpecification;
 import org.apache.twill.api.Hosts;
 import org.apache.twill.api.Racks;
+import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 
-import java.util.ArrayList;
+import javax.annotation.Nullable;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 
 /**
  * Straightforward implementation of {@link org.apache.twill.api.TwillSpecification}.
@@ -38,17 +38,30 @@ import javax.annotation.Nullable;
 public final class DefaultTwillSpecification implements TwillSpecification {
 
   private final String name;
+  private final ResourceSpecification amResourceSpec;
   private final Map<String, RuntimeSpecification> runnables;
   private final List<Order> orders;
   private final List<PlacementPolicy> placementPolicies;
   private final EventHandlerSpecification eventHandler;
 
-  public DefaultTwillSpecification(String name, Map<String, RuntimeSpecification> runnables,
-                                   List<Order> orders, List<PlacementPolicy> placementPolicies,
+//  public DefaultTwillSpecification(String name, Map<String, RuntimeSpecification> runnables,
+//                                   List<Order> orders, List<PlacementPolicy> placementPolicies,
+//                                   EventHandlerSpecification eventHandler) {
+//    this.name = name;
+//    this.runnables = Collections.unmodifiableMap(new HashMap<String, RuntimeSpecification>(runnables));
+//    this.orders = Collections.unmodifiableList(new ArrayList<Order>(orders));
+//    this.placementPolicies = placementPolicies;
+//    this.eventHandler = eventHandler;
+//  }
+
+  public DefaultTwillSpecification(String name, ResourceSpecification amResourceSpec,
+                                   Map<String, RuntimeSpecification> runnables, List<Order> orders,
+                                   List<PlacementPolicy> placementPolicies,
                                    EventHandlerSpecification eventHandler) {
     this.name = name;
-    this.runnables = Collections.unmodifiableMap(new HashMap<String, RuntimeSpecification>(runnables));
-    this.orders = Collections.unmodifiableList(new ArrayList<Order>(orders));
+    this.amResourceSpec = amResourceSpec;
+    this.runnables = runnables;
+    this.orders = orders;
     this.placementPolicies = placementPolicies;
     this.eventHandler = eventHandler;
   }
@@ -56,6 +69,11 @@ public final class DefaultTwillSpecification implements TwillSpecification {
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public ResourceSpecification getAmResourceSpecification() {
+    return amResourceSpec;
   }
 
   @Override

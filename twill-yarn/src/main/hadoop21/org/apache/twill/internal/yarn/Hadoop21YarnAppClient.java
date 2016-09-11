@@ -92,7 +92,9 @@ public final class Hadoop21YarnAppClient implements YarnAppClient {
 
     // TODO: Make it adjustable through TwillSpec (TWILL-90)
     // Set the resource requirement for AM
-    final Resource capability = adjustMemory(response, Resource.newInstance(Constants.APP_MASTER_MEMORY_MB, 1));
+    final Resource capability = adjustMemory(response, Resource.newInstance(
+            twillSpec.getAmResourceSpecification().getMemorySize(),
+            twillSpec.getAmResourceSpecification().getVirtualCores()));
     ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(),
                                                                     capability.getVirtualCores());
 

@@ -99,7 +99,7 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
     // TODO: Make it adjustable through TwillSpec (TWILL-90)
     // Set the resource requirement for AM
     Resource amResource = Records.newRecord(Resource.class);
-    amResource.setMemory(Constants.APP_MASTER_MEMORY_MB);
+    amResource.setMemory(t);
     final Resource capability = adjustMemory(response, amResource);
     ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(), 1);
 
