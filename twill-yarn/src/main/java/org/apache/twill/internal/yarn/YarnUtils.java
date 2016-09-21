@@ -165,7 +165,7 @@ public class YarnUtils {
         tokens = ImmutableList.copyOf(fsTokens);
       }
     } else if (factory instanceof FileContextLocationFactory) {
-      FileContext fc = ((FileContextLocationFactory) locationFactory).getFileContext();
+      FileContext fc = ((FileContextLocationFactory) factory).getFileContext();
       tokens = fc.getDelegationTokens(new Path(locationFactory.create("/").toURI()), renewer);
     }
 
