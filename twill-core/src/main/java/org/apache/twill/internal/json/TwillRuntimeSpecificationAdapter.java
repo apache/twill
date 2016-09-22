@@ -34,6 +34,7 @@ import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.internal.TwillRuntimeSpecification;
 import org.apache.twill.internal.json.TwillSpecificationCodec.EventHandlerSpecificationCoder;
 import org.apache.twill.internal.json.TwillSpecificationCodec.TwillSpecificationOrderCoder;
 import org.apache.twill.internal.json.TwillSpecificationCodec.TwillSpecificationPlacementPolicyCoder;
@@ -49,17 +50,18 @@ import java.util.Map;
 /**
  *
  */
-public final class TwillSpecificationAdapter {
+public final class TwillRuntimeSpecificationAdapter {
 
   private final Gson gson;
 
-  public static TwillSpecificationAdapter create() {
-    return new TwillSpecificationAdapter();
+  public static TwillRuntimeSpecificationAdapter create() {
+    return new TwillRuntimeSpecificationAdapter();
   }
 
-  private TwillSpecificationAdapter() {
+  private TwillRuntimeSpecificationAdapter() {
     gson = new GsonBuilder()
               .serializeNulls()
+              .registerTypeAdapter(TwillRuntimeSpecification.class, new TwillRuntimeSpecificationCodec())
               .registerTypeAdapter(TwillSpecification.class, new TwillSpecificationCodec())
               .registerTypeAdapter(TwillSpecification.Order.class, new TwillSpecificationOrderCoder())
               .registerTypeAdapter(TwillSpecification.PlacementPolicy.class,
@@ -73,29 +75,29 @@ public final class TwillSpecificationAdapter {
               .create();
   }
 
-  public String toJson(TwillSpecification spec) {
-    return gson.toJson(spec, TwillSpecification.class);
+  public String toJson(TwillRuntimeSpecification spec) {
+    return gson.toJson(spec, TwillRuntimeSpecification.class);
   }
 
-  public void toJson(TwillSpecification spec, Writer writer) {
-    gson.toJson(spec, TwillSpecification.class, writer);
+  public void toJson(TwillRuntimeSpecification spec, Writer writer) {
+    gson.toJson(spec, TwillRuntimeSpecification.class, writer);
   }
 
-  public void toJson(TwillSpecification spec, File file) throws IOException {
+  public void toJson(TwillRuntimeSpecification spec, File file) throws IOException {
     try (Writer writer = Files.newWriter(file, Charsets.UTF_8)) {
       toJson(spec, writer);
     }
   }
 
-  public TwillSpecification fromJson(String json) {
-    return gson.fromJson(json, TwillSpecification.class);
+  public TwillRuntimeSpecification fromJson(String json) {
+    return gson.fromJson(json, TwillRuntimeSpecification.class);
   }
 
-  public TwillSpecification fromJson(Reader reader) {
-    return gson.fromJson(reader, TwillSpecification.class);
+  public TwillRuntimeSpecification fromJson(Reader reader) {
+    return gson.fromJson(reader, TwillRuntimeSpecification.class);
   }
 
-  public TwillSpecification fromJson(File file) throws IOException {
+  public TwillRuntimeSpecification fromJson(File file) throws IOException {
     try (Reader reader = Files.newReader(file, Charsets.UTF_8)) {
       return fromJson(reader);
     }
