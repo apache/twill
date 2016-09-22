@@ -30,6 +30,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnableSpecification;
+import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.Arguments;
@@ -41,7 +42,7 @@ import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.ServiceMain;
 import org.apache.twill.internal.json.ArgumentsCodec;
-import org.apache.twill.internal.json.TwillSpecificationAdapter;
+import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.logging.Loggings;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClientService;
@@ -83,9 +84,10 @@ public final class TwillContainerMain extends ServiceMain {
 
     ZKClient appRunZkClient = getAppRunZKClient(zkClientService, appRunId);
 
-    TwillSpecification twillSpec = loadTwillSpec(twillSpecFile);
+    TwillRuntimeSpecification twillRuntimeSpec = loadTwillSpec(twillSpecFile);
     
-    TwillRunnableSpecification runnableSpec = twillSpec.getRunnables().get(runnableName).getRunnableSpecification();
+    TwillRunnableSpecification runnableSpec =
+      twillRuntimeSpec.getTwillSpecification().getRunnables().get(runnableName).getRunnableSpecification();
     ContainerInfo containerInfo = new EnvContainerInfo();
     Arguments arguments = decodeArgs();
     BasicTwillContext context = new BasicTwillContext(
@@ -156,9 +158,9 @@ public final class TwillContainerMain extends ServiceMain {
     return classLoader;
   }
 
-  private static TwillSpecification loadTwillSpec(File specFile) throws IOException {
+  private static TwillRuntimeSpecification loadTwillSpec(File specFile) throws IOException {
     try (Reader reader = Files.newReader(specFile, Charsets.UTF_8)) {
-      return TwillSpecificationAdapter.create().fromJson(reader);
+      return TwillRuntimeSpecificationAdapter.create().fromJson(reader);
     }
   }
 

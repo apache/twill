@@ -56,6 +56,7 @@ import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
@@ -69,7 +70,7 @@ import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.TwillContainerLauncher;
 import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
-import org.apache.twill.internal.json.TwillSpecificationAdapter;
+import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.utils.Instances;
 import org.apache.twill.internal.yarn.AbstractYarnTwillService;
@@ -126,6 +127,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private final Location applicationLocation;
   private final PlacementPolicyManager placementPolicyManager;
   private final Map<String, Map<String, String>> environments;
+  private final TwillRuntimeSpecification twillRuntimeSpec;
 
   private volatile boolean stopped;
   private Queue<RunnableContainerRequest> runnableContainerRequests;
@@ -136,13 +138,14 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     super(zkClient, runId, applicationLocation);
 
     this.runId = runId;
-    this.twillSpec = TwillSpecificationAdapter.create().fromJson(twillSpecFile);
+    this.twillRuntimeSpec = TwillRuntimeSpecificationAdapter.create().fromJson(twillSpecFile);
     this.zkClient = zkClient;
     this.applicationLocation = applicationLocation;
     this.amClient = amClient;
     this.credentials = createCredentials();
     this.jvmOpts = loadJvmOptions();
     this.reservedMemory = getReservedMemory();
+    this.twillSpec = twillRuntimeSpec.getTwillSpecification();
     this.placementPolicyManager = new PlacementPolicyManager(twillSpec.getPlacementPolicies());
     this.environments = getEnvironments();
 
@@ -227,7 +230,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
   @Override
   protected void doStart() throws Exception {
-    LOG.info("Start application master with spec: " + TwillSpecificationAdapter.create().toJson(twillSpec));
+    LOG.info("Start application master with spec: " +
+               TwillRuntimeSpecificationAdapter.create().toJson(twillRuntimeSpec));
 
     // initialize the event handler, if it fails, it will fail the application.
     if (eventHandler != null) {
@@ -246,7 +250,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   protected void doStop() throws Exception {
     Thread.interrupted();     // This is just to clear the interrupt flag
 
-    LOG.info("Stop application master with spec: {}", TwillSpecificationAdapter.create().toJson(twillSpec));
+    LOG.info("Stop application master with spec: {}",
+             TwillRuntimeSpecificationAdapter.create().toJson(twillRuntimeSpec));
 
     if (eventHandler != null) {
       try {

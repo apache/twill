@@ -50,6 +50,7 @@ import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.SecureStore;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillPreparer;
+import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
@@ -61,6 +62,7 @@ import org.apache.twill.internal.Configs;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.DefaultLocalFile;
 import org.apache.twill.internal.DefaultRuntimeSpecification;
+import org.apache.twill.internal.DefaultTwillRuntimeSpecification;
 import org.apache.twill.internal.DefaultTwillSpecification;
 import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.JvmOptions;
@@ -74,7 +76,7 @@ import org.apache.twill.internal.container.TwillContainerMain;
 import org.apache.twill.internal.json.ArgumentsCodec;
 import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
-import org.apache.twill.internal.json.TwillSpecificationAdapter;
+import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.utils.Dependencies;
 import org.apache.twill.internal.utils.Paths;
 import org.apache.twill.internal.utils.Resources;
@@ -118,6 +120,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final LocationFactory locationFactory;
   private final YarnTwillControllerFactory controllerFactory;
   private final RunId runId;
+  private final TwillRuntimeSpecification twillRuntimeSpec;
 
   private final List<LogHandler> logHandlers = Lists.newArrayList();
   private final List<String> arguments = Lists.newArrayList();
@@ -152,6 +155,12 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.extraOptions = extraOptions;
     this.logLevel = logLevel;
     this.classAcceptor = new ClassAcceptor();
+    this.twillRuntimeSpec = new DefaultTwillRuntimeSpecification(twillSpec,
+                                                                 locationFactory.getHomeLocation().getName(),
+                                                                 getAppLocation().toURI().toASCIIString(),
+                                                                 zkConnectString, runId.getId(), twillSpec.getName(),
+                                                                 yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS),
+                                                                 Integer.toString(reservedMemory), logLevel.toString());
   }
 
   @Override
@@ -319,7 +328,9 @@ final class YarnTwillPreparer implements TwillPreparer {
           createAppMasterJar(createBundler(), localFiles);
           createContainerJar(createBundler(), localFiles);
           populateRunnableLocalFiles(twillSpec, runnableLocalFiles);
+          LOG.info("Yaojie - before save");
           saveSpecification(twillSpec, runnableLocalFiles, localFiles);
+          LOG.info("Yaojie - after save");
           saveLogback(localFiles);
           saveLauncher(localFiles);
           saveJvmOptions(localFiles);
@@ -523,10 +534,15 @@ final class YarnTwillPreparer implements TwillPreparer {
       if (eventHandler == null) {
         eventHandler = new LogOnlyEventHandler().configure();
       }
-
-      TwillSpecificationAdapter.create().toJson(
-        new DefaultTwillSpecification(spec.getName(), runtimeSpec, spec.getOrders(), spec.getPlacementPolicies(),
-                                      eventHandler), writer);
+      TwillSpecification newTwillSpec = new DefaultTwillSpecification(spec.getName(), runtimeSpec, spec.getOrders(),
+                                                                      spec.getPlacementPolicies(), eventHandler);
+      TwillRuntimeSpecificationAdapter.create().toJson(
+        new DefaultTwillRuntimeSpecification(newTwillSpec, twillRuntimeSpec.getFsUser(),
+                                             twillRuntimeSpec.getTwillAppDir(), twillRuntimeSpec.getZkConnectStr(),
+                                             twillRuntimeSpec.getTwillRunId(), twillRuntimeSpec.getTwillAppName(),
+                                             twillRuntimeSpec.getReservedMemory(),
+                                             twillRuntimeSpec.getRmSchedulerAddr(),
+                                             twillRuntimeSpec.getLogLevel()), writer);
     }
     LOG.debug("Done {}", Constants.Files.TWILL_SPEC);
 
