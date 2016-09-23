@@ -17,6 +17,8 @@
  */
 package org.apache.twill.internal.json;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
@@ -24,24 +26,28 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import com.google.gson.reflect.TypeToken;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.DefaultTwillRunResources;
 
 import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Codec for serializing and deserializing a {@link org.apache.twill.api.TwillRunResources} object using json.
  */
 public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunResources>,
-                                              JsonDeserializer<TwillRunResources> {
+  JsonDeserializer<TwillRunResources> {
   private static final String CONTAINER_ID = "containerId";
   private static final String INSTANCE_ID = "instanceId";
   private static final String HOST = "host";
   private static final String MEMORY_MB = "memoryMB";
   private static final String VIRTUAL_CORES = "virtualCores";
   private static final String DEBUG_PORT = "debugPort";
-  private static final String LOG_LEVEL = "logLevel";
+  private static final String LOG_LEVEL = "rootLogLevel";
+  private static final String LOG_LEVEL_ARGUMENTS = "logLevelArguments";
 
   @Override
   public JsonElement serialize(TwillRunResources src, Type typeOfSrc, JsonSerializationContext context) {
@@ -55,24 +61,33 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
     if (src.getDebugPort() != null) {
       json.addProperty(DEBUG_PORT, src.getDebugPort());
     }
-    if (src.getLogLevel() != null) {
-      json.addProperty(LOG_LEVEL, src.getLogLevel().toString());
+    if (src.getRootLogLevel() != null) {
+      json.addProperty(LOG_LEVEL, src.getRootLogLevel().toString());
     }
-
+    if (!src.getLogLevelArguments().isEmpty()) {
+      Gson gson = new GsonBuilder().create();
+      json.addProperty(LOG_LEVEL_ARGUMENTS, gson.toJson(src.getLogLevelArguments()));
+    }
     return json;
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public TwillRunResources deserialize(JsonElement json, Type typeOfT,
-                                           JsonDeserializationContext context) throws JsonParseException {
+                                       JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
+    Gson gson = new GsonBuilder().create();
     return new DefaultTwillRunResources(jsonObj.get("instanceId").getAsInt(),
                                         jsonObj.get("containerId").getAsString(),
                                         jsonObj.get("virtualCores").getAsInt(),
                                         jsonObj.get("memoryMB").getAsInt(),
                                         jsonObj.get("host").getAsString(),
                                         jsonObj.has("debugPort") ? jsonObj.get("debugPort").getAsInt() : null,
-                                        jsonObj.has("logLevel") ? LogEntry.Level.valueOf(
-                                          jsonObj.get("logLevel").getAsString()) : LogEntry.Level.INFO);
+                                        jsonObj.has("rootLogLevel") ? LogEntry.Level.valueOf(
+                                          jsonObj.get("rootLogLevel").getAsString()) : LogEntry.Level.INFO,
+                                        jsonObj.has("logLevelArguments") ? (Map<String, String>) gson.fromJson(
+                                          jsonObj.get("logLevelArguments").getAsString(),
+                                          new TypeToken<Map<String, String>>() {}.getType()) :
+                                          new HashMap<String, String>());
   }
 }

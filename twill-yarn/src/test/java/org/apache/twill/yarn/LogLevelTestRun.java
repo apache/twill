@@ -137,8 +137,8 @@ public class LogLevelTestRun extends BaseYarnTest {
         continue;
       }
       for (TwillRunResources resources : report.getRunnableResources(runnable)) {
-        if (resources.getLogLevel() != null) {
-           return resources.getLogLevel();
+        if (resources.getRootLogLevel() != null) {
+           return resources.getRootLogLevel();
         }
       }
       TimeUnit.MILLISECONDS.sleep(100);

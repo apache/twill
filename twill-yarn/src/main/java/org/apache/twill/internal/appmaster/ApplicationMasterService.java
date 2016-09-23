@@ -332,6 +332,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       return result;
     }
 
+    if (handleLogLevelChange(message, completion)) {
+      return result;
+    }
+
     // Replicate messages to all runnables
     if (message.getScope() == Message.Scope.ALL_RUNNABLE) {
       runningContainers.sendToAll(message, completion);
@@ -653,7 +657,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
                               Queue<ProvisionRequest> provisioning) {
     for (ProcessLauncher<YarnContainerInfo> processLauncher : launchers) {
       LOG.info("Got container {}", processLauncher.getContainerInfo().getId());
-      LOG.info("Yaojie - twill: {}", twillRuntimeSpec.getRmSchedulerAddr() );
       ProvisionRequest provisionRequest = provisioning.peek();
       if (provisionRequest == null) {
         continue;
@@ -963,5 +966,30 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         completion.run();
       }
     };
+  }
+
+  private boolean handleLogLevelChange(final Message message, final Runnable completion) {
+    Message.Scope scope = message.getScope();
+    if (message.getType() != Message.Type.SYSTEM ||
+      (scope != Message.Scope.RUNNABLE && scope != Message.Scope.ALL_RUNNABLE)) {
+      return false;
+    }
+
+    Command command = message.getCommand();
+    if (!command.getCommand().equals(Constants.SystemMessages.LOG_LEVEL)) {
+      return false;
+    }
+
+    if (scope == Message.Scope.ALL_RUNNABLE) {
+      runningContainers.sendToAll(message, completion);
+    } else {
+      final String runnableName = message.getRunnableName();
+      if (runnableName == null || runnableName.isEmpty() || !twillSpec.getRunnables().containsKey(runnableName)) {
+        LOG.info("Unknown runnable {}", runnableName);
+        return false;
+      }
+      runningContainers.sendToRunnable(runnableName, message, completion);
+    }
+    return true;
   }
 }

@@ -303,6 +303,16 @@ final class YarnTwillPreparer implements TwillPreparer {
   }
 
   @Override
+  public TwillPreparer setLogLevel(Map<String, LogEntry.Level> logLevelAppArgs) {
+    return null;
+  }
+
+  @Override
+  public TwillPreparer setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelRunnableArgs) {
+    return null;
+  }
+
+  @Override
   public TwillController start() {
     try {
       final ProcessLauncher<ApplicationMasterInfo> launcher = yarnAppClient.createLauncher(twillSpec, schedulerQueue);

@@ -17,6 +17,8 @@
  */
 package org.apache.twill.internal.container;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -28,15 +30,18 @@ import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.BasicTwillContext;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.ContainerLiveNodeData;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.utils.Instances;
 import org.apache.twill.internal.yarn.AbstractYarnTwillService;
 import org.apache.twill.zookeeper.ZKClient;
+import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -96,6 +101,10 @@ public final class TwillContainerService extends AbstractYarnTwillService {
       context.setInstanceCount(Integer.parseInt(command.getOptions().get("count")));
     }
 
+    if (message.getType() == Message.Type.SYSTEM && Constants.SystemMessages.LOG_LEVEL.equals(command.getCommand())) {
+      return setLogLevel(messageId, command);
+    }
+
     commandExecutor.execute(new Runnable() {
 
       @Override
@@ -151,5 +160,25 @@ public final class TwillContainerService extends AbstractYarnTwillService {
     } catch (Throwable t) {
       LOG.error("Exception when stopping runnable.", t);
     }
+  }
+
+  private ListenableFuture<String> setLogLevel(String messageId, Command command) {
+    ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
+    if (!(loggerFactory instanceof LoggerContext)) {
+      String errorMsg = "LoggerFactory is not a logback LoggerContext, cannot change log level";
+      LOG.error(errorMsg);
+      return Futures.immediateFailedFuture(new Exception(errorMsg));
+    }
+
+    Map<String, String> logLevelArguments = command.getOptions();
+    LoggerContext loggerContext = (LoggerContext) loggerFactory;
+    for (Map.Entry<String, String> entry : logLevelArguments.entrySet()) {
+      String loggerName = entry.getKey();
+      String logLevel = entry.getValue();
+      ch.qos.logback.classic.Logger logger = loggerContext.getLogger(loggerName);
+      LOG.info("Log level of {} changed from {} to {}", loggerName, logger.getLevel(), logLevel);
+      logger.setLevel(Level.toLevel(logLevel));
+    }
+    return Futures.immediateFuture(messageId);
   }
 }

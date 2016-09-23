@@ -235,6 +235,10 @@ public interface TwillPreparer {
    */
   TwillPreparer setLogLevel(LogEntry.Level logLevel);
 
+  TwillPreparer setLogLevel(Map<String, LogEntry.Level> logLevelAppArgs);
+
+  TwillPreparer setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelRunnableArgs);
+
   /**
    * Starts the application.
    * @return A {@link TwillController} for controlling the running application.

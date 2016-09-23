@@ -20,6 +20,11 @@ package org.apache.twill.internal.state;
 import org.apache.twill.api.Command;
 
 import com.google.common.base.Preconditions;
+import org.apache.twill.api.logging.LogEntry;
+import org.apache.twill.internal.Constants;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Collection of predefined system messages.
@@ -29,6 +34,7 @@ public final class SystemMessages {
   public static final Command STOP_COMMAND = Command.Builder.of("stop").build();
   public static final Message SECURE_STORE_UPDATED = new SimpleMessage(
     Message.Type.SYSTEM, Message.Scope.APPLICATION, null, Command.Builder.of("secureStoreUpdated").build());
+  public static final String ALL_RUNNABLES = "ALL";
 
   public static Message stopApplication() {
     return new SimpleMessage(Message.Type.SYSTEM, Message.Scope.APPLICATION, null, STOP_COMMAND);
@@ -66,6 +72,23 @@ public final class SystemMessages {
   public static Message updateRunnablesInstances(Command updateCommand) {
     Preconditions.checkNotNull(updateCommand);
     return new SimpleMessage(Message.Type.SYSTEM, Message.Scope.RUNNABLES, null, updateCommand);
+  }
+
+  public static Message setLogLevel(Map<String, LogEntry.Level> logLevelArguments) {
+    return setLogLevel(ALL_RUNNABLES, logLevelArguments);
+  }
+
+  public static Message setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelArguments) {
+    Preconditions.checkNotNull(runnableName);
+    Preconditions.checkNotNull(logLevelArguments);
+    Map<String, String> options = new LinkedHashMap<>();
+    for (Map.Entry<String, LogEntry.Level> entry : logLevelArguments.entrySet()) {
+      options.put(entry.getKey(), entry.getValue().name());
+    }
+    return new SimpleMessage(Message.Type.SYSTEM,
+                             runnableName.equals(ALL_RUNNABLES) ? Message.Scope.ALL_RUNNABLE : Message.Scope.RUNNABLE,
+                             runnableName, Command.Builder.of(Constants.SystemMessages.LOG_LEVEL)
+                               .addOptions(options).build());
   }
 
   private SystemMessages() {
