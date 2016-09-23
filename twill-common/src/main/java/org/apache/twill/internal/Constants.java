@@ -78,6 +78,12 @@ public final class Constants {
     }
   }
 
+  public static final class Environments {
+
+    public static final String TWILL_FS_USER = "TWILL_FS_USER";
+    public static final String TWILL_APP_NAME = "TWILL_APP_NAME";
+  }
+
   private Constants() {
   }
 }

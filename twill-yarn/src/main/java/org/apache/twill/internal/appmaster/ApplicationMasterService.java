@@ -172,7 +172,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   private int getReservedMemory() {
-    String value = System.getenv(EnvKeys.TWILL_RESERVED_MEMORY_MB);
+    String value = twillRuntimeSpec.getReservedMemory();
     if (value == null) {
       return Configs.Defaults.JAVA_RESERVED_MEMORY_MB;
     }
@@ -653,6 +653,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
                               Queue<ProvisionRequest> provisioning) {
     for (ProcessLauncher<YarnContainerInfo> processLauncher : launchers) {
       LOG.info("Got container {}", processLauncher.getContainerInfo().getId());
+      LOG.info("Yaojie - twill: {}", twillRuntimeSpec.getRmSchedulerAddr() );
       ProvisionRequest provisionRequest = provisioning.peek();
       if (provisionRequest == null) {
         continue;
@@ -661,7 +662,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       String runnableName = provisionRequest.getRuntimeSpec().getName();
       LOG.info("Starting runnable {} with {}", runnableName, processLauncher);
 
-      LOG.debug("Log level for Twill runnable {} is {}", runnableName, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+      LOG.debug("Log level for Twill runnable {} is {}", runnableName, twillRuntimeSpec.getLogLevel());
 
       int containerCount = expectedContainers.getExpected(runnableName);
 
@@ -671,12 +672,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         env.putAll(environments.get(runnableName));
       }
       // Override with system env
-      env.put(EnvKeys.TWILL_APP_DIR, System.getenv(EnvKeys.TWILL_APP_DIR));
-      env.put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER));
-      env.put(EnvKeys.TWILL_APP_RUN_ID, runId.getId());
-      env.put(EnvKeys.TWILL_APP_NAME, twillSpec.getName());
-      env.put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
-      env.put(EnvKeys.TWILL_ZK_CONNECT, System.getenv(EnvKeys.TWILL_ZK_CONNECT));
       env.put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect());
 
       ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env, getLocalizeFiles(),
@@ -687,7 +682,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
         containerCount, jvmOpts, reservedMemory, getSecureStoreLocation());
 
-      runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher);
+      runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher,
+                              twillRuntimeSpec.getLogLevel());
 
       // Need to call complete to workaround bug in YARN AMRMClient
       if (provisionRequest.containerAcquired()) {

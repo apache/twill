@@ -62,6 +62,7 @@ import java.io.Reader;
 public final class TwillContainerMain extends ServiceMain {
 
   private static final Logger LOG = LoggerFactory.getLogger(TwillContainerMain.class);
+  private static String logLevel;
 
   /**
    * Main method for launching a {@link TwillContainerService} which runs
@@ -71,20 +72,20 @@ public final class TwillContainerMain extends ServiceMain {
     // Try to load the secure store from localized file, which AM requested RM to localize it for this container.
     loadSecureStore();
 
-    String zkConnectStr = System.getenv(EnvKeys.TWILL_ZK_CONNECT);
     File twillSpecFile = new File(Constants.Files.TWILL_SPEC);
-    RunId appRunId = RunIds.fromString(System.getenv(EnvKeys.TWILL_APP_RUN_ID));
+    TwillRuntimeSpecification twillRuntimeSpec = loadTwillSpec(twillSpecFile);
+    String zkConnectStr = twillRuntimeSpec.getZkConnectStr();
+    RunId appRunId = RunIds.fromString(twillRuntimeSpec.getTwillRunId());
     RunId runId = RunIds.fromString(System.getenv(EnvKeys.TWILL_RUN_ID));
     String runnableName = System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
     int instanceId = Integer.parseInt(System.getenv(EnvKeys.TWILL_INSTANCE_ID));
     int instanceCount = Integer.parseInt(System.getenv(EnvKeys.TWILL_INSTANCE_COUNT));
+    logLevel = twillRuntimeSpec.getLogLevel();
 
-    ZKClientService zkClientService = createZKClient(zkConnectStr, System.getenv(EnvKeys.TWILL_APP_NAME));
+    ZKClientService zkClientService = createZKClient(zkConnectStr, twillRuntimeSpec.getTwillAppName());
     ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
     ZKClient appRunZkClient = getAppRunZKClient(zkClientService, appRunId);
-
-    TwillRuntimeSpecification twillRuntimeSpec = loadTwillSpec(twillSpecFile);
     
     TwillRunnableSpecification runnableSpec =
       twillRuntimeSpec.getTwillSpecification().getRunnables().get(runnableName).getRunnableSpecification();
@@ -102,7 +103,8 @@ public final class TwillContainerMain extends ServiceMain {
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
     Service service = new TwillContainerService(context, containerInfo, containerZKClient,
                                                 runId, runnableSpec, getClassLoader(),
-                                                createAppLocation(conf));
+                                                createAppLocation(conf, twillRuntimeSpec.getFsUser(),
+                                                                  twillRuntimeSpec.getTwillAppDir()));
     new TwillContainerMain().doMain(
       service,
       zkClientService,
@@ -114,9 +116,7 @@ public final class TwillContainerMain extends ServiceMain {
 
   @Override
   protected String getLoggerLevel(Logger logger) {
-    String appLogLevel = System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL);
-
-    return Strings.isNullOrEmpty(appLogLevel) ? super.getLoggerLevel(logger) : appLogLevel;
+    return Strings.isNullOrEmpty(logLevel) ? super.getLoggerLevel(logger) : logLevel;
   }
 
   private static void loadSecureStore() throws IOException {

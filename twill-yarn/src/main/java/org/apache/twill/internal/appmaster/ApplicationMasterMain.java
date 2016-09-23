@@ -23,10 +23,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.RunId;
+import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.ServiceMain;
+import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
 import org.apache.twill.internal.logging.Loggings;
 import org.apache.twill.internal.yarn.VersionDetectYarnAMClientFactory;
@@ -64,17 +66,20 @@ public final class ApplicationMasterMain extends ServiceMain {
    * Starts the application master.
    */
   public static void main(String[] args) throws Exception {
-    String zkConnect = System.getenv(EnvKeys.TWILL_ZK_CONNECT);
     File twillSpec = new File(Constants.Files.TWILL_SPEC);
-    RunId runId = RunIds.fromString(System.getenv(EnvKeys.TWILL_RUN_ID));
+    TwillRuntimeSpecification twillRuntimeSpec = TwillRuntimeSpecificationAdapter.create().fromJson(twillSpec);
+    String zkConnect = twillRuntimeSpec.getZkConnectStr();
+    RunId runId = RunIds.fromString(twillRuntimeSpec.getTwillRunId());
 
-    ZKClientService zkClientService = createZKClient(zkConnect, System.getenv(EnvKeys.TWILL_APP_NAME));
+    ZKClientService zkClientService = createZKClient(zkConnect, twillRuntimeSpec.getTwillAppName());
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
-    setRMSchedulerAddress(conf);
+    setRMSchedulerAddress(conf, twillRuntimeSpec.getRmSchedulerAddr());
 
     final YarnAMClient amClient = new VersionDetectYarnAMClientFactory(conf).create();
     ApplicationMasterService service = new ApplicationMasterService(runId, zkClientService,
-                                                                    twillSpec, amClient, createAppLocation(conf));
+                                                                    twillSpec, amClient, createAppLocation(
+                                                                      conf, twillRuntimeSpec.getFsUser(),
+                                                                      twillRuntimeSpec.getTwillAppDir()));
     TrackerService trackerService = new TrackerService(service);
 
     new ApplicationMasterMain(service.getKafkaZKConnect())
@@ -90,8 +95,7 @@ public final class ApplicationMasterMain extends ServiceMain {
   /**
    * Optionally sets the RM scheduler address based on the environment variable if it is not set in the cluster config.
    */
-  private static void setRMSchedulerAddress(Configuration conf) {
-    String schedulerAddress = System.getenv(EnvKeys.YARN_RM_SCHEDULER_ADDRESS);
+  private static void setRMSchedulerAddress(Configuration conf, String schedulerAddress) {
     if (schedulerAddress == null) {
       return;
     }
@@ -122,7 +126,6 @@ public final class ApplicationMasterMain extends ServiceMain {
   protected String getRunnableName() {
     return System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
   }
-
 
   /**
    * A service wrapper for starting/stopping {@link EmbeddedKafkaServer} and make sure the ZK path for

@@ -50,12 +50,14 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
     JsonObject json = new JsonObject();
-    json.addProperty(FS_USER, src.getFsUser());
     json.addProperty(TWILL_APP_DIR, src.getTwillAppDir());
     json.addProperty(ZK_CONNECT_STR, src.getZkConnectStr());
     json.addProperty(TWILL_RUNID, src.getTwillRunId());
     json.addProperty(TWILL_APP_NAME, src.getTwillAppName());
     json.addProperty(RESERVED_MEMORY, src.getReservedMemory());
+    if (src.getFsUser() != null) {
+      json.addProperty(FS_USER, src.getFsUser());
+    }
     if (src.getRmSchedulerAddr() != null) {
       json.addProperty(RM_SCHEDULER_ADDR, src.getRmSchedulerAddr());
     }
@@ -74,7 +76,8 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
 
     TwillSpecification twillSpecification = context.deserialize(
       jsonObj.get(TWILL_SPEC), new TypeToken<TwillSpecification>() { }.getType());
-    return new DefaultTwillRuntimeSpecification(twillSpecification, jsonObj.get(FS_USER).getAsString(),
+    return new DefaultTwillRuntimeSpecification(twillSpecification,
+                                                jsonObj.has(FS_USER) ? jsonObj.get(FS_USER).getAsString() : null,
                                                 jsonObj.get(TWILL_APP_DIR).getAsString(),
                                                 jsonObj.get(ZK_CONNECT_STR).getAsString(),
                                                 jsonObj.get(TWILL_RUNID).getAsString(),

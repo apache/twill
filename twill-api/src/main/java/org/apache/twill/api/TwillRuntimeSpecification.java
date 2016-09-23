@@ -39,6 +39,4 @@ public interface TwillRuntimeSpecification {
   String getRmSchedulerAddr();
 
   String getLogLevel();
-
-  void setLogLevel(String logLevel);
 }

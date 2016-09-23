@@ -126,7 +126,7 @@ final class RunningContainers {
   /**
    * Start a container for a runnable.
    */
-  void start(String runnableName, ContainerInfo containerInfo, TwillContainerLauncher launcher) {
+  void start(String runnableName, ContainerInfo containerInfo, TwillContainerLauncher launcher, String logLevel) {
     containerLock.lock();
     try {
       int instanceId = getStartInstanceId(runnableName);
@@ -140,7 +140,7 @@ final class RunningContainers {
                                                                  containerInfo.getMemoryMB(),
                                                                  containerInfo.getHost().getHostName(),
                                                                  controller,
-                                                                 System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+                                                                 logLevel);
       resourceReport.addRunResources(runnableName, resources);
       containerStats.put(runnableName, containerInfo);
 

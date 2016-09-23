@@ -34,7 +34,7 @@ public class DefaultTwillRuntimeSpecification implements TwillRuntimeSpecificati
   private final String twillAppName;
   private final String reservedMemory;
   private final String rmSchedulerAddr;
-  private String logLevel;
+  private final String logLevel;
 
   public DefaultTwillRuntimeSpecification(TwillSpecification twillSpecification, String fsUser, String twillAppDir,
                                           String zkConnectStr, String twillRunId, String twillAppName,
@@ -94,10 +94,4 @@ public class DefaultTwillRuntimeSpecification implements TwillRuntimeSpecificati
   public String getLogLevel() {
     return logLevel;
   }
-
-  @Override
-  public void setLogLevel(String logLevel) {
-    this.logLevel = logLevel;
-  }
-
 }

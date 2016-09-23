@@ -120,7 +120,6 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final LocationFactory locationFactory;
   private final YarnTwillControllerFactory controllerFactory;
   private final RunId runId;
-  private final TwillRuntimeSpecification twillRuntimeSpec;
 
   private final List<LogHandler> logHandlers = Lists.newArrayList();
   private final List<String> arguments = Lists.newArrayList();
@@ -155,12 +154,6 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.extraOptions = extraOptions;
     this.logLevel = logLevel;
     this.classAcceptor = new ClassAcceptor();
-    this.twillRuntimeSpec = new DefaultTwillRuntimeSpecification(twillSpec,
-                                                                 locationFactory.getHomeLocation().getName(),
-                                                                 getAppLocation().toURI().toASCIIString(),
-                                                                 zkConnectString, runId.getId(), twillSpec.getName(),
-                                                                 yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS),
-                                                                 Integer.toString(reservedMemory), logLevel.toString());
   }
 
   @Override
@@ -328,9 +321,7 @@ final class YarnTwillPreparer implements TwillPreparer {
           createAppMasterJar(createBundler(), localFiles);
           createContainerJar(createBundler(), localFiles);
           populateRunnableLocalFiles(twillSpec, runnableLocalFiles);
-          LOG.info("Yaojie - before save");
           saveSpecification(twillSpec, runnableLocalFiles, localFiles);
-          LOG.info("Yaojie - after save");
           saveLogback(localFiles);
           saveLauncher(localFiles);
           saveJvmOptions(localFiles);
@@ -348,26 +339,20 @@ final class YarnTwillPreparer implements TwillPreparer {
           //     appMaster.jar
           //     org.apache.twill.internal.appmaster.ApplicationMasterMain
           //     false
-          ImmutableMap.Builder<String, String> builder = ImmutableMap.<String, String>builder()
-            .put(EnvKeys.TWILL_FS_USER, fsUser)
-            .put(EnvKeys.TWILL_APP_DIR, getAppLocation().toURI().toASCIIString())
-            .put(EnvKeys.TWILL_ZK_CONNECT, zkConnectString)
-            .put(EnvKeys.TWILL_RUN_ID, runId.getId())
-            .put(EnvKeys.TWILL_RESERVED_MEMORY_MB, Integer.toString(reservedMemory))
-            .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName())
-            .put(EnvKeys.YARN_RM_SCHEDULER_ADDRESS, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS));
+          //  .put(EnvKeys.TWILL_FS_USER, fsUser)
+         //   .put(EnvKeys.TWILL_RUN_ID, runId.getId())
+         //   .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName());
 
           LOG.debug("Log level is set to {} for the Twill application.", logLevel);
-          builder.put(EnvKeys.TWILL_APP_LOG_LEVEL, logLevel.toString());
 
           int memory = Resources.computeMaxHeapSize(appMasterInfo.getMemoryMB(),
                                                     Constants.APP_MASTER_RESERVED_MEMORY_MB, Constants.HEAP_MIN_RATIO);
-          return launcher.prepareLaunch(builder.build(), localFiles.values(), credentials)
+          return launcher.prepareLaunch(ImmutableMap.<String, String>of(), localFiles.values(), credentials)
             .addCommand(
               "$JAVA_HOME/bin/java",
               "-Djava.io.tmpdir=tmp",
               "-Dyarn.appId=$" + EnvKeys.YARN_APP_ID_STR,
-              "-Dtwill.app=$" + EnvKeys.TWILL_APP_NAME,
+              "-Dtwill.app=$" + Constants.Environments.TWILL_APP_NAME,
               "-cp", Constants.Files.LAUNCHER_JAR + ":$HADOOP_CONF_DIR",
               "-Xmx" + memory + "m",
               extraOptions == null ? "" : extraOptions,
@@ -537,12 +522,11 @@ final class YarnTwillPreparer implements TwillPreparer {
       TwillSpecification newTwillSpec = new DefaultTwillSpecification(spec.getName(), runtimeSpec, spec.getOrders(),
                                                                       spec.getPlacementPolicies(), eventHandler);
       TwillRuntimeSpecificationAdapter.create().toJson(
-        new DefaultTwillRuntimeSpecification(newTwillSpec, twillRuntimeSpec.getFsUser(),
-                                             twillRuntimeSpec.getTwillAppDir(), twillRuntimeSpec.getZkConnectStr(),
-                                             twillRuntimeSpec.getTwillRunId(), twillRuntimeSpec.getTwillAppName(),
-                                             twillRuntimeSpec.getReservedMemory(),
-                                             twillRuntimeSpec.getRmSchedulerAddr(),
-                                             twillRuntimeSpec.getLogLevel()), writer);
+        new DefaultTwillRuntimeSpecification(newTwillSpec, locationFactory.getHomeLocation().getName(),
+                                             getAppLocation().toURI().toASCIIString(), zkConnectString,
+                                             runId.getId(), twillSpec.getName(), Integer.toString(reservedMemory),
+                                             yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS),
+                                             logLevel.toString()), writer);
     }
     LOG.debug("Done {}", Constants.Files.TWILL_SPEC);
 
