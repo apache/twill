@@ -17,6 +17,10 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.api.logging.LogEntry;
+
+import java.util.Map;
+
 /**
  *
  */
@@ -39,4 +43,6 @@ public interface TwillRuntimeSpecification {
   String getRmSchedulerAddr();
 
   String getLogLevel();
+
+  Map<String, Map<String, LogEntry.Level>> getLogLevelArguments();
 }

@@ -45,7 +45,7 @@ import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.ContainerLiveNodeData;
 import org.apache.twill.internal.DefaultResourceReport;
 import org.apache.twill.internal.DefaultTwillRunResources;
-import org.apache.twill.internal.EnvKeys;
+import org.apache.twill.internal.utils.LogLevelUtil;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillContainerController;
 import org.apache.twill.internal.TwillContainerLauncher;
@@ -62,6 +62,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -100,8 +101,10 @@ final class RunningContainers {
   private final Condition containerChange;
   private final ZKClient zkClient;
   private final Multimap<String, ContainerInfo> containerStats;
+  private final Map<String, Map<String, LogEntry.Level>> logLevelArguments;
 
-  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient) {
+  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient,
+                    Map<String, Map<String, LogEntry.Level>> logLevelArguments) {
     containers = HashBasedTable.create();
     runnableInstances = Maps.newHashMap();
     completedContainerCount = Maps.newHashMap();
@@ -111,6 +114,7 @@ final class RunningContainers {
     resourceReport = new DefaultResourceReport(appId, appMasterResources);
     zkClient = zookeeperClient;
     containerStats = HashMultimap.create();
+    this.logLevelArguments = logLevelArguments;
   }
 
   /**
@@ -136,13 +140,19 @@ final class RunningContainers {
       TwillContainerController controller = launcher.start(runId, instanceId,
                                                            TwillContainerMain.class, "$HADOOP_CONF_DIR");
       containers.put(runnableName, containerInfo.getId(), controller);
+      Map<String, String> logRunnableArguments = LogLevelUtil.getLogLevelForRunnable(runnableName, logLevelArguments);
+      logLevel = logRunnableArguments.containsKey(Logger.ROOT_LOGGER_NAME) ?
+        logRunnableArguments.get(Logger.ROOT_LOGGER_NAME) : logLevel;
+
       TwillRunResources resources = new DynamicTwillRunResources(instanceId,
                                                                  containerInfo.getId(),
                                                                  containerInfo.getVirtualCores(),
                                                                  containerInfo.getMemoryMB(),
                                                                  containerInfo.getHost().getHostName(),
                                                                  controller,
-                                                                 logLevel);
+                                                                 logLevel,
+                                                                 logRunnableArguments);
+      resourceReport.updateLogLevel(runnableName, logRunnableArguments);
       resourceReport.addRunResources(runnableName, resources);
       containerStats.put(runnableName, containerInfo);
 
@@ -581,6 +591,19 @@ final class RunningContainers {
     return false;
   }
 
+  private Map<String, LogEntry.Level> getLogLevelArguments(String runnableName) {
+    Map<String, LogEntry.Level> logAppArguments = logLevelArguments.get(Constants.SystemMessages.LOG_ALL_RUNNABLES);
+    Map<String, LogEntry.Level> logRunnableArguments = logLevelArguments.get(runnableName);
+    if (logAppArguments == null && logRunnableArguments == null) {
+      return new HashMap<>();
+    } else if (logAppArguments == null) {
+      logAppArguments = logRunnableArguments;
+    } else if (logRunnableArguments != null) {
+      logAppArguments.putAll(logRunnableArguments);
+    }
+    return logAppArguments;
+  }
+
   /**
    * A helper class that overrides the debug port of the resources with the live info from the container controller.
    */
@@ -591,9 +614,10 @@ final class RunningContainers {
 
     private DynamicTwillRunResources(int instanceId, String containerId,
                                      int cores, int memoryMB, String host,
-                                     TwillContainerController controller, String logLevel) {
+                                     TwillContainerController controller, String logLevel,
+                                     Map<String, String> logLevelArguments) {
       super(instanceId, containerId, cores, memoryMB, host, null,
-            (logLevel != null) ? LogEntry.Level.valueOf(logLevel) : null);
+            (logLevel != null) ? LogEntry.Level.valueOf(logLevel) : null, logLevelArguments);
       this.controller = controller;
     }
 

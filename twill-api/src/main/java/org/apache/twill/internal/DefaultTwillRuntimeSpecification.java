@@ -19,6 +19,9 @@ package org.apache.twill.internal;
 
 import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.LogEntry;
+
+import java.util.Map;
 
 /**
  *
@@ -35,10 +38,12 @@ public class DefaultTwillRuntimeSpecification implements TwillRuntimeSpecificati
   private final String reservedMemory;
   private final String rmSchedulerAddr;
   private final String logLevel;
+  private final Map<String, Map<String, LogEntry.Level>> logLevelArguments;
 
   public DefaultTwillRuntimeSpecification(TwillSpecification twillSpecification, String fsUser, String twillAppDir,
                                           String zkConnectStr, String twillRunId, String twillAppName,
-                                          String reservedMemory, String rmSchedulerAddr, String logLevel) {
+                                          String reservedMemory, String rmSchedulerAddr, String logLevel,
+                                          Map<String, Map<String, LogEntry.Level>> logLevelArguments) {
     this.twillSpecification = twillSpecification;
     this.fsUser = fsUser;
     this.twillAppDir = twillAppDir;
@@ -48,6 +53,7 @@ public class DefaultTwillRuntimeSpecification implements TwillRuntimeSpecificati
     this.reservedMemory = reservedMemory;
     this.rmSchedulerAddr = rmSchedulerAddr;
     this.logLevel = logLevel;
+    this.logLevelArguments = logLevelArguments;
   }
 
   @Override
@@ -93,5 +99,10 @@ public class DefaultTwillRuntimeSpecification implements TwillRuntimeSpecificati
   @Override
   public String getLogLevel() {
     return logLevel;
+  }
+
+  @Override
+  public Map<String, Map<String, LogEntry.Level>> getLogLevelArguments() {
+    return logLevelArguments;
   }
 }

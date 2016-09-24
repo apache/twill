@@ -22,6 +22,7 @@ import org.apache.twill.api.Command;
 import com.google.common.base.Preconditions;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.Constants;
+import org.apache.twill.internal.utils.LogLevelUtil;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -81,10 +82,7 @@ public final class SystemMessages {
   public static Message setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelArguments) {
     Preconditions.checkNotNull(runnableName);
     Preconditions.checkNotNull(logLevelArguments);
-    Map<String, String> options = new LinkedHashMap<>();
-    for (Map.Entry<String, LogEntry.Level> entry : logLevelArguments.entrySet()) {
-      options.put(entry.getKey(), entry.getValue().name());
-    }
+    Map<String, String> options = LogLevelUtil.convertLogLevelArgs(logLevelArguments);
     return new SimpleMessage(Message.Type.SYSTEM,
                              runnableName.equals(ALL_RUNNABLES) ? Message.Scope.ALL_RUNNABLE : Message.Scope.RUNNABLE,
                              runnableName, Command.Builder.of(Constants.SystemMessages.LOG_LEVEL)

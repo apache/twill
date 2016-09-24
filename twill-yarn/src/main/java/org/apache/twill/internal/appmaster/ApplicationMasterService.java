@@ -212,7 +212,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
       appMasterHost, null, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
-    return new RunningContainers(appId, appMasterResources, zkClient);
+    return new RunningContainers(appId, appMasterResources, zkClient, twillRuntimeSpec.getLogLevelArguments());
   }
 
   private ExpectedContainers initExpectedContainers(TwillSpecification twillSpec) {

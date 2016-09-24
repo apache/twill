@@ -50,7 +50,6 @@ import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.SecureStore;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillPreparer;
-import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
@@ -131,6 +130,7 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final List<String> applicationClassPaths = Lists.newArrayList();
   private final Credentials credentials;
   private final int reservedMemory;
+  private final Map<String, Map<String, LogEntry.Level>> logLevelArguments = new HashMap<>();
   private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
@@ -304,12 +304,22 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer setLogLevel(Map<String, LogEntry.Level> logLevelAppArgs) {
-    return null;
+    Preconditions.checkArgument(!logLevelAppArgs.isEmpty());
+    if (logLevelAppArgs.containsKey(Logger.ROOT_LOGGER_NAME)) {
+      this.logLevel = logLevelAppArgs.get(Logger.ROOT_LOGGER_NAME);
+    }
+    setLogLevelArguments(Constants.SystemMessages.LOG_ALL_RUNNABLES, logLevelAppArgs);
+    return this;
   }
 
   @Override
   public TwillPreparer setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelRunnableArgs) {
-    return null;
+    Preconditions.checkNotNull(runnableName);
+    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
+                                "Runnable %s is not defined in the application.", runnableName);
+    Preconditions.checkArgument(!logLevelRunnableArgs.isEmpty());
+    setLogLevelArguments(runnableName, logLevelRunnableArgs);
+    return this;
   }
 
   @Override
@@ -395,6 +405,15 @@ final class YarnTwillPreparer implements TwillPreparer {
       if (overwrite || !environment.containsKey(entry.getKey())) {
         environment.put(entry.getKey(), entry.getValue());
       }
+    }
+  }
+
+  private void setLogLevelArguments(String runnableName, Map<String, LogEntry.Level> logLevelArgs) {
+    Map<String, LogEntry.Level> currentLogLevelArgs = this.logLevelArguments.get(runnableName);
+    if (currentLogLevelArgs == null) {
+      this.logLevelArguments.put(runnableName, new LinkedHashMap<>(logLevelArgs));
+    } else {
+      currentLogLevelArgs.putAll(new LinkedHashMap<>(logLevelArgs));
     }
   }
 
@@ -536,7 +555,7 @@ final class YarnTwillPreparer implements TwillPreparer {
                                              getAppLocation().toURI().toASCIIString(), zkConnectString,
                                              runId.getId(), twillSpec.getName(), Integer.toString(reservedMemory),
                                              yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS),
-                                             logLevel.toString()), writer);
+                                             logLevel.toString(), logLevelArguments), writer);
     }
     LOG.debug("Done {}", Constants.Files.TWILL_SPEC);
 

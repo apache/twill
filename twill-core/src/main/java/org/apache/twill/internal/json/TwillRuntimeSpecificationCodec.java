@@ -27,9 +27,11 @@ import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.DefaultTwillRuntimeSpecification;
 
 import java.lang.reflect.Type;
+import java.util.Map;
 
 /**
  *
@@ -46,6 +48,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   private static final String RM_SCHEDULER_ADDR = "rmSchedulerAddr";
   private static final String LOG_LEVEL = "logLevel";
   private static final String TWILL_SPEC = "twillSpecification";
+  private static final String LOG_LEVEL_ARGS = "logLevelArguments";
 
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
@@ -66,6 +69,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     }
     json.add(TWILL_SPEC, context.serialize(src.getTwillSpecification(),
                                            new TypeToken<TwillSpecification>() { }.getType()));
+    json.add(LOG_LEVEL_ARGS,
+             context.serialize(src.getLogLevelArguments(),
+                               new TypeToken<Map<String, Map<String, LogEntry.Level>>>() { }.getType()));
     return json;
   }
 
@@ -76,6 +82,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
 
     TwillSpecification twillSpecification = context.deserialize(
       jsonObj.get(TWILL_SPEC), new TypeToken<TwillSpecification>() { }.getType());
+    Map<String, Map<String, LogEntry.Level>> logLevelArgs =
+      context.deserialize(jsonObj.get(LOG_LEVEL_ARGS),
+                          new TypeToken<Map<String, Map<String, LogEntry.Level>>>() { }.getType());
     return new DefaultTwillRuntimeSpecification(twillSpecification,
                                                 jsonObj.has(FS_USER) ? jsonObj.get(FS_USER).getAsString() : null,
                                                 jsonObj.get(TWILL_APP_DIR).getAsString(),
@@ -86,6 +95,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                                 jsonObj.has(RM_SCHEDULER_ADDR) ?
                                                   jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
                                                 jsonObj.has(LOG_LEVEL) ?
-                                                  jsonObj.get(LOG_LEVEL).getAsString() : null);
+                                                  jsonObj.get(LOG_LEVEL).getAsString() : null,
+                                                logLevelArgs);
   }
 }

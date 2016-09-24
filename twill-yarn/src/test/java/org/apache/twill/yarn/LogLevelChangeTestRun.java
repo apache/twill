@@ -199,7 +199,6 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
       for (TwillRunResources resources : report.getRunnableResources(runnable)) {
         actual = resources.getRootLogLevel();
         actualArgs = resources.getLogLevelArguments();
-        LOG.info("Yaojie - runnable: {} {} == {}, args = {}", runnable, actual, expected, actualArgs);
         if (actual != null && actual.equals(expected) && actualArgs != null) {
           stopped = true;
           break;

@@ -17,8 +17,6 @@
  */
 package org.apache.twill.internal.json;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
@@ -32,7 +30,6 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.DefaultTwillRunResources;
 
 import java.lang.reflect.Type;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -64,19 +61,17 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
     if (src.getRootLogLevel() != null) {
       json.addProperty(LOG_LEVEL, src.getRootLogLevel().toString());
     }
-    if (!src.getLogLevelArguments().isEmpty()) {
-      Gson gson = new GsonBuilder().create();
-      json.addProperty(LOG_LEVEL_ARGUMENTS, gson.toJson(src.getLogLevelArguments()));
-    }
+    json.add(LOG_LEVEL_ARGUMENTS, context.serialize(src.getLogLevelArguments(),
+                                                    new TypeToken<Map<String, String>>() { }.getType()));
     return json;
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public TwillRunResources deserialize(JsonElement json, Type typeOfT,
                                        JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
-    Gson gson = new GsonBuilder().create();
+    Map<String, String> logLevelArguments =
+      context.deserialize(jsonObj.get("logLevelArguments"), new TypeToken<Map<String, String>>() { }.getType());
     return new DefaultTwillRunResources(jsonObj.get("instanceId").getAsInt(),
                                         jsonObj.get("containerId").getAsString(),
                                         jsonObj.get("virtualCores").getAsInt(),
@@ -85,9 +80,6 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
                                         jsonObj.has("debugPort") ? jsonObj.get("debugPort").getAsInt() : null,
                                         jsonObj.has("rootLogLevel") ? LogEntry.Level.valueOf(
                                           jsonObj.get("rootLogLevel").getAsString()) : LogEntry.Level.INFO,
-                                        jsonObj.has("logLevelArguments") ? (Map<String, String>) gson.fromJson(
-                                          jsonObj.get("logLevelArguments").getAsString(),
-                                          new TypeToken<Map<String, String>>() {}.getType()) :
-                                          new HashMap<String, String>());
+                                        logLevelArguments);
   }
 }

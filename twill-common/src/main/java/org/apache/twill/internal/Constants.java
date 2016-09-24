@@ -92,6 +92,7 @@ public final class Constants {
    */
   public static final class SystemMessages {
     public static final String LOG_LEVEL = "system.log.level";
+    public static final String LOG_ALL_RUNNABLES = "ALL";
   }
 
   private Constants() {

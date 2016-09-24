@@ -27,6 +27,7 @@ import org.apache.twill.api.Command;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnableSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.BasicTwillContext;
@@ -41,6 +42,7 @@ import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,18 +58,20 @@ public final class TwillContainerService extends AbstractYarnTwillService {
   private final ClassLoader classLoader;
   private final BasicTwillContext context;
   private final ContainerLiveNodeData containerLiveNodeData;
+  private final Map<String, String> logLevelArguments;
   private ExecutorService commandExecutor;
   private TwillRunnable runnable;
 
   public TwillContainerService(BasicTwillContext context, ContainerInfo containerInfo, ZKClient zkClient,
                                RunId runId, TwillRunnableSpecification specification, ClassLoader classLoader,
-                               Location applicationLocation) {
+                               Location applicationLocation, Map<String, String> logLevelArguments) {
     super(zkClient, runId, applicationLocation);
 
     this.specification = specification;
     this.classLoader = classLoader;
     this.containerLiveNodeData = createLiveNodeData(containerInfo);
     this.context = context;
+    this.logLevelArguments = logLevelArguments;
   }
 
   private ContainerLiveNodeData createLiveNodeData(ContainerInfo containerInfo) {
@@ -102,7 +106,12 @@ public final class TwillContainerService extends AbstractYarnTwillService {
     }
 
     if (message.getType() == Message.Type.SYSTEM && Constants.SystemMessages.LOG_LEVEL.equals(command.getCommand())) {
-      return setLogLevel(messageId, command);
+      if (!setLogLevel(command.getOptions())) {
+        String errorMsg = "LoggerFactory is not a logback LoggerContext, cannot change log level";
+        LOG.error(errorMsg);
+        return Futures.immediateFailedFuture(new Exception(errorMsg));
+      }
+      return Futures.immediateFuture(messageId);
     }
 
     commandExecutor.execute(new Runnable() {
@@ -132,6 +141,7 @@ public final class TwillContainerService extends AbstractYarnTwillService {
 
     runnable = Instances.newInstance((Class<TwillRunnable>) runnableClass);
     runnable.initialize(context);
+    setLogLevel(logLevelArguments);
   }
 
   @Override
@@ -162,15 +172,20 @@ public final class TwillContainerService extends AbstractYarnTwillService {
     }
   }
 
-  private ListenableFuture<String> setLogLevel(String messageId, Command command) {
+  private Map<String, String> convertLogLevelArguments(Map<String, LogEntry.Level> logLevelArguments) {
+    Map<String, String> result = new HashMap<>();
+    for (Map.Entry<String, LogEntry.Level> entry : logLevelArguments.entrySet()) {
+      result.put(entry.getKey(), entry.getValue().toString());
+    }
+    return result;
+  }
+
+  private boolean setLogLevel(Map<String, String> logLevelArguments) {
     ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
     if (!(loggerFactory instanceof LoggerContext)) {
-      String errorMsg = "LoggerFactory is not a logback LoggerContext, cannot change log level";
-      LOG.error(errorMsg);
-      return Futures.immediateFailedFuture(new Exception(errorMsg));
+      return false;
     }
 
-    Map<String, String> logLevelArguments = command.getOptions();
     LoggerContext loggerContext = (LoggerContext) loggerFactory;
     for (Map.Entry<String, String> entry : logLevelArguments.entrySet()) {
       String loggerName = entry.getKey();
@@ -179,6 +194,6 @@ public final class TwillContainerService extends AbstractYarnTwillService {
       LOG.info("Log level of {} changed from {} to {}", loggerName, logger.getLevel(), logLevel);
       logger.setLevel(Level.toLevel(logLevel));
     }
-    return Futures.immediateFuture(messageId);
+    return true;
   }
 }
