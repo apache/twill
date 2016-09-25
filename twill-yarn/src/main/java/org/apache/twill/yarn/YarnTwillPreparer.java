@@ -359,9 +359,6 @@ final class YarnTwillPreparer implements TwillPreparer {
           //     appMaster.jar
           //     org.apache.twill.internal.appmaster.ApplicationMasterMain
           //     false
-          //  .put(EnvKeys.TWILL_FS_USER, fsUser)
-         //   .put(EnvKeys.TWILL_RUN_ID, runId.getId())
-         //   .put(EnvKeys.TWILL_APP_NAME, twillSpec.getName());
 
           LOG.debug("Log level is set to {} for the Twill application.", logLevel);
 

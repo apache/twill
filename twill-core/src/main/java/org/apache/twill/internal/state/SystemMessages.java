@@ -24,7 +24,6 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.utils.LogLevelUtil;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**

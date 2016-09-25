@@ -21,11 +21,9 @@ import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogEntry.Level;
 import org.slf4j.Logger;
-import sun.rmi.runtime.Log;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *  Straightforward implementation of {@link org.apache.twill.api.TwillRunResources}.
@@ -39,7 +37,6 @@ public class DefaultTwillRunResources implements TwillRunResources {
   private final Integer debugPort;
   private final Map<String, String> logLevelArguments;
   private Level rootLogLevel;
-
 
   public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
                                   String host, Integer debugPort, Level rootLogLevel) {
@@ -120,7 +117,6 @@ public class DefaultTwillRunResources implements TwillRunResources {
     if (logLevelArguments.containsKey(Logger.ROOT_LOGGER_NAME)) {
       this.rootLogLevel = LogEntry.Level.valueOf(logLevelArguments.get(Logger.ROOT_LOGGER_NAME));
     }
-    this.logLevelArguments.clear();
     this.logLevelArguments.putAll(logLevelArguments);
   }
 

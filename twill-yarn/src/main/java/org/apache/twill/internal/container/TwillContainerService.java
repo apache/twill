@@ -27,7 +27,6 @@ import org.apache.twill.api.Command;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnableSpecification;
-import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.BasicTwillContext;
@@ -42,7 +41,6 @@ import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -141,7 +139,9 @@ public final class TwillContainerService extends AbstractYarnTwillService {
 
     runnable = Instances.newInstance((Class<TwillRunnable>) runnableClass);
     runnable.initialize(context);
-    setLogLevel(logLevelArguments);
+    if (!setLogLevel(logLevelArguments)) {
+      LOG.error("LoggerFactory is not a logback LoggerContext, cannot change log level");
+    }
   }
 
   @Override
@@ -172,14 +172,13 @@ public final class TwillContainerService extends AbstractYarnTwillService {
     }
   }
 
-  private Map<String, String> convertLogLevelArguments(Map<String, LogEntry.Level> logLevelArguments) {
-    Map<String, String> result = new HashMap<>();
-    for (Map.Entry<String, LogEntry.Level> entry : logLevelArguments.entrySet()) {
-      result.put(entry.getKey(), entry.getValue().toString());
-    }
-    return result;
-  }
-
+  /**
+   * Set the log level for the requested logger name.
+   *
+   * @param logLevelArguments map of the log level arguments.
+   * @return {@code true} if the log level is successful and {@code false} if the logger factory is not a logger
+   *         context.
+   */
   private boolean setLogLevel(Map<String, String> logLevelArguments) {
     ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
     if (!(loggerFactory instanceof LoggerContext)) {

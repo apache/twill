@@ -80,7 +80,7 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
   }
 
   /**
-   * .
+   * Second runnable.
    */
   public static final class LogLevelTestSecondRunnable extends AbstractTwillRunnable {
     private volatile Thread runThread;

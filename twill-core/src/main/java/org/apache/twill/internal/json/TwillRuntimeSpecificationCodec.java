@@ -34,7 +34,7 @@ import java.lang.reflect.Type;
 import java.util.Map;
 
 /**
- *
+ * Codec for serializing and deserializing a {@link org.apache.twill.api.TwillRuntimeSpecification} object using json.
  */
 final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntimeSpecification>,
                                                          JsonDeserializer<TwillRuntimeSpecification> {

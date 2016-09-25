@@ -34,6 +34,7 @@ import org.junit.runners.Suite;
   InitializeFailTestRun.class,
   LocalFileTestRun.class,
   LogHandlerTestRun.class,
+  LogLevelChangeTestRun.class,
   LogLevelTestRun.class,
   PlacementPolicyTestRun.class,
   ProvisionTimeoutTestRun.class,

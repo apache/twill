@@ -968,6 +968,11 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     };
   }
 
+  /**
+   * Attempt to change the log level from a runnable or all runnables.
+   *
+   * @return {@code true} if the message requests changing log levels and {@code false} otherwise.
+   */
   private boolean handleLogLevelChange(final Message message, final Runnable completion) {
     Message.Scope scope = message.getScope();
     if (message.getType() != Message.Type.SYSTEM ||

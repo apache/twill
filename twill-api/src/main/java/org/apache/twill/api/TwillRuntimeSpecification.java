@@ -22,7 +22,7 @@ import org.apache.twill.api.logging.LogEntry;
 import java.util.Map;
 
 /**
- *
+ * Represents runtime specification of a {@link TwillApplication}.
  */
 public interface TwillRuntimeSpecification {
 

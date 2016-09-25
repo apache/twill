@@ -24,7 +24,7 @@ import org.apache.twill.api.logging.LogEntry;
 import java.util.Map;
 
 /**
- *
+ * Straightforward implementation of {@link org.apache.twill.api.TwillRuntimeSpecification}.
  */
 public class DefaultTwillRuntimeSpecification implements TwillRuntimeSpecification {
 

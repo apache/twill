@@ -79,7 +79,7 @@ public final class Constants {
   }
 
   /**
-   *
+   * Constants for twill environment variable names.
    */
   public static final class Environments {
 

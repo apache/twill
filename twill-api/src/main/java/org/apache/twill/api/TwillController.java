@@ -91,9 +91,28 @@ public interface TwillController extends ServiceController {
    */
   Future<String> restartInstances(String runnable, int instanceId, int... moreInstanceIds);
 
+  /**
+   * Set the root log level for Twill applications running in a container.
+   *
+   * @param logLevel The log level for the root logger to change.
+   * @return A {@link Future} that will be completed when the set log level operation has been done.
+   */
   Future<String> setLogLevel(LogEntry.Level logLevel);
 
+  /**
+   * Set the log levels for requested logger names for Twill applications running in a container.
+   *
+   * @param logLevelAppArgs The {@link Map} contains the requested logger names and log levels that need to be set.
+   * @return A {@link Future} that will be completed when the set log level operation has been done.
+   */
   Future<String> setLogLevel(Map<String, LogEntry.Level> logLevelAppArgs);
 
+  /**
+   * Set the log levels for requested logger names for a {@link TwillRunnable}.
+   *
+   * @param runnableName The name of the runnable to set the log level.
+   * @param logLevels The {@link Map} contains the requested logger name and log level that need to be changed.
+   * @return A {@link Future} that will be completed when the set log level operation has been done.
+   */
   Future<String> setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevels);
 }

@@ -591,19 +591,6 @@ final class RunningContainers {
     return false;
   }
 
-  private Map<String, LogEntry.Level> getLogLevelArguments(String runnableName) {
-    Map<String, LogEntry.Level> logAppArguments = logLevelArguments.get(Constants.SystemMessages.LOG_ALL_RUNNABLES);
-    Map<String, LogEntry.Level> logRunnableArguments = logLevelArguments.get(runnableName);
-    if (logAppArguments == null && logRunnableArguments == null) {
-      return new HashMap<>();
-    } else if (logAppArguments == null) {
-      logAppArguments = logRunnableArguments;
-    } else if (logRunnableArguments != null) {
-      logAppArguments.putAll(logRunnableArguments);
-    }
-    return logAppArguments;
-  }
-
   /**
    * A helper class that overrides the debug port of the resources with the live info from the container controller.
    */

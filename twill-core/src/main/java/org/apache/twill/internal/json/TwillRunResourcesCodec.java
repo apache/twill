@@ -36,7 +36,7 @@ import java.util.Map;
  * Codec for serializing and deserializing a {@link org.apache.twill.api.TwillRunResources} object using json.
  */
 public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunResources>,
-  JsonDeserializer<TwillRunResources> {
+                                              JsonDeserializer<TwillRunResources> {
   private static final String CONTAINER_ID = "containerId";
   private static final String INSTANCE_ID = "instanceId";
   private static final String HOST = "host";
@@ -63,12 +63,13 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
     }
     json.add(LOG_LEVEL_ARGUMENTS, context.serialize(src.getLogLevelArguments(),
                                                     new TypeToken<Map<String, String>>() { }.getType()));
+
     return json;
   }
 
   @Override
   public TwillRunResources deserialize(JsonElement json, Type typeOfT,
-                                       JsonDeserializationContext context) throws JsonParseException {
+                                           JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
     Map<String, String> logLevelArguments =
       context.deserialize(jsonObj.get("logLevelArguments"), new TypeToken<Map<String, String>>() { }.getType());

@@ -24,10 +24,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- *
+ * Collections of helper functions for log level change.
  */
 public final class LogLevelUtil {
 
+  /**
+   * Convert the log level argument type.
+   */
   public static Map<String, String> convertLogLevelArgs(Map<String, LogEntry.Level> logLevelArguments) {
     Map<String, String> result = new HashMap<>();
     for (Map.Entry<String, LogEntry.Level> entry : logLevelArguments.entrySet()) {
@@ -36,8 +39,18 @@ public final class LogLevelUtil {
     return result;
   }
 
+  /**
+   * Get the log level arguments for a twill runnable.
+   *
+   * @param runnableName name of the runnable.
+   * @param logLevelArguments the arguments for all runnables.
+   * @return the map of the log level arguments for the runnable, empty if there is no argument.
+   */
   public static Map<String, String> getLogLevelForRunnable(String runnableName,
                                                            Map<String, Map<String, LogEntry.Level>> logLevelArguments) {
+    if (logLevelArguments.isEmpty()) {
+      return new HashMap<>();
+    }
     Map<String, LogEntry.Level> logAppArguments = logLevelArguments.get(Constants.SystemMessages.LOG_ALL_RUNNABLES);
     Map<String, LogEntry.Level> logRunnableArguments = logLevelArguments.get(runnableName);
     Map<String, LogEntry.Level> result = logAppArguments;

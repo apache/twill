@@ -64,12 +64,12 @@ public interface TwillRunResources {
   LogEntry.Level getRootLogLevel();
 
   /**
-   *
+   * @return the enabled log level arguments for the container where the runnable is running in.
    */
   Map<String, String> getLogLevelArguments();
 
   /**
-   *
+   * Update the log level arguments for the container where the runnable is running in.
    */
   void updateLogLevel(Map<String, String> logLevelArguments);
 }

@@ -30,7 +30,6 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.api.TwillRuntimeSpecification;
-import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.Arguments;
 import org.apache.twill.internal.BasicTwillContext;
@@ -55,7 +54,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -174,19 +172,6 @@ public final class TwillContainerMain extends ServiceMain {
 
   private static Arguments decodeArgs() throws IOException {
     return ArgumentsCodec.decode(Files.newReaderSupplier(new File(Constants.Files.ARGUMENTS), Charsets.UTF_8));
-  }
-
-  private static Map<String, LogEntry.Level> getLogLevelArguments(Map<String, Map<String, LogEntry.Level>> allLogArgs) {
-    Map<String, LogEntry.Level> logAppArguments = allLogArgs.get(Constants.SystemMessages.LOG_ALL_RUNNABLES);
-    Map<String, LogEntry.Level> logRunnableArguments = allLogArgs.get(System.getenv(EnvKeys.TWILL_RUNNABLE_NAME));
-    if (logAppArguments == null && logRunnableArguments == null) {
-      return new HashMap<>();
-    } else if (logAppArguments == null) {
-      logAppArguments = logRunnableArguments;
-    } else if (logRunnableArguments != null) {
-      logAppArguments.putAll(logRunnableArguments);
-    }
-    return logAppArguments;
   }
 
   @Override
