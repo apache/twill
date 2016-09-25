@@ -57,16 +57,28 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
    * Twill runnable.
    */
   public static final class LogLevelTestRunnable extends AbstractTwillRunnable {
+    public static final Logger LOG = LoggerFactory.getLogger(LogLevelChangeTestRun.LogLevelTestRunnable.class);
+
     private volatile Thread runThread;
 
     @Override
     public void run() {
       this.runThread = Thread.currentThread();
+
+      // check if the initial log level is DEBUG
+      Assert.assertTrue(LOG.isDebugEnabled() && !LOG.isTraceEnabled());
+
+      int i = 0;
       while (!Thread.interrupted()) {
-        try {
-          TimeUnit.MILLISECONDS.sleep(500);
-        } catch (InterruptedException e) {
-          break;
+        if (i == 0 && !LOG.isDebugEnabled()) {
+          // check if the log level is changed to INFO
+          Assert.assertTrue(LOG.isInfoEnabled());
+          i++;
+        }
+        if (i == 1 && !LOG.isInfoEnabled()) {
+          // check if the log level is changed to WARN
+          Assert.assertTrue(LOG.isWarnEnabled());
+          i++;
         }
       }
     }
@@ -83,16 +95,28 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
    * Second runnable.
    */
   public static final class LogLevelTestSecondRunnable extends AbstractTwillRunnable {
+    public static final Logger LOG = LoggerFactory.getLogger(LogLevelChangeTestRun.LogLevelTestSecondRunnable.class);
+
     private volatile Thread runThread;
 
     @Override
     public void run() {
       this.runThread = Thread.currentThread();
+
+      // check if the initial log level is DEBUG
+      Assert.assertTrue(LOG.isDebugEnabled() && !LOG.isTraceEnabled());
+
+      int i = 0;
       while (!Thread.interrupted()) {
-        try {
-          TimeUnit.MILLISECONDS.sleep(500);
-        } catch (InterruptedException e) {
-          break;
+        if (i == 0 && !LOG.isDebugEnabled()) {
+          // check if the log level is changed to INFO
+          Assert.assertTrue(LOG.isInfoEnabled());
+          i++;
+        }
+        if (i == 1 && LOG.isDebugEnabled()) {
+          // check if the log level is changed to TRACE
+          Assert.assertTrue(LOG.isTraceEnabled());
+          i++;
         }
       }
     }
@@ -124,13 +148,13 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
   }
 
   @Test
-  public void testDebugLogLevel()throws Exception {
+  public void testChangeLogLevel()throws Exception {
     YarnTwillRunnerService runner = getTwillRunner();
     runner.start();
 
-    // Set log level to ERROR
+    // Set log level to DEBUG
     TwillController controller = runner.prepare(new LogLevelTestApplication())
-      .setLogLevel(LogEntry.Level.ERROR)
+      .setLogLevel(LogEntry.Level.DEBUG)
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
       .start();
 
@@ -144,22 +168,22 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     }, Threads.SAME_THREAD_EXECUTOR);
     Assert.assertTrue(running.await(200, TimeUnit.SECONDS));
 
-    // assert that log level is ERROR
+    // assert that log level is DEBUG
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    200L, TimeUnit.SECONDS, LogEntry.Level.ERROR, ImmutableMap.<String, String>of());
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.<String, String>of());
 
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    200L, TimeUnit.SECONDS, LogEntry.Level.ERROR, ImmutableMap.<String, String>of());
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.<String, String>of());
 
     // change the log level to INFO
     controller.setLogLevel(LogEntry.Level.INFO).get();
 
     // assert log level has changed to INFO
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    200L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", "INFO"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", "INFO"));
 
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    200L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", "INFO"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", "INFO"));
 
     // change the log level of LogLevelTestRunnable to WARN,
     // change the log level of LogLevelTestSecondRunnable to TRACE
@@ -169,9 +193,9 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     controller.setLogLevel(LogLevelTestSecondRunnable.class.getSimpleName(), logLevelSecondRunnable).get();
 
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    200L, TimeUnit.SECONDS, LogEntry.Level.WARN, ImmutableMap.of("ROOT", "WARN"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, ImmutableMap.of("ROOT", "WARN"));
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    200L, TimeUnit.SECONDS, LogEntry.Level.TRACE, ImmutableMap.of("ROOT", "TRACE"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.TRACE, ImmutableMap.of("ROOT", "TRACE"));
 
     // stop
     controller.terminate().get(120, TimeUnit.SECONDS);
@@ -199,7 +223,7 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
       for (TwillRunResources resources : report.getRunnableResources(runnable)) {
         actual = resources.getRootLogLevel();
         actualArgs = resources.getLogLevelArguments();
-        if (actual != null && actual.equals(expected) && actualArgs != null) {
+        if (actual != null && actual.equals(expected)) {
           stopped = true;
           break;
         }
