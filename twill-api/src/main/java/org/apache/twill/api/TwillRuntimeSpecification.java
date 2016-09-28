@@ -15,34 +15,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.yarn;
+package org.apache.twill.api;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
+import org.apache.twill.api.logging.LogEntry;
+
+import java.util.Map;
 
 /**
- * Test suite for all tests with mini yarn cluster.
+ * Represents runtime specification of a {@link TwillApplication}.
  */
-@RunWith(Suite.class)
-@Suite.SuiteClasses({
-  ContainerSizeTestRun.class,
-  DebugTestRun.class,
-  DistributeShellTestRun.class,
-  EchoServerTestRun.class,
-  EnvironmentTestRun.class,
-  FailureRestartTestRun.class,
-  InitializeFailTestRun.class,
-  LocalFileTestRun.class,
-  LogHandlerTestRun.class,
-  LogLevelChangeTestRun.class,
-  LogLevelTestRun.class,
-  PlacementPolicyTestRun.class,
-  ProvisionTimeoutTestRun.class,
-  ResourceReportTestRun.class,
-  ServiceDiscoveryTestRun.class,
-  SessionExpireTestRun.class,
-  TaskCompletedTestRun.class,
-  RestartRunnableTestRun.class
-})
-public final class YarnTestSuite extends BaseYarnTest {
+public interface TwillRuntimeSpecification {
+
+  TwillSpecification getTwillSpecification();
+
+  String getFsUser();
+
+  String getTwillAppDir();
+
+  String getZkConnectStr();
+
+  String getTwillAppRunId();
+
+  String getTwillAppName();
+
+  String getReservedMemory();
+
+  String getRmSchedulerAddr();
+
+  String getLogLevel();
+
+  Map<String, Map<String, LogEntry.Level>> getLogLevelArguments();
 }

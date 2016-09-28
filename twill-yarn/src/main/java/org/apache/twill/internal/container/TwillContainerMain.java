@@ -22,7 +22,6 @@ import com.google.common.base.Strings;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.AbstractService;
-import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.security.Credentials;
@@ -30,7 +29,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnableSpecification;
-import org.apache.twill.api.TwillSpecification;
+import org.apache.twill.api.TwillRuntimeSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.Arguments;
 import org.apache.twill.internal.BasicTwillContext;
@@ -38,10 +38,11 @@ import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.EnvContainerInfo;
 import org.apache.twill.internal.EnvKeys;
+import org.apache.twill.internal.utils.LogLevelUtil;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.ServiceMain;
 import org.apache.twill.internal.json.ArgumentsCodec;
-import org.apache.twill.internal.json.TwillSpecificationAdapter;
+import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.logging.Loggings;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClientService;
@@ -54,6 +55,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.Reader;
+import java.util.Map;
 
 /**
  * The main class for launching a {@link TwillContainerService}.
@@ -61,6 +63,11 @@ import java.io.Reader;
 public final class TwillContainerMain extends ServiceMain {
 
   private static final Logger LOG = LoggerFactory.getLogger(TwillContainerMain.class);
+  private final String logLevel;
+
+  private TwillContainerMain(String logLevel) {
+    this.logLevel = logLevel;
+  }
 
   /**
    * Main method for launching a {@link TwillContainerService} which runs
@@ -70,22 +77,22 @@ public final class TwillContainerMain extends ServiceMain {
     // Try to load the secure store from localized file, which AM requested RM to localize it for this container.
     loadSecureStore();
 
-    String zkConnectStr = System.getenv(EnvKeys.TWILL_ZK_CONNECT);
     File twillSpecFile = new File(Constants.Files.TWILL_SPEC);
-    RunId appRunId = RunIds.fromString(System.getenv(EnvKeys.TWILL_APP_RUN_ID));
+    TwillRuntimeSpecification twillRuntimeSpec = loadTwillSpec(twillSpecFile);
+    String zkConnectStr = twillRuntimeSpec.getZkConnectStr();
+    RunId appRunId = RunIds.fromString(twillRuntimeSpec.getTwillAppRunId());
     RunId runId = RunIds.fromString(System.getenv(EnvKeys.TWILL_RUN_ID));
     String runnableName = System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
     int instanceId = Integer.parseInt(System.getenv(EnvKeys.TWILL_INSTANCE_ID));
     int instanceCount = Integer.parseInt(System.getenv(EnvKeys.TWILL_INSTANCE_COUNT));
 
-    ZKClientService zkClientService = createZKClient(zkConnectStr, System.getenv(EnvKeys.TWILL_APP_NAME));
+    ZKClientService zkClientService = createZKClient(zkConnectStr, twillRuntimeSpec.getTwillAppName());
     ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
     ZKClient appRunZkClient = getAppRunZKClient(zkClientService, appRunId);
-
-    TwillSpecification twillSpec = loadTwillSpec(twillSpecFile);
     
-    TwillRunnableSpecification runnableSpec = twillSpec.getRunnables().get(runnableName).getRunnableSpecification();
+    TwillRunnableSpecification runnableSpec =
+      twillRuntimeSpec.getTwillSpecification().getRunnables().get(runnableName).getRunnableSpecification();
     ContainerInfo containerInfo = new EnvContainerInfo();
     Arguments arguments = decodeArgs();
     BasicTwillContext context = new BasicTwillContext(
@@ -98,10 +105,14 @@ public final class TwillContainerMain extends ServiceMain {
 
     ZKClient containerZKClient = getContainerZKClient(zkClientService, appRunId, runnableName);
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
-    Service service = new TwillContainerService(context, containerInfo, containerZKClient,
-                                                runId, runnableSpec, getClassLoader(),
-                                                createAppLocation(conf));
-    new TwillContainerMain().doMain(
+    Map<String, LogEntry.Level> logLevelArguments = LogLevelUtil.getLogLevelForRunnable(
+      System.getenv(EnvKeys.TWILL_RUNNABLE_NAME), twillRuntimeSpec.getLogLevelArguments());
+    TwillContainerService service = new TwillContainerService(context, containerInfo, containerZKClient,
+                                                              runId, runnableSpec, getClassLoader(),
+                                                              createAppLocation(conf, twillRuntimeSpec.getFsUser(),
+                                                                                twillRuntimeSpec.getTwillAppDir()),
+                                                              logLevelArguments);
+    new TwillContainerMain(twillRuntimeSpec.getLogLevel()).doMain(
       service,
       zkClientService,
       new LogFlushService(),
@@ -112,9 +123,7 @@ public final class TwillContainerMain extends ServiceMain {
 
   @Override
   protected String getLoggerLevel(Logger logger) {
-    String appLogLevel = System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL);
-
-    return Strings.isNullOrEmpty(appLogLevel) ? super.getLoggerLevel(logger) : appLogLevel;
+    return Strings.isNullOrEmpty(logLevel) ? super.getLoggerLevel(logger) : logLevel;
   }
 
   private static void loadSecureStore() throws IOException {
@@ -156,9 +165,9 @@ public final class TwillContainerMain extends ServiceMain {
     return classLoader;
   }
 
-  private static TwillSpecification loadTwillSpec(File specFile) throws IOException {
+  private static TwillRuntimeSpecification loadTwillSpec(File specFile) throws IOException {
     try (Reader reader = Files.newReader(specFile, Charsets.UTF_8)) {
-      return TwillSpecificationAdapter.create().fromJson(reader);
+      return TwillRuntimeSpecificationAdapter.create().fromJson(reader);
     }
   }
 

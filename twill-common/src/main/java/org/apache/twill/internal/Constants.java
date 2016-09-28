@@ -52,7 +52,7 @@ public final class Constants {
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
 
   /**
-   * Common ZK paths constants
+   * Common ZK paths constants.
    */
   public static final String DISCOVERY_PATH_PREFIX = "/discoverable";
   public static final String INSTANCES_PATH_PREFIX = "/instances";
@@ -76,6 +76,23 @@ public final class Constants {
 
     private Files() {
     }
+  }
+
+  /**
+   * Constants for twill environment variable names.
+   */
+  public static final class Environments {
+
+    public static final String TWILL_FS_USER = "TWILL_FS_USER";
+    public static final String TWILL_APP_NAME = "TWILL_APP_NAME";
+  }
+
+  /**
+   * Constants for logLevel system messages.
+   */
+  public static final class SystemMessages {
+    public static final String LOG_LEVEL = "system.log.level";
+    public static final String LOG_ALL_RUNNABLES = "ALL";
   }
 
   private Constants() {

@@ -17,6 +17,8 @@
  */
 package org.apache.twill.internal.container;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -25,18 +27,23 @@ import org.apache.twill.api.Command;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnableSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
 import org.apache.twill.internal.BasicTwillContext;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.ContainerLiveNodeData;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.utils.Instances;
+import org.apache.twill.internal.utils.LogLevelUtil;
 import org.apache.twill.internal.yarn.AbstractYarnTwillService;
 import org.apache.twill.zookeeper.ZKClient;
+import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -51,18 +58,20 @@ public final class TwillContainerService extends AbstractYarnTwillService {
   private final ClassLoader classLoader;
   private final BasicTwillContext context;
   private final ContainerLiveNodeData containerLiveNodeData;
+  private final Map<String, LogEntry.Level> logLevelArguments;
   private ExecutorService commandExecutor;
   private TwillRunnable runnable;
 
   public TwillContainerService(BasicTwillContext context, ContainerInfo containerInfo, ZKClient zkClient,
                                RunId runId, TwillRunnableSpecification specification, ClassLoader classLoader,
-                               Location applicationLocation) {
+                               Location applicationLocation, Map<String, LogEntry.Level> logLevelArguments) {
     super(zkClient, runId, applicationLocation);
 
     this.specification = specification;
     this.classLoader = classLoader;
     this.containerLiveNodeData = createLiveNodeData(containerInfo);
     this.context = context;
+    this.logLevelArguments = logLevelArguments;
   }
 
   private ContainerLiveNodeData createLiveNodeData(ContainerInfo containerInfo) {
@@ -96,6 +105,15 @@ public final class TwillContainerService extends AbstractYarnTwillService {
       context.setInstanceCount(Integer.parseInt(command.getOptions().get("count")));
     }
 
+    if (message.getType() == Message.Type.SYSTEM && Constants.SystemMessages.LOG_LEVEL.equals(command.getCommand())) {
+      if (!setLogLevel(LogLevelUtil.convertLogLevelValuesToLogEntry(command.getOptions()))) {
+        String errorMsg = "LoggerFactory is not a logback LoggerContext, cannot change log level";
+        LOG.error(errorMsg);
+        return Futures.immediateFailedFuture(new Exception(errorMsg));
+      }
+      return Futures.immediateFuture(messageId);
+    }
+
     commandExecutor.execute(new Runnable() {
 
       @Override
@@ -123,6 +141,9 @@ public final class TwillContainerService extends AbstractYarnTwillService {
 
     runnable = Instances.newInstance((Class<TwillRunnable>) runnableClass);
     runnable.initialize(context);
+    if (!setLogLevel(logLevelArguments)) {
+      LOG.error("LoggerFactory is not a logback LoggerContext, cannot change log level");
+    }
   }
 
   @Override
@@ -151,5 +172,29 @@ public final class TwillContainerService extends AbstractYarnTwillService {
     } catch (Throwable t) {
       LOG.error("Exception when stopping runnable.", t);
     }
+  }
+
+  /**
+   * Set the log level for the requested logger name.
+   *
+   * @param logLevelArguments map of the log level arguments.
+   * @return {@code true} if the log level is successful and {@code false} if the logger factory is not a logger
+   *         context.
+   */
+  private boolean setLogLevel(Map<String, LogEntry.Level> logLevelArguments) {
+    ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
+    if (!(loggerFactory instanceof LoggerContext)) {
+      return false;
+    }
+
+    LoggerContext loggerContext = (LoggerContext) loggerFactory;
+    for (Map.Entry<String, LogEntry.Level> entry : logLevelArguments.entrySet()) {
+      String loggerName = entry.getKey();
+      String logLevel = entry.getValue().toString();
+      ch.qos.logback.classic.Logger logger = loggerContext.getLogger(loggerName);
+      LOG.info("Log level of {} changed from {} to {}", loggerName, logger.getLevel(), logLevel);
+      logger.setLevel(Level.toLevel(logLevel));
+    }
+    return true;
   }
 }

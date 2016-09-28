@@ -227,13 +227,30 @@ public interface TwillPreparer {
   TwillPreparer addSecureStore(SecureStore secureStore);
 
   /**
-   * Set the log level for Twill applications running in a container.
+   * Set the root log level for Twill applications running in a container.
    *
    * @param logLevel the {@link LogEntry.Level} that should be set.
    *                 The level match the {@code Logback} levels.
    * @return This {@link TwillPreparer}.
    */
   TwillPreparer setLogLevel(LogEntry.Level logLevel);
+
+  /**
+   * Set the log levels for requested logger names for Twill applications running in a container.
+   *
+   * @param logLevelAppArgs The {@link Map} contains the requested logger names and log levels that need to be set.
+   * @return This {@link TwillPreparer}.
+   */
+  TwillPreparer setLogLevel(Map<String, LogEntry.Level> logLevelAppArgs);
+
+  /**
+   * Set the log levels for requested logger names for a {@link TwillRunnable}.
+   *
+   * @param runnableName The name of the runnable to set the log level.
+   * @param logLevelRunnableArgs The {@link Map} contains the requested logger names and log levels that need to be set.
+   * @return This {@link TwillPreparer}.
+   */
+  TwillPreparer setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelRunnableArgs);
 
   /**
    * Starts the application.

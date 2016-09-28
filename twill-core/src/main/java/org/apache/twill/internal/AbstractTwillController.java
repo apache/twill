@@ -59,6 +59,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 
 /**
  * A abstract base class for {@link TwillController} implementation that uses Zookeeper to controller a
@@ -137,7 +138,7 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
 
   @Override
   public final ListenableFuture<Set<String>> restartInstances(Map<String,
-      ? extends Set<Integer>> runnableToInstanceIds) {
+    ? extends Set<Integer>> runnableToInstanceIds) {
     Map<String, String> runnableToStringInstanceIds =
       Maps.transformEntries(runnableToInstanceIds, new Maps.EntryTransformer<String, Set<Integer>, String>() {
         @Override
@@ -168,6 +169,22 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
         return runnable;
       }
     });
+  }
+
+  @Override
+  public Future<String> setLogLevel(LogEntry.Level logLevel) {
+    return sendMessage(SystemMessages.setLogLevel(
+      ImmutableMap.of(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME, logLevel)), logLevel.name());
+  }
+
+  @Override
+  public Future<String> setLogLevel(Map<String, LogEntry.Level> logLevelAppArgs) {
+    return sendMessage(SystemMessages.setLogLevel(logLevelAppArgs), logLevelAppArgs.toString());
+  }
+
+  @Override
+  public Future<String> setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelRunnableArgs) {
+    return sendMessage(SystemMessages.setLogLevel(runnableName, logLevelRunnableArgs), runnableName);
   }
 
   private void validateInstanceIds(String runnable, Set<Integer> instanceIds) {

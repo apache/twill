@@ -34,16 +34,18 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.logging.LogEntry;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerExitCodes;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.ContainerLiveNodeData;
 import org.apache.twill.internal.DefaultResourceReport;
 import org.apache.twill.internal.DefaultTwillRunResources;
-import org.apache.twill.internal.EnvKeys;
+import org.apache.twill.internal.utils.LogLevelUtil;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillContainerController;
 import org.apache.twill.internal.TwillContainerLauncher;
@@ -99,14 +101,15 @@ final class RunningContainers {
   private final ZKClient zkClient;
   private final Multimap<String, ContainerInfo> containerStats;
 
-  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient) {
+  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient,
+                    Map<String, Map<String, LogEntry.Level>> logLevelArguments) {
     containers = HashBasedTable.create();
     runnableInstances = Maps.newHashMap();
     completedContainerCount = Maps.newHashMap();
     startSequence = Lists.newLinkedList();
     containerLock = new ReentrantLock();
     containerChange = containerLock.newCondition();
-    resourceReport = new DefaultResourceReport(appId, appMasterResources);
+    resourceReport = new DefaultResourceReport(appId, appMasterResources, logLevelArguments);
     zkClient = zookeeperClient;
     containerStats = HashMultimap.create();
   }
@@ -126,7 +129,7 @@ final class RunningContainers {
   /**
    * Start a container for a runnable.
    */
-  void start(String runnableName, ContainerInfo containerInfo, TwillContainerLauncher launcher) {
+  void start(String runnableName, ContainerInfo containerInfo, TwillContainerLauncher launcher, String logLevel) {
     containerLock.lock();
     try {
       int instanceId = getStartInstanceId(runnableName);
@@ -134,13 +137,20 @@ final class RunningContainers {
       TwillContainerController controller = launcher.start(runId, instanceId,
                                                            TwillContainerMain.class, "$HADOOP_CONF_DIR");
       containers.put(runnableName, containerInfo.getId(), controller);
+      Map<String, LogEntry.Level> logRunnableArguments =
+        LogLevelUtil.getLogLevelForRunnable(runnableName, resourceReport.getLogLevelArguments());
+      logLevel = logRunnableArguments.containsKey(Logger.ROOT_LOGGER_NAME) ?
+        logRunnableArguments.get(Logger.ROOT_LOGGER_NAME).toString() : logLevel;
+
       TwillRunResources resources = new DynamicTwillRunResources(instanceId,
                                                                  containerInfo.getId(),
                                                                  containerInfo.getVirtualCores(),
                                                                  containerInfo.getMemoryMB(),
                                                                  containerInfo.getHost().getHostName(),
                                                                  controller,
-                                                                 System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+                                                                 logLevel,
+                                                                 logRunnableArguments);
+      resourceReport.updateLogLevel(runnableName, logRunnableArguments);
       resourceReport.addRunResources(runnableName, resources);
       containerStats.put(runnableName, containerInfo);
 
@@ -474,6 +484,12 @@ final class RunningContainers {
     Futures.addCallback(controller.sendMessage(message), new FutureCallback<Message>() {
       @Override
       public void onSuccess(Message result) {
+        //update log level information
+        Command command = message.getCommand();
+        if (Constants.SystemMessages.LOG_LEVEL.equals(command.getCommand())) {
+          resourceReport.updateLogLevel(runnableName,
+                                        LogLevelUtil.convertLogLevelValuesToLogEntry(command.getOptions()));
+        }
         if (count.decrementAndGet() == 0) {
           completion.run();
         }
@@ -584,9 +600,10 @@ final class RunningContainers {
 
     private DynamicTwillRunResources(int instanceId, String containerId,
                                      int cores, int memoryMB, String host,
-                                     TwillContainerController controller, String logLevel) {
+                                     TwillContainerController controller, String logLevel,
+                                     Map<String, LogEntry.Level> logLevelArguments) {
       super(instanceId, containerId, cores, memoryMB, host, null,
-            (logLevel != null) ? LogEntry.Level.valueOf(logLevel) : null);
+            (logLevel != null) ? LogEntry.Level.valueOf(logLevel) : null, logLevelArguments);
       this.controller = controller;
     }
 

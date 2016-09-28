@@ -136,7 +136,8 @@ public final class TwillContainerLauncher {
     int memory = Resources.computeMaxHeapSize(containerInfo.getMemoryMB(), reservedMemory, Constants.HEAP_MIN_RATIO);
     commandBuilder.add("-Djava.io.tmpdir=tmp",
                        "-Dyarn.container=$" + EnvKeys.YARN_CONTAINER_ID,
-                       "-Dtwill.runnable=$" + EnvKeys.TWILL_APP_NAME + ".$" + EnvKeys.TWILL_RUNNABLE_NAME,
+                       "-Dtwill.runnable=$" + Constants.Environments.TWILL_APP_NAME + ".$" +
+                         EnvKeys.TWILL_RUNNABLE_NAME,
                        "-cp", Constants.Files.LAUNCHER_JAR + ":" + classPath,
                        "-Xmx" + memory + "m");
     if (jvmOpts.getExtraOptions() != null) {

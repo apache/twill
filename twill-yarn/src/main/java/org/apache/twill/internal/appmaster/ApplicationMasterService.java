@@ -56,6 +56,7 @@ import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.TwillRuntimeSpecification;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
@@ -69,7 +70,7 @@ import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.TwillContainerLauncher;
 import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
-import org.apache.twill.internal.json.TwillSpecificationAdapter;
+import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.utils.Instances;
 import org.apache.twill.internal.yarn.AbstractYarnTwillService;
@@ -126,23 +127,25 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private final Location applicationLocation;
   private final PlacementPolicyManager placementPolicyManager;
   private final Map<String, Map<String, String>> environments;
+  private final TwillRuntimeSpecification twillRuntimeSpec;
 
   private volatile boolean stopped;
   private Queue<RunnableContainerRequest> runnableContainerRequests;
   private ExecutorService instanceChangeExecutor;
 
-  public ApplicationMasterService(RunId runId, ZKClient zkClient, File twillSpecFile,
+  public ApplicationMasterService(RunId runId, ZKClient zkClient, TwillRuntimeSpecification twillRuntimeSpec,
                                   YarnAMClient amClient, Location applicationLocation) throws Exception {
     super(zkClient, runId, applicationLocation);
 
     this.runId = runId;
-    this.twillSpec = TwillSpecificationAdapter.create().fromJson(twillSpecFile);
+    this.twillRuntimeSpec = twillRuntimeSpec;
     this.zkClient = zkClient;
     this.applicationLocation = applicationLocation;
     this.amClient = amClient;
     this.credentials = createCredentials();
     this.jvmOpts = loadJvmOptions();
     this.reservedMemory = getReservedMemory();
+    this.twillSpec = twillRuntimeSpec.getTwillSpecification();
     this.placementPolicyManager = new PlacementPolicyManager(twillSpec.getPlacementPolicies());
     this.environments = getEnvironments();
 
@@ -169,7 +172,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   private int getReservedMemory() {
-    String value = System.getenv(EnvKeys.TWILL_RESERVED_MEMORY_MB);
+    String value = twillRuntimeSpec.getReservedMemory();
     if (value == null) {
       return Configs.Defaults.JAVA_RESERVED_MEMORY_MB;
     }
@@ -209,7 +212,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
       appMasterHost, null, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
-    return new RunningContainers(appId, appMasterResources, zkClient);
+    return new RunningContainers(appId, appMasterResources, zkClient, twillRuntimeSpec.getLogLevelArguments());
   }
 
   private ExpectedContainers initExpectedContainers(TwillSpecification twillSpec) {
@@ -227,7 +230,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
   @Override
   protected void doStart() throws Exception {
-    LOG.info("Start application master with spec: " + TwillSpecificationAdapter.create().toJson(twillSpec));
+    LOG.info("Start application master with spec: " +
+               TwillRuntimeSpecificationAdapter.create().toJson(twillRuntimeSpec));
 
     // initialize the event handler, if it fails, it will fail the application.
     if (eventHandler != null) {
@@ -246,7 +250,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   protected void doStop() throws Exception {
     Thread.interrupted();     // This is just to clear the interrupt flag
 
-    LOG.info("Stop application master with spec: {}", TwillSpecificationAdapter.create().toJson(twillSpec));
+    LOG.info("Stop application master with spec: {}",
+             TwillRuntimeSpecificationAdapter.create().toJson(twillRuntimeSpec));
 
     if (eventHandler != null) {
       try {
@@ -324,6 +329,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     }
 
     if (handleRestartRunnablesInstances(message, completion)) {
+      return result;
+    }
+
+    if (handleLogLevelChange(message, completion)) {
       return result;
     }
 
@@ -656,7 +665,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       String runnableName = provisionRequest.getRuntimeSpec().getName();
       LOG.info("Starting runnable {} with {}", runnableName, processLauncher);
 
-      LOG.debug("Log level for Twill runnable {} is {}", runnableName, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
+      LOG.debug("Log level for Twill runnable {} is {}", runnableName, twillRuntimeSpec.getLogLevel());
 
       int containerCount = expectedContainers.getExpected(runnableName);
 
@@ -666,12 +675,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         env.putAll(environments.get(runnableName));
       }
       // Override with system env
-      env.put(EnvKeys.TWILL_APP_DIR, System.getenv(EnvKeys.TWILL_APP_DIR));
-      env.put(EnvKeys.TWILL_FS_USER, System.getenv(EnvKeys.TWILL_FS_USER));
-      env.put(EnvKeys.TWILL_APP_RUN_ID, runId.getId());
-      env.put(EnvKeys.TWILL_APP_NAME, twillSpec.getName());
-      env.put(EnvKeys.TWILL_APP_LOG_LEVEL, System.getenv(EnvKeys.TWILL_APP_LOG_LEVEL));
-      env.put(EnvKeys.TWILL_ZK_CONNECT, System.getenv(EnvKeys.TWILL_ZK_CONNECT));
       env.put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect());
 
       ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env, getLocalizeFiles(),
@@ -682,7 +685,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
         containerCount, jvmOpts, reservedMemory, getSecureStoreLocation());
 
-      runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher);
+      runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher,
+                              twillRuntimeSpec.getLogLevel());
 
       // Need to call complete to workaround bug in YARN AMRMClient
       if (provisionRequest.containerAcquired()) {
@@ -962,5 +966,35 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         completion.run();
       }
     };
+  }
+
+  /**
+   * Attempt to change the log level from a runnable or all runnables.
+   *
+   * @return {@code true} if the message requests changing log levels and {@code false} otherwise.
+   */
+  private boolean handleLogLevelChange(final Message message, final Runnable completion) {
+    Message.Scope scope = message.getScope();
+    if (message.getType() != Message.Type.SYSTEM ||
+      (scope != Message.Scope.RUNNABLE && scope != Message.Scope.ALL_RUNNABLE)) {
+      return false;
+    }
+
+    Command command = message.getCommand();
+    if (!command.getCommand().equals(Constants.SystemMessages.LOG_LEVEL)) {
+      return false;
+    }
+
+    if (scope == Message.Scope.ALL_RUNNABLE) {
+      runningContainers.sendToAll(message, completion);
+    } else {
+      final String runnableName = message.getRunnableName();
+      if (runnableName == null || runnableName.isEmpty() || !twillSpec.getRunnables().containsKey(runnableName)) {
+        LOG.info("Unknown runnable {}", runnableName);
+        return false;
+      }
+      runningContainers.sendToRunnable(runnableName, message, completion);
+    }
+    return true;
   }
 }
