@@ -81,7 +81,7 @@ public final class SystemMessages {
   public static Message setLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelArguments) {
     Preconditions.checkNotNull(runnableName);
     Preconditions.checkNotNull(logLevelArguments);
-    Map<String, String> options = LogLevelUtil.convertLogLevelArgs(logLevelArguments);
+    Map<String, String> options = LogLevelUtil.convertLogLevelValuesToString(logLevelArguments);
     return new SimpleMessage(Message.Type.SYSTEM,
                              runnableName.equals(ALL_RUNNABLES) ? Message.Scope.ALL_RUNNABLE : Message.Scope.RUNNABLE,
                              runnableName, Command.Builder.of(Constants.SystemMessages.LOG_LEVEL)

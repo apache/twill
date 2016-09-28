@@ -55,7 +55,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     JsonObject json = new JsonObject();
     json.addProperty(TWILL_APP_DIR, src.getTwillAppDir());
     json.addProperty(ZK_CONNECT_STR, src.getZkConnectStr());
-    json.addProperty(TWILL_RUNID, src.getTwillRunId());
+    json.addProperty(TWILL_RUNID, src.getTwillAppRunId());
     json.addProperty(TWILL_APP_NAME, src.getTwillAppName());
     json.addProperty(RESERVED_MEMORY, src.getReservedMemory());
     if (src.getFsUser() != null) {

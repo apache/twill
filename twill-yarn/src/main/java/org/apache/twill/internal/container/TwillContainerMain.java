@@ -30,6 +30,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.api.TwillRuntimeSpecification;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.Arguments;
 import org.apache.twill.internal.BasicTwillContext;
@@ -79,7 +80,7 @@ public final class TwillContainerMain extends ServiceMain {
     File twillSpecFile = new File(Constants.Files.TWILL_SPEC);
     TwillRuntimeSpecification twillRuntimeSpec = loadTwillSpec(twillSpecFile);
     String zkConnectStr = twillRuntimeSpec.getZkConnectStr();
-    RunId appRunId = RunIds.fromString(twillRuntimeSpec.getTwillRunId());
+    RunId appRunId = RunIds.fromString(twillRuntimeSpec.getTwillAppRunId());
     RunId runId = RunIds.fromString(System.getenv(EnvKeys.TWILL_RUN_ID));
     String runnableName = System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
     int instanceId = Integer.parseInt(System.getenv(EnvKeys.TWILL_INSTANCE_ID));
@@ -104,7 +105,7 @@ public final class TwillContainerMain extends ServiceMain {
 
     ZKClient containerZKClient = getContainerZKClient(zkClientService, appRunId, runnableName);
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
-    Map<String, String> logLevelArguments = LogLevelUtil.getLogLevelForRunnable(
+    Map<String, LogEntry.Level> logLevelArguments = LogLevelUtil.getLogLevelForRunnable(
       System.getenv(EnvKeys.TWILL_RUNNABLE_NAME), twillRuntimeSpec.getLogLevelArguments());
     TwillContainerService service = new TwillContainerService(context, containerInfo, containerZKClient,
                                                               runId, runnableSpec, getClassLoader(),

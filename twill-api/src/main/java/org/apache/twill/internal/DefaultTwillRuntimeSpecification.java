@@ -77,7 +77,7 @@ public class DefaultTwillRuntimeSpecification implements TwillRuntimeSpecificati
   }
 
   @Override
-  public String getTwillRunId() {
+  public String getTwillAppRunId() {
     return twillRunId;
   }
 

@@ -34,7 +34,7 @@ public interface TwillRuntimeSpecification {
 
   String getZkConnectStr();
 
-  String getTwillRunId();
+  String getTwillAppRunId();
 
   String getTwillAppName();
 

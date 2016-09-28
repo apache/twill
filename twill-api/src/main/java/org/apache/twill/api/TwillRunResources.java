@@ -66,10 +66,11 @@ public interface TwillRunResources {
   /**
    * @return the enabled log level arguments for the container where the runnable is running in.
    */
-  Map<String, String> getLogLevelArguments();
+  Map<String, LogEntry.Level> getLogLevelArguments();
 
   /**
    * Update the log level arguments for the container where the runnable is running in.
+   * @param logLevelArguments
    */
-  void updateLogLevel(Map<String, String> logLevelArguments);
+  void updateLogLevel(Map<String, LogEntry.Level> logLevelArguments);
 }

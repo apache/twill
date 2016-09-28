@@ -24,6 +24,7 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.logging.LogEntry;
 
 import java.util.Collection;
 import java.util.List;
@@ -39,18 +40,22 @@ public final class DefaultResourceReport implements ResourceReport {
   private final TwillRunResources appMasterResources;
   private final String applicationId;
   private final AtomicReference<List<String>> services;
+  private final Map<String, Map<String, LogEntry.Level>> logLevelArguments;
 
-  public DefaultResourceReport(String applicationId, TwillRunResources masterResources) {
-    this(applicationId, masterResources, ImmutableMap.<String, Collection<TwillRunResources>>of());
+  public DefaultResourceReport(String applicationId, TwillRunResources masterResources,
+                               Map<String, Map<String, LogEntry.Level>> logLevelArguments) {
+    this(applicationId, masterResources, ImmutableMap.<String, Collection<TwillRunResources>>of(), logLevelArguments);
   }
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources,
-                               Map<String, Collection<TwillRunResources>> resources) {
-    this(applicationId, masterResources, resources, ImmutableList.<String>of());
+                               Map<String, Collection<TwillRunResources>> resources,
+                               Map<String, Map<String, LogEntry.Level>> logLevelArguments) {
+    this(applicationId, masterResources, resources, ImmutableList.<String>of(), logLevelArguments);
   }
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources,
-                               Map<String, Collection<TwillRunResources>> resources, List<String> services) {
+                               Map<String, Collection<TwillRunResources>> resources, List<String> services,
+                               Map<String, Map<String, LogEntry.Level>> logLevelArguments) {
     this.applicationId = applicationId;
     this.appMasterResources = masterResources;
     this.usedResources = HashMultimap.create();
@@ -58,6 +63,7 @@ public final class DefaultResourceReport implements ResourceReport {
       this.usedResources.putAll(entry.getKey(), entry.getValue());
     }
     this.services = new AtomicReference<>(services);
+    this.logLevelArguments = logLevelArguments;
   }
 
   /**
@@ -150,15 +156,31 @@ public final class DefaultResourceReport implements ResourceReport {
   }
 
   /**
+   * Get the map of the log level arguments of the twill application.
+   *
+   * @return the map of the log level arguments of the twill application
+   */
+  @Override
+  public Map<String, Map<String, LogEntry.Level>> getLogLevelArguments() {
+    return logLevelArguments;
+  }
+
+  /**
    * Update the log level arguments for the specified twill runnable.
    *
    * @param runnableName name of the runnable.
    * @param logLevelArguments map of the log level arguments to be updated.
    */
-  public void updateLogLevel(String runnableName, Map<String, String> logLevelArguments) {
+  @Override
+  public void updateLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelArguments) {
     if (usedResources.containsKey(runnableName)) {
       for (TwillRunResources resources : usedResources.get(runnableName)) {
         resources.updateLogLevel(logLevelArguments);
+      }
+      if (!logLevelArguments.containsKey(runnableName)) {
+        this.logLevelArguments.put(runnableName, logLevelArguments);
+      } else {
+        this.logLevelArguments.get(runnableName).putAll(logLevelArguments);
       }
     }
   }

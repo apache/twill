@@ -170,20 +170,20 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
 
     // assert that log level is DEBUG
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.<String, String>of());
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.<String, LogEntry.Level>of());
 
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.<String, String>of());
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.<String, LogEntry.Level>of());
 
     // change the log level to INFO
     controller.setLogLevel(LogEntry.Level.INFO).get();
 
     // assert log level has changed to INFO
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", "INFO"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", LogEntry.Level.INFO));
 
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", "INFO"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", LogEntry.Level.INFO));
 
     // change the log level of LogLevelTestRunnable to WARN,
     // change the log level of LogLevelTestSecondRunnable to TRACE
@@ -193,9 +193,9 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     controller.setLogLevel(LogLevelTestSecondRunnable.class.getSimpleName(), logLevelSecondRunnable).get();
 
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, ImmutableMap.of("ROOT", "WARN"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, ImmutableMap.of("ROOT", LogEntry.Level.WARN));
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.TRACE, ImmutableMap.of("ROOT", "TRACE"));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.TRACE, ImmutableMap.of("ROOT", LogEntry.Level.TRACE));
 
     // stop
     controller.terminate().get(120, TimeUnit.SECONDS);
@@ -208,12 +208,12 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
   // could return null if the application has not fully started.
   private void waitForLogLevel(TwillController controller, String runnable, long timeout,
                                TimeUnit timeoutUnit, LogEntry.Level expected,
-                               Map<String, String> expectedArgs) throws InterruptedException {
+                               Map<String, LogEntry.Level> expectedArgs) throws InterruptedException {
 
     Stopwatch stopwatch = new Stopwatch();
     stopwatch.start();
     LogEntry.Level actual = null;
-    Map<String, String> actualArgs = null;
+    Map<String, LogEntry.Level> actualArgs = null;
     boolean stopped = false;
     do {
       ResourceReport report = controller.getResourceReport();

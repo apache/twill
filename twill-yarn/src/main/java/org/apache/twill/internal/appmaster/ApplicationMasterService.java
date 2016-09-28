@@ -133,12 +133,12 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private Queue<RunnableContainerRequest> runnableContainerRequests;
   private ExecutorService instanceChangeExecutor;
 
-  public ApplicationMasterService(RunId runId, ZKClient zkClient, File twillSpecFile,
+  public ApplicationMasterService(RunId runId, ZKClient zkClient, TwillRuntimeSpecification twillRuntimeSpec,
                                   YarnAMClient amClient, Location applicationLocation) throws Exception {
     super(zkClient, runId, applicationLocation);
 
     this.runId = runId;
-    this.twillRuntimeSpec = TwillRuntimeSpecificationAdapter.create().fromJson(twillSpecFile);
+    this.twillRuntimeSpec = twillRuntimeSpec;
     this.zkClient = zkClient;
     this.applicationLocation = applicationLocation;
     this.amClient = amClient;

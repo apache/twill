@@ -35,17 +35,18 @@ public class DefaultTwillRunResources implements TwillRunResources {
   private final int memoryMB;
   private final String host;
   private final Integer debugPort;
-  private final Map<String, String> logLevelArguments;
+  private final Map<String, LogEntry.Level> logLevelArguments;
   private Level rootLogLevel;
 
   public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
                                   String host, Integer debugPort, Level rootLogLevel) {
-    this(instanceId, containerId, cores, memoryMB, host, debugPort, rootLogLevel, new HashMap<String, String>());
+    this(instanceId, containerId, cores, memoryMB, host, debugPort, rootLogLevel,
+         new HashMap<String, LogEntry.Level>());
   }
 
   public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
                                   String host, Integer debugPort,
-                                  Level rootLogLevel, Map<String, String> logLevelArguments) {
+                                  Level rootLogLevel, Map<String, LogEntry.Level> logLevelArguments) {
     this.instanceId = instanceId;
     this.containerId = containerId;
     this.virtualCores = cores;
@@ -108,14 +109,14 @@ public class DefaultTwillRunResources implements TwillRunResources {
   }
 
   @Override
-  public Map<String, String> getLogLevelArguments() {
+  public Map<String, LogEntry.Level> getLogLevelArguments() {
     return logLevelArguments;
   }
 
   @Override
-  public void updateLogLevel(Map<String, String> logLevelArguments) {
+  public void updateLogLevel(Map<String, Level> logLevelArguments) {
     if (logLevelArguments.containsKey(Logger.ROOT_LOGGER_NAME)) {
-      this.rootLogLevel = LogEntry.Level.valueOf(logLevelArguments.get(Logger.ROOT_LOGGER_NAME));
+      this.rootLogLevel = logLevelArguments.get(Logger.ROOT_LOGGER_NAME);
     }
     this.logLevelArguments.putAll(logLevelArguments);
   }

@@ -71,8 +71,8 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
   public TwillRunResources deserialize(JsonElement json, Type typeOfT,
                                            JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
-    Map<String, String> logLevelArguments =
-      context.deserialize(jsonObj.get("logLevelArguments"), new TypeToken<Map<String, String>>() { }.getType());
+    Map<String, LogEntry.Level> logLevelArguments =
+      context.deserialize(jsonObj.get("logLevelArguments"), new TypeToken<Map<String, LogEntry.Level>>() { }.getType());
     return new DefaultTwillRunResources(jsonObj.get("instanceId").getAsInt(),
                                         jsonObj.get("containerId").getAsString(),
                                         jsonObj.get("virtualCores").getAsInt(),

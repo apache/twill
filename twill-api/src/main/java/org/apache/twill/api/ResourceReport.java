@@ -17,6 +17,8 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.api.logging.LogEntry;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -61,4 +63,19 @@ public interface ResourceReport {
    * @return list of services of the application master.
    */
   List<String> getServices();
+
+  /**
+   * Get the map of the log level arguments of the twill application.
+   *
+   * @return the map of the log level arguments of the twill application
+   */
+  Map<String, Map<String, LogEntry.Level>> getLogLevelArguments();
+
+  /**
+   * Update the log level arguments for the specified twill runnable.
+   *
+   * @param runnableName name of the runnable.
+   * @param logLevelArguments map of the log level arguments to be updated.
+   */
+  void updateLogLevel(String runnableName, Map<String, LogEntry.Level> logLevelArguments);
 }
