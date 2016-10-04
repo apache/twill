@@ -28,7 +28,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
@@ -38,7 +37,6 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.common.Cancellable;
-import org.apache.twill.discovery.DiscoveryServiceClient;
 import org.apache.twill.discovery.ServiceDiscovered;
 import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.json.LogEntryDecoder;
@@ -73,14 +71,13 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
 
   private final Queue<LogHandler> logHandlers;
   private final KafkaClientService kafkaClient;
-  private final DiscoveryServiceClient discoveryServiceClient;
-  private volatile Cancellable logCancellable;
+  private ZKDiscoveryService discoveryServiceClient;
+  private Cancellable logCancellable;
 
   public AbstractTwillController(RunId runId, ZKClient zkClient, Iterable<LogHandler> logHandlers) {
     super(runId, zkClient);
     this.logHandlers = new ConcurrentLinkedQueue<>();
     this.kafkaClient = new ZKKafkaClientService(ZKClients.namespace(zkClient, "/" + runId.getId() + "/kafka"));
-    this.discoveryServiceClient = new ZKDiscoveryService(zkClient);
     Iterables.addAll(this.logHandlers, logHandlers);
   }
 
@@ -95,9 +92,12 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   }
 
   @Override
-  protected void doShutDown() {
+  protected synchronized void doShutDown() {
     if (logCancellable != null) {
       logCancellable.cancel();
+    }
+    if (discoveryServiceClient != null) {
+      discoveryServiceClient.close();
     }
     // Safe to call stop no matter when state the KafkaClientService is in.
     kafkaClient.stopAndWait();
@@ -115,7 +115,10 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   }
 
   @Override
-  public final ServiceDiscovered discoverService(String serviceName) {
+  public final synchronized ServiceDiscovered discoverService(String serviceName) {
+    if (discoveryServiceClient == null) {
+      discoveryServiceClient = new ZKDiscoveryService(zkClient);
+    }
     return discoveryServiceClient.discover(serviceName);
   }
 

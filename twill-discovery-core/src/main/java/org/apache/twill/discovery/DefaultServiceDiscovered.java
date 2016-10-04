@@ -20,6 +20,8 @@ package org.apache.twill.discovery;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import org.apache.twill.common.Cancellable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +38,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 final class DefaultServiceDiscovered implements ServiceDiscovered {
 
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultServiceDiscovered.class);
+
   private final String name;
   private final AtomicReference<Set<Discoverable>> discoverables;
   private final List<ListenerCaller> listenerCallers;
@@ -49,7 +53,10 @@ final class DefaultServiceDiscovered implements ServiceDiscovered {
   }
 
   void setDiscoverables(Set<Discoverable> discoverables) {
-    this.discoverables.set(ImmutableSet.copyOf(discoverables));
+    Set<Discoverable> newDiscoverables = ImmutableSet.copyOf(discoverables);
+    LOG.debug("Discoverables changed: {}={}", name, newDiscoverables);
+
+    this.discoverables.set(newDiscoverables);
 
     // Collect all listeners with a read lock to the listener list.
     List<ListenerCaller> callers = Lists.newArrayList();
@@ -96,17 +103,7 @@ final class DefaultServiceDiscovered implements ServiceDiscovered {
   @Override
   public boolean contains(Discoverable discoverable) {
     // If the name doesn't match, it shouldn't be in the list.
-    if (!discoverable.getName().equals(name)) {
-      return false;
-    }
-
-    // Wrap it if necessary for hashCode/equals comparison.
-    Discoverable target = discoverable;
-    if (!(target instanceof DiscoverableWrapper)) {
-      target = new DiscoverableWrapper(target);
-    }
-
-    return discoverables.get().contains(target);
+    return discoverable.getName().equals(name) && discoverables.get().contains(discoverable);
   }
 
   @Override

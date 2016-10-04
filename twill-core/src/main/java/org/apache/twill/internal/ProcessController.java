@@ -24,7 +24,7 @@ import org.apache.twill.common.Cancellable;
  *
  * @param <R> Report type.
  */
-public interface ProcessController<R> extends Cancellable {
+public interface ProcessController<R> extends AutoCloseable, Cancellable {
 
   R getReport();
 

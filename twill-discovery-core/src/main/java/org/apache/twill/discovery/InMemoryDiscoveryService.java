@@ -37,12 +37,11 @@ public class InMemoryDiscoveryService implements DiscoveryService, DiscoveryServ
 
   @Override
   public Cancellable register(final Discoverable discoverable) {
-    final Discoverable wrapper = new DiscoverableWrapper(discoverable);
-    final String serviceName = wrapper.getName();
+    final String serviceName = discoverable.getName();
 
     lock.lock();
     try {
-      services.put(serviceName, wrapper);
+      services.put(serviceName, discoverable);
 
       DefaultServiceDiscovered serviceDiscovered = serviceDiscoveredMap.get(serviceName);
       if (serviceDiscovered != null) {
@@ -57,7 +56,7 @@ public class InMemoryDiscoveryService implements DiscoveryService, DiscoveryServ
       public void cancel() {
         lock.lock();
         try {
-          services.remove(serviceName, wrapper);
+          services.remove(serviceName, discoverable);
 
           DefaultServiceDiscovered serviceDiscovered = serviceDiscoveredMap.get(serviceName);
           if (serviceDiscovered != null) {

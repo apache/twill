@@ -20,6 +20,8 @@ package org.apache.twill.discovery;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -47,14 +49,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 
 /**
  * Zookeeper implementation of {@link DiscoveryService} and {@link DiscoveryServiceClient}.
@@ -93,19 +99,21 @@ import java.util.concurrent.locks.ReentrantLock;
  *   </pre>
  * </blockquote>
  */
-public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceClient {
+public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceClient, AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(ZKDiscoveryService.class);
 
   private static final long RETRY_MILLIS = 1000;
 
+  private final AtomicBoolean closed;
   // In memory map for recreating ephemeral nodes after session expires.
   // It map from discoverable to the corresponding Cancellable
   private final Multimap<Discoverable, DiscoveryCancellable> discoverables;
   private final Lock lock;
 
-  private final LoadingCache<String, ServiceDiscovered> services;
+  private final LoadingCache<String, ServiceDiscoveredCacheEntry> services;
   private final ZKClient zkClient;
   private final ScheduledExecutorService retryExecutor;
+  private final Cancellable watcherCancellable;
 
   /**
    * Constructs ZKDiscoveryService using the provided zookeeper client for storing service registry.
@@ -122,13 +130,24 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
    *                  If namespace is {@code null}, no namespace will be used.
    */
   public ZKDiscoveryService(ZKClient zkClient, String namespace) {
+    this.closed = new AtomicBoolean();
     this.discoverables = HashMultimap.create();
     this.lock = new ReentrantLock();
     this.retryExecutor = Executors.newSingleThreadScheduledExecutor(
       Threads.createDaemonThreadFactory("zk-discovery-retry"));
     this.zkClient = namespace == null ? zkClient : ZKClients.namespace(zkClient, namespace);
-    this.services = CacheBuilder.newBuilder().build(createServiceLoader());
-    this.zkClient.addConnectionWatcher(createConnectionWatcher());
+    this.services = CacheBuilder.newBuilder()
+      .removalListener(new RemovalListener<String, ServiceDiscoveredCacheEntry>() {
+        @Override
+        public void onRemoval(RemovalNotification<String, ServiceDiscoveredCacheEntry> notification) {
+          ServiceDiscoveredCacheEntry entry = notification.getValue();
+          if (entry != null) {
+            entry.cancel();
+          }
+        }
+      })
+      .build(createServiceLoader());
+    this.watcherCancellable = this.zkClient.addConnectionWatcher(createConnectionWatcher());
   }
 
   /**
@@ -146,23 +165,30 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
    */
   @Override
   public Cancellable register(final Discoverable discoverable) {
-    final Discoverable wrapper = new DiscoverableWrapper(discoverable);
+    if (closed.get()) {
+      throw new IllegalStateException("Cannot register discoverable through a closed ZKDiscoveryService");
+    }
+
     final SettableFuture<String> future = SettableFuture.create();
-    final DiscoveryCancellable cancellable = new DiscoveryCancellable(wrapper);
+    final DiscoveryCancellable cancellable = new DiscoveryCancellable(discoverable);
 
     // Create the zk ephemeral node.
-    Futures.addCallback(doRegister(wrapper), new FutureCallback<String>() {
+    Futures.addCallback(doRegister(discoverable), new FutureCallback<String>() {
       @Override
       public void onSuccess(String result) {
         // Set the sequence node path to cancellable for future cancellation.
         cancellable.setPath(result);
         lock.lock();
         try {
-          discoverables.put(wrapper, cancellable);
+          if (!closed.get()) {
+            discoverables.put(discoverable, cancellable);
+          } else {
+            cancellable.asyncCancel();
+          }
         } finally {
           lock.unlock();
         }
-        LOG.debug("Service registered: {} {}", wrapper, result);
+        LOG.debug("Service registered: {} {}", discoverable, result);
         future.set(result);
       }
 
@@ -171,7 +197,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
         if (t instanceof KeeperException.NodeExistsException) {
           handleRegisterFailure(discoverable, future, this, t);
         } else {
-          LOG.warn("Failed to register: {}", wrapper, t);
+          LOG.warn("Failed to register: {}", discoverable, t);
           future.setException(t);
         }
       }
@@ -183,7 +209,45 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
 
   @Override
   public ServiceDiscovered discover(String service) {
+    if (closed.get()) {
+      throw new IllegalStateException("Cannot discover through a closed ZKDiscoveryService");
+    }
     return services.getUnchecked(service);
+  }
+
+  @Override
+  public void close() {
+    if (!closed.compareAndSet(false, true)) {
+      return;
+    }
+
+    // Stop the registration retry executor
+    retryExecutor.shutdownNow();
+
+    // Cancel the connection watcher
+    watcherCancellable.cancel();
+
+    // Cancel all registered services
+    List<ListenableFuture<?>> futures = new ArrayList<>();
+    lock.lock();
+    try {
+      for (Map.Entry<Discoverable, DiscoveryCancellable> entry : discoverables.entries()) {
+        LOG.debug("Un-registering service {} - {}", entry.getKey().getName(), entry.getKey().getSocketAddress());
+        futures.add(entry.getValue().asyncCancel());
+      }
+    } finally {
+      lock.unlock();
+    }
+    try {
+      Futures.successfulAsList(futures).get();
+      LOG.debug("All services unregistered");
+    } catch (Exception e) {
+      // This is not expected to happen
+      LOG.warn("Unexpected exception when waiting for all services to get unregistered", e);
+    }
+
+    // Cancel all services being watched
+    services.invalidateAll();
   }
 
   /**
@@ -198,11 +262,14 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
                                      final SettableFuture<String> completion,
                                      final FutureCallback<String> creationCallback,
                                      final Throwable failureCause) {
+    if (closed.get()) {
+      return;
+    }
 
     final String path = getNodePath(discoverable);
     Futures.addCallback(zkClient.exists(path), new FutureCallback<Stat>() {
       @Override
-      public void onSuccess(Stat result) {
+      public void onSuccess(@Nullable Stat result) {
         if (result == null) {
           // If the node is gone, simply retry.
           LOG.info("Node {} is gone. Retry registration for {}.", path, discoverable);
@@ -245,15 +312,20 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   }
 
   private void retryRegister(final Discoverable discoverable, final FutureCallback<String> creationCallback) {
+    if (closed.get()) {
+      return;
+    }
+
     retryExecutor.schedule(new Runnable() {
 
       @Override
       public void run() {
-        Futures.addCallback(doRegister(discoverable), creationCallback, Threads.SAME_THREAD_EXECUTOR);
+        if (!closed.get()) {
+          Futures.addCallback(doRegister(discoverable), creationCallback, Threads.SAME_THREAD_EXECUTOR);
+        }
       }
     }, RETRY_MILLIS, TimeUnit.MILLISECONDS);
   }
-
 
   /**
    * Generate unique node path for a given {@link Discoverable}.
@@ -289,6 +361,11 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
           lock.lock();
           try {
             for (final Map.Entry<Discoverable, DiscoveryCancellable> entry : discoverables.entries()) {
+              if (closed.get()) {
+                entry.getValue().asyncCancel();
+                continue;
+              }
+
               LOG.info("Re-registering service: {}", entry.getKey());
 
               // Must be non-blocking in here.
@@ -319,22 +396,22 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
   /**
    * Creates a CacheLoader for creating live Iterable for watching instances changes for a given service.
    */
-  private CacheLoader<String, ServiceDiscovered> createServiceLoader() {
-    return new CacheLoader<String, ServiceDiscovered>() {
+  private CacheLoader<String, ServiceDiscoveredCacheEntry> createServiceLoader() {
+    return new CacheLoader<String, ServiceDiscoveredCacheEntry>() {
       @Override
-      public ServiceDiscovered load(String service) throws Exception {
+      public ServiceDiscoveredCacheEntry load(String service) throws Exception {
         final DefaultServiceDiscovered serviceDiscovered = new DefaultServiceDiscovered(service);
-        final String serviceBase = "/" + service;
+        final String pathBase = "/" + service;
 
         // Watch for children changes in /service
-        ZKOperations.watchChildren(zkClient, serviceBase, new ZKOperations.ChildrenCallback() {
+        Cancellable cancellable = ZKOperations.watchChildren(zkClient, pathBase, new ZKOperations.ChildrenCallback() {
           @Override
           public void updated(NodeChildren nodeChildren) {
             // Fetch data of all children nodes in parallel.
             List<String> children = nodeChildren.getChildren();
             List<OperationFuture<NodeData>> dataFutures = Lists.newArrayListWithCapacity(children.size());
             for (String child : children) {
-              dataFutures.add(zkClient.getData(serviceBase + "/" + child));
+              dataFutures.add(zkClient.getData(pathBase + "/" + child));
             }
 
             // Update the service map when all fetching are done.
@@ -357,7 +434,7 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
             }, Threads.SAME_THREAD_EXECUTOR);
           }
         });
-        return serviceDiscovered;
+        return new ServiceDiscoveredCacheEntry(serviceDiscovered, cancellable);
       }
     };
   }
@@ -395,18 +472,23 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
 
     @Override
     public void cancel() {
+      Futures.getUnchecked(asyncCancel());
+      LOG.debug("Service unregistered: {} {}", discoverable, path);
+    }
+
+    ListenableFuture<?> asyncCancel() {
       if (!cancelled.compareAndSet(false, true)) {
-        return;
+        return Futures.immediateFuture(null);
       }
 
       // Take a snapshot of the volatile path.
       String path = this.path;
 
-      // If it is null, meaning cancel() is called before the ephemeral node is created, hence
+      // If it is null, meaning cancel is called before the ephemeral node is created, hence
       // setPath() will be called in future (through zk callback when creation is completed)
       // so that deletion will be done in setPath().
       if (path == null) {
-        return;
+        return Futures.immediateFuture(null);
       }
 
       // Remove this Cancellable from the map so that upon session expiration won't try to register.
@@ -419,9 +501,49 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
 
       // Delete the path. It's ok if the path not exists
       // (e.g. what session expired and before node has been re-created)
-      Futures.getUnchecked(ZKOperations.ignoreError(zkClient.delete(path),
-                                                    KeeperException.NoNodeException.class, path));
-      LOG.debug("Service unregistered: {} {}", discoverable, path);
+      try {
+        return ZKOperations.ignoreError(zkClient.delete(path), KeeperException.NoNodeException.class, path);
+      } catch (Exception e) {
+        return Futures.immediateFailedFuture(e);
+      }
+    }
+  }
+
+  /**
+   * Class to be used as the service discovered cache entry.
+   */
+  private static final class ServiceDiscoveredCacheEntry implements Cancellable, ServiceDiscovered {
+    private final ServiceDiscovered serviceDiscovered;
+    private final Cancellable cancellable;
+
+    private ServiceDiscoveredCacheEntry(ServiceDiscovered serviceDiscovered, Cancellable cancellable) {
+      this.serviceDiscovered = serviceDiscovered;
+      this.cancellable = cancellable;
+    }
+
+    @Override
+    public void cancel() {
+      cancellable.cancel();
+    }
+
+    @Override
+    public String getName() {
+      return serviceDiscovered.getName();
+    }
+
+    @Override
+    public Cancellable watchChanges(ChangeListener listener, Executor executor) {
+      return serviceDiscovered.watchChanges(listener, executor);
+    }
+
+    @Override
+    public boolean contains(Discoverable discoverable) {
+      return serviceDiscovered.contains(discoverable);
+    }
+
+    @Override
+    public Iterator<Discoverable> iterator() {
+      return serviceDiscovered.iterator();
     }
   }
 }

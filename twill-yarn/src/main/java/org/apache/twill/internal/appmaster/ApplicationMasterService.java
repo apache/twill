@@ -25,6 +25,7 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.HashMultiset;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -87,6 +88,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -259,7 +261,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     // For checking if all containers are stopped.
     final Set<String> ids = Sets.newHashSet(runningContainers.getContainerIds());
-    YarnAMClient.AllocateHandler handler = new YarnAMClient.AllocateHandler() {
+    final YarnAMClient.AllocateHandler handler = new YarnAMClient.AllocateHandler() {
       @Override
       public void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers) {
         // no-op
@@ -268,20 +270,35 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       @Override
       public void completed(List<YarnContainerStatus> completed) {
         for (YarnContainerStatus status : completed) {
+          handleCompleted(completed);
           ids.remove(status.getContainerId());
         }
       }
     };
 
+    // Handle heartbeats during shutdown because runningContainers.stopAll() waits until
+    // handleCompleted() is called for every stopped runnable
+    ExecutorService stopPoller = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("stopPoller"));
+    stopPoller.execute(new Runnable() {
+      @Override
+      public void run() {
+        while (!ids.isEmpty()) {
+          try {
+            amClient.allocate(0.0f, handler);
+            if (!ids.isEmpty()) {
+              TimeUnit.SECONDS.sleep(1);
+            }
+          } catch (Exception e) {
+            LOG.error("Got exception while getting heartbeat", e);
+          }
+        }
+      }
+    });
+
+    // runningContainers.stopAll() will wait for all the running runnables to stop or kill them after a timeout
     runningContainers.stopAll();
-
-    // Poll for 5 seconds to wait for containers to stop.
-    int count = 0;
-    while (!ids.isEmpty() && count++ < 5) {
-      amClient.allocate(0.0f, handler);
-      TimeUnit.SECONDS.sleep(1);
-    }
-
+    // Since all the runnables are now stopped, it is okay to stop the poller.
+    stopPoller.shutdownNow();
     cleanupDir();
   }
 
@@ -375,6 +392,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       }
 
       // If nothing is in provisioning, and no pending request, move to next one
+      int count = runnableContainerRequests.size();
       while (provisioning.isEmpty() && currentRequest == null && !runnableContainerRequests.isEmpty()) {
         RunnableContainerRequest runnableContainerRequest = runnableContainerRequests.peek();
         if (!runnableContainerRequest.isReadyToBeProvisioned()) {
@@ -382,6 +400,11 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
           runnableContainerRequest = runnableContainerRequests.poll();
           runnableContainerRequests.add(runnableContainerRequest);
 
+          // We checked all the requests that were pending when we started this loop
+          // Any remaining requests are not ready to be provisioned
+          if (--count <= 0) {
+            break;
+          }
           continue;
         }
         currentRequest = runnableContainerRequest.takeRequest();
@@ -498,7 +521,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         completedContainerCount.get(runnableName) : 0;
       if (expectedCount.getCount() > runningCount + completedCount) {
         timeoutEvents.add(new EventHandler.TimeoutEvent(runnableName, expectedCount.getCount(),
-                                                                   runningCount, expectedCount.getTimestamp()));
+                                                        runningCount, expectedCount.getTimestamp()));
       }
     }
 
@@ -610,9 +633,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         // TODO: Allow user to set priority?
         LOG.info("Request {} container with capability {} for runnable {}", newContainers, capability, name);
         String requestId = amClient.addContainerRequest(capability, newContainers)
-                .addHosts(hosts)
-                .addRacks(racks)
-                .setPriority(0).apply();
+          .addHosts(hosts)
+          .addRacks(racks)
+          .setPriority(0).apply();
         provisioning.add(new ProvisionRequest(runtimeSpec, requestId, newContainers, allocationType));
       }
     }
@@ -693,7 +716,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     }
 
     try (Reader reader = Files.newReader(envFile, Charsets.UTF_8)) {
-      return new Gson().fromJson(reader, new TypeToken<Map<String, Map<String, String>>>() { }.getType());
+      return new Gson().fromJson(reader, new TypeToken<Map<String, Map<String, String>>>() {
+      }.getType());
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }
@@ -709,8 +733,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
   /**
    * Attempts to change the number of running instances.
+   *
    * @return {@code true} if the message does requests for changes in number of running instances of a runnable,
-   *         {@code false} otherwise.
+   * {@code false} otherwise.
    */
   private boolean handleSetInstances(final Message message, final Runnable completion) {
     if (message.getType() != Message.Type.SYSTEM || message.getScope() != Message.Scope.RUNNABLE) {
@@ -765,13 +790,14 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
             if (newCount < oldCount) {
               // Shutdown some running containers
               for (int i = 0; i < oldCount - newCount; i++) {
-                runningContainers.removeLast(runnableName);
+                runningContainers.stopLastAndWait(runnableName);
               }
             } else {
               // Increase the number of instances
               runnableContainerRequests.add(createRunnableContainerRequest(runnableName, newCount - oldCount));
             }
           } finally {
+            // Send a message to all running runnables that number of instances have changed
             runningContainers.sendToRunnable(runnableName, message, completion);
             LOG.info("Change instances request completed. From {} to {}.", oldCount, newCount);
           }
@@ -843,6 +869,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
   /**
    * Attempt to restart some instances from a runnable or some runnables.
+   *
    * @return {@code true} if the message requests restarting some instances and {@code false} otherwise.
    */
   private boolean handleRestartRunnablesInstances(final Message message, final Runnable completion) {
@@ -875,7 +902,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       for (Map.Entry<String, String> option : requestCommand.getOptions().entrySet()) {
         String runnableName = option.getKey();
         Set<Integer> restartedInstanceIds = GSON.fromJson(option.getValue(),
-                                                          new TypeToken<Set<Integer>>() {}.getType());
+                                                          new TypeToken<Set<Integer>>() {
+                                                          }.getType());
 
         LOG.debug("Start restarting runnable {} instances {}", runnableName, restartedInstanceIds);
         restartRunnableInstances(runnableName, restartedInstanceIds, completion);
@@ -903,11 +931,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       @Override
       public void run() {
         LOG.debug("Begin restart runnable {} instances.", runnableName);
-
-        Set<Integer> instancesToRemove = instanceIds;
+        int runningCount = runningContainers.count(runnableName);
+        Set<Integer> instancesToRemove = instanceIds == null ? null : ImmutableSet.copyOf(instanceIds);
         if (instancesToRemove == null) {
-          instancesToRemove =
-            Ranges.closedOpen(0, runningContainers.count(runnableName)).asSet(DiscreteDomains.integers());
+          instancesToRemove = Ranges.closedOpen(0, runningCount).asSet(DiscreteDomains.integers());
         }
 
         LOG.info("Restarting instances {} for runnable {}", instancesToRemove, runnableName);
@@ -916,9 +943,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         runnableContainerRequests.add(containerRequest);
 
         for (int instanceId : instancesToRemove) {
-          LOG.debug("Remove instance {} for runnable {}", instanceId, runnableName);
+          LOG.debug("Stop instance {} for runnable {}", instanceId, runnableName);
           try {
-            runningContainers.removeById(runnableName, instanceId);
+            runningContainers.stopByIdAndWait(runnableName, instanceId);
           } catch (Exception ex) {
             // could be thrown if the container already stopped.
             LOG.info("Exception thrown when stopping instance {} probably already stopped.", instanceId);
@@ -927,6 +954,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
         // set the container request to be ready
         containerRequest.setReadyToBeProvisioned(true);
+
+        // For all runnables that needs to re-request for containers, update the expected count timestamp
+        // so that the EventHandler would be triggered with the right expiration timestamp.
+        expectedContainers.updateRequestTime(Collections.singleton(runnableName));
 
         completion.run();
       }

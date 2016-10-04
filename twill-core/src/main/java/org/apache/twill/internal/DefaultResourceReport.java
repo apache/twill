@@ -148,4 +148,14 @@ public final class DefaultResourceReport implements ResourceReport {
   public List<String> getServices() {
     return services.get();
   }
+
+  @Override
+  public String toString() {
+    return "DefaultResourceReport{" +
+      "usedResources=" + usedResources +
+      ", appMasterResources=" + appMasterResources +
+      ", applicationId='" + applicationId + '\'' +
+      ", services=" + services +
+      '}';
+  }
 }

@@ -154,7 +154,7 @@ final class YarnTwillController extends AbstractTwillController implements Twill
     }
 
     // Poll application status from yarn
-    try {
+    try (ProcessController<YarnApplicationReport> processController = this.processController) {
       Stopwatch stopWatch = new Stopwatch();
       stopWatch.start();
       long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_STOP_SECONDS, TimeUnit.SECONDS);

@@ -19,12 +19,16 @@ package org.apache.twill.yarn;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
+import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +69,18 @@ public abstract class BaseYarnTest {
     }
   };
 
+  @Rule
+  public final TestName testName = new TestName();
+
+  @Before
+  public void beforeTest() {
+    LOG.info("Before test {}", testName.getMethodName());
+  }
+
+  @After
+  public void afterTest() {
+    LOG.info("After test {}", testName.getMethodName());
+  }
 
   @After
   public final void cleanupTest() {
@@ -132,5 +148,9 @@ public abstract class BaseYarnTest {
 
   public String getZKConnectionString() {
     return TWILL_TESTER.getZKConnectionString();
+  }
+
+  public ApplicationResourceUsageReport getApplicationResourceReport(String appId) throws Exception {
+    return TWILL_TESTER.getApplicationResourceReport(appId);
   }
 }

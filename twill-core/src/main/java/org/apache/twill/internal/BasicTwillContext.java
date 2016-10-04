@@ -131,17 +131,12 @@ public final class BasicTwillContext implements TwillContext {
 
   @Override
   public Cancellable announce(final String serviceName, final int port) {
-    return discoveryService.register(new Discoverable() {
-      @Override
-      public String getName() {
-        return serviceName;
-      }
+    return announce(serviceName, port, new byte[]{});
+  }
 
-      @Override
-      public InetSocketAddress getSocketAddress() {
-        return new InetSocketAddress(getHost(), port);
-      }
-    });
+  @Override
+  public Cancellable announce(final String serviceName, final int port, final byte[] payload) {
+    return discoveryService.register(new Discoverable(serviceName, new InetSocketAddress(getHost(), port), payload));
   }
 
   @Override

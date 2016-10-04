@@ -76,6 +76,11 @@ public final class RunnableProcessLauncher extends AbstractYarnProcessLauncher<Y
 
     return new ProcessController<R>() {
       @Override
+      public void close() throws Exception {
+        // no-op
+      }
+
+      @Override
       public R getReport() {
         // No reporting support for runnable launch yet.
         return null;

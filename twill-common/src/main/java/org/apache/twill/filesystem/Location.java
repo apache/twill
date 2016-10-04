@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import javax.annotation.Nullable;
 
@@ -53,9 +54,40 @@ public interface Location {
    * Atomically creates a new, empty file named by this abstract pathname if and only if a file with this name
    * does not yet exist.
    * @return {@code true} if the file is successfully create, {@code false} otherwise.
-   * @throws IOException
+   * @throws IOException if error encountered during creation of the file
    */
   boolean createNew() throws IOException;
+
+  /**
+   * Atomically creates a new, empty file named by this abstract pathname if and only if a file with this name
+   * does not yet exist. The newly created file will have permission set based on the given permission settings.
+   *
+   * @param permission A permission string. It has to be either a three digit or a nine character string.
+   *                   For the three digit string, it is similar to the UNIX permission numeric representation.
+   *                   The first digit is the permission for owner, second digit is the permission for group and
+   *                   the third digit is the permission for all.
+   *                   For the nine character string, it uses the format as specified by the
+   *                   {@link PosixFilePermissions#fromString(String)} method.
+   * @return {@code true} if the file is successfully create, {@code false} otherwise.
+   * @throws IOException if error encountered during creation of the file
+   */
+  boolean createNew(String permission) throws IOException;
+
+  /**
+   * Returns the permissions of this {@link Location}. The permission string is a nine character string as the format
+   * specified by the {@link PosixFilePermissions#fromString(String)} method.
+   *
+   * @throws IOException if failed to get the permissions of the location
+   */
+  String getPermissions() throws IOException;
+
+  /**
+   * Sets the permissions on this location.
+   *
+   * @param permission A permission string. See {@link #createNew(String)} for the format.
+   * @throws IOException if failed to set the permission
+   */
+  void setPermissions(String permission) throws IOException;
 
   /**
    * @return An {@link java.io.InputStream} for this location.
@@ -73,7 +105,12 @@ public interface Location {
    * Creates an {@link OutputStream} for this location with the given permission. The actual permission supported
    * depends on implementation.
    *
-   * @param permission A POSIX permission string.
+   * @param permission A permission string. It has to be either a three digit or a nine character string.
+   *                   For the three digit string, it is similar to the UNIX permission numeric representation.
+   *                   The first digit is the permission for owner, second digit is the permission for group and
+   *                   the third digit is the permission for all.
+   *                   For the nine character string, it uses the format as specified by the
+   *                   {@link PosixFilePermissions#fromString(String)} method.
    * @return An {@link OutputStream} for writing to this location.
    * @throws IOException If failed to create the {@link OutputStream}.
    */
