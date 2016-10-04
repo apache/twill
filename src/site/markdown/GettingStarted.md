@@ -28,7 +28,7 @@ For your application module
 <dependency>
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-api</artifactId>
-    <version>0.7.0-incubating</version>
+    <version>0.8.0</version>
 </dependency>
 ```
 
@@ -38,7 +38,7 @@ For the your Apache Twill YARN client module
 <dependency>
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-yarn</artifactId>
-    <version>0.7.0-incubating</version>
+    <version>0.8.0</version>
 </dependency>
 ```
 
@@ -116,7 +116,7 @@ to create an instance of `TwillRunnerService`:
 ```java
 TwillRunnerService runnerService = new YarnTwillRunnerService(
   new YarnConfiguration(), zkConnectStr);
-runnerService.startAndWait();
+runnerService.start();
 ```
 
 Now you are read to run the EchoServer on YARN, by simply preparing and starting through the `TwillRunnerService`. You
@@ -143,7 +143,7 @@ controller.addListener(new ListenerAdapter() {
 You can also stop the application through the `TwillController`:
 
 ```java
-controller.stop().get();
+controller.terminate().get();
 ```
 
 This will shut down the application master and all the containers.
@@ -170,7 +170,7 @@ You can run the HelloWorld application from any node of the Hadoop cluster using
 (be sure to add your ZooKeeper Host and Port):
 
 ```sh
-$ export CP=twill-examples-yarn-0.7.0-incubating-SNAPSHOT.jar:`hadoop classpath`
+$ export CP=twill-examples-yarn-0.8.0.jar:`hadoop classpath`
 $ java -cp $CP org.apache.twill.example.yarn.HelloWorld {zookeeper_host:port}
 ```
 
@@ -193,9 +193,9 @@ You can run the BundleJarExample application from any node of the Hadoop cluster
 (be sure to add your ZooKeeper Host and Port):
 
 ```sh
-$ export CP=twill-examples-yarn-0.7.0-incubating-SNAPSHOT.jar:`hadoop classpath`
+$ export CP=twill-examples-yarn-0.8.0.jar:`hadoop classpath`
 $ java -cp $CP org.apache.twill.example.yarn.BundledJarExample {zookeeper_host:port} \
-    twill-examples-echo-0.7.0-incubating-SNAPSHOT.jar echo.EchoMain arg1
+    twill-examples-echo-0.8.0.jar echo.EchoMain arg1
 ```
 
 Like with the HelloWorld example, you should see logs output to the terminal.  Once the application is complete, check

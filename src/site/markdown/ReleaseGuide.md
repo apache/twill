@@ -173,7 +173,10 @@ ${RELEASE_VERSION} passed with n binding +1s and no 0 or -1.
 Binding +1s:
 [BINDING_+1_NAMES]
 
-I am going to create a vote in the general@ list.
+Non-binding +1s
+[NON_BINDING_+1_NAMES]
+
+This release vote has passed. Thanks everyone for voting.
 
 Thanks,
 [YOUR_NAME]

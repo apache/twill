@@ -43,8 +43,8 @@ Hadoop® cluster.
 
 ### Latest Release
 
-The latest release of Apache Twill is [0.7.0-incubating](releases/0.7.0-incubating.html). 
-Please go to the [release](releases/0.7.0-incubating.html) page
+The latest release of Apache Twill is [0.8.0](releases/0.8.0.html). 
+Please go to the [release](releases/0.8.0.html) page
 to find out more.
 
 ### Is it Building?
