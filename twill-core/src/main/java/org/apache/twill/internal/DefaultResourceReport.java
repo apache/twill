@@ -19,13 +19,13 @@ package org.apache.twill.internal;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.TwillRunResources;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -41,12 +41,8 @@ public final class DefaultResourceReport implements ResourceReport {
   private final AtomicReference<List<String>> services;
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources) {
-    this(applicationId, masterResources, ImmutableMap.<String, Collection<TwillRunResources>>of());
-  }
-
-  public DefaultResourceReport(String applicationId, TwillRunResources masterResources,
-                               Map<String, Collection<TwillRunResources>> resources) {
-    this(applicationId, masterResources, resources, ImmutableList.<String>of());
+    this(applicationId, masterResources, Collections.<String, Collection<TwillRunResources>>emptyMap(),
+         Collections.<String>emptyList());
   }
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources,

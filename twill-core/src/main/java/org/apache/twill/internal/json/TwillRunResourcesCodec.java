@@ -24,11 +24,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import com.google.gson.reflect.TypeToken;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.DefaultTwillRunResources;
 
 import java.lang.reflect.Type;
+import java.util.Map;
 
 /**
  * Codec for serializing and deserializing a {@link org.apache.twill.api.TwillRunResources} object using json.
@@ -41,7 +43,7 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
   private static final String MEMORY_MB = "memoryMB";
   private static final String VIRTUAL_CORES = "virtualCores";
   private static final String DEBUG_PORT = "debugPort";
-  private static final String LOG_LEVEL = "logLevel";
+  private static final String LOG_LEVELS = "logLevels";
 
   @Override
   public JsonElement serialize(TwillRunResources src, Type typeOfSrc, JsonSerializationContext context) {
@@ -55,9 +57,8 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
     if (src.getDebugPort() != null) {
       json.addProperty(DEBUG_PORT, src.getDebugPort());
     }
-    if (src.getLogLevel() != null) {
-      json.addProperty(LOG_LEVEL, src.getLogLevel().toString());
-    }
+    json.add(LOG_LEVELS, context.serialize(src.getLogLevels(),
+                                           new TypeToken<Map<String, LogEntry.Level>>() { }.getType()));
 
     return json;
   }
@@ -66,13 +67,14 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
   public TwillRunResources deserialize(JsonElement json, Type typeOfT,
                                            JsonDeserializationContext context) throws JsonParseException {
     JsonObject jsonObj = json.getAsJsonObject();
-    return new DefaultTwillRunResources(jsonObj.get("instanceId").getAsInt(),
-                                        jsonObj.get("containerId").getAsString(),
-                                        jsonObj.get("virtualCores").getAsInt(),
-                                        jsonObj.get("memoryMB").getAsInt(),
-                                        jsonObj.get("host").getAsString(),
-                                        jsonObj.has("debugPort") ? jsonObj.get("debugPort").getAsInt() : null,
-                                        jsonObj.has("logLevel") ? LogEntry.Level.valueOf(
-                                          jsonObj.get("logLevel").getAsString()) : LogEntry.Level.INFO);
+    Map<String, LogEntry.Level> logLevels =
+      context.deserialize(jsonObj.get(LOG_LEVELS), new TypeToken<Map<String, LogEntry.Level>>() { }.getType());
+    return new DefaultTwillRunResources(jsonObj.get(INSTANCE_ID).getAsInt(),
+                                        jsonObj.get(CONTAINER_ID).getAsString(),
+                                        jsonObj.get(VIRTUAL_CORES).getAsInt(),
+                                        jsonObj.get(MEMORY_MB).getAsInt(),
+                                        jsonObj.get(HOST).getAsString(),
+                                        jsonObj.has(DEBUG_PORT) ? jsonObj.get(DEBUG_PORT).getAsInt() : null,
+                                        logLevels);
   }
 }

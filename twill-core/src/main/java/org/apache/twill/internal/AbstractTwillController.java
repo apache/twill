@@ -19,6 +19,7 @@ package org.apache.twill.internal;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -59,6 +60,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 
 /**
  * A abstract base class for {@link TwillController} implementation that uses Zookeeper to controller a
@@ -136,8 +138,8 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   }
 
   @Override
-  public final ListenableFuture<Set<String>> restartInstances(Map<String,
-      ? extends Set<Integer>> runnableToInstanceIds) {
+  public final ListenableFuture<Set<String>> restartInstances(
+    Map<String, ? extends Set<Integer>> runnableToInstanceIds) {
     Map<String, String> runnableToStringInstanceIds =
       Maps.transformEntries(runnableToInstanceIds, new Maps.EntryTransformer<String, Set<Integer>, String>() {
         @Override
@@ -168,6 +170,27 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
         return runnable;
       }
     });
+  }
+
+  @Override
+  public Future<Map<String, LogEntry.Level>> updateLogLevels(Map<String, LogEntry.Level> logLevels) {
+    return sendMessage(SystemMessages.updateLogLevels(logLevels), logLevels);
+  }
+
+  @Override
+  public Future<Map<String, LogEntry.Level>> updateLogLevels(String runnableName,
+                                                             Map<String, LogEntry.Level> runnableLogLevels) {
+    Preconditions.checkNotNull(runnableName);
+    return sendMessage(SystemMessages.updateLogLevels(runnableName, runnableLogLevels), runnableLogLevels);
+  }
+
+  @Override
+  public Future<String[]> resetLogLevels(String...loggerNames) {
+    return sendMessage(SystemMessages.resetLogLevels(Sets.newHashSet(loggerNames)), loggerNames);
+  }
+  @Override
+  public Future<String[]> resetRunnableLogLevels(String runnableName, String...loggerNames) {
+    return sendMessage(SystemMessages.resetLogLevels(runnableName, Sets.newHashSet(loggerNames)), loggerNames);
   }
 
   private void validateInstanceIds(String runnable, Set<Integer> instanceIds) {

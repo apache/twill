@@ -18,7 +18,14 @@
 package org.apache.twill.internal;
 
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogEntry.Level;
+import org.slf4j.Logger;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  *  Straightforward implementation of {@link org.apache.twill.api.TwillRunResources}.
@@ -30,17 +37,25 @@ public class DefaultTwillRunResources implements TwillRunResources {
   private final int memoryMB;
   private final String host;
   private final Integer debugPort;
-  private final Level logLevel;
+  private final Map<String, LogEntry.Level> logLevels;
+
+  /**
+   * Constructor to create an instance of {@link DefaultTwillRunResources} with empty log levels.
+   */
+  public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
+                                  String host, Integer debugPort) {
+    this(instanceId, containerId, cores, memoryMB, host, debugPort, Collections.<String, Level>emptyMap());
+  }
 
   public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
-                                  String host, Integer debugPort, Level logLevel) {
+                                  String host, Integer debugPort, Map<String, LogEntry.Level> logLevels) {
     this.instanceId = instanceId;
     this.containerId = containerId;
     this.virtualCores = cores;
     this.memoryMB = memoryMB;
     this.host = host;
     this.debugPort = debugPort;
-    this.logLevel = logLevel;
+    this.logLevels = new HashMap<>(logLevels);
   }
 
   /**
@@ -90,8 +105,15 @@ public class DefaultTwillRunResources implements TwillRunResources {
   }
 
   @Override
+  @Deprecated
+  @Nullable
   public Level getLogLevel() {
-    return logLevel;
+    return getLogLevels().get(Logger.ROOT_LOGGER_NAME);
+  }
+
+  @Override
+  public Map<String, LogEntry.Level> getLogLevels() {
+    return logLevels;
   }
 
   @Override
@@ -129,7 +151,7 @@ public class DefaultTwillRunResources implements TwillRunResources {
       ", memoryMB=" + memoryMB +
       ", host='" + host + '\'' +
       ", debugPort=" + debugPort +
-      ", logLevel=" + logLevel +
+      ", logLevels=" + logLevels +
       '}';
   }
 }

@@ -17,6 +17,7 @@
  */
 package org.apache.twill.internal.appmaster;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashBasedTable;
@@ -29,26 +30,31 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Table;
+import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.logging.LogEntry;
+import org.apache.twill.filesystem.Location;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerExitCodes;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.ContainerLiveNodeData;
 import org.apache.twill.internal.DefaultResourceReport;
 import org.apache.twill.internal.DefaultTwillRunResources;
-import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillContainerController;
 import org.apache.twill.internal.TwillContainerLauncher;
 import org.apache.twill.internal.container.TwillContainerMain;
 import org.apache.twill.internal.state.Message;
+import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.internal.yarn.YarnContainerStatus;
 import org.apache.twill.zookeeper.NodeChildren;
 import org.apache.twill.zookeeper.ZKClient;
@@ -56,18 +62,24 @@ import org.apache.twill.zookeeper.ZKOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nullable;
 
 /**
  * A helper class for ApplicationMasterService to keep track of running containers and to interact
@@ -98,8 +110,12 @@ final class RunningContainers {
   private final Condition containerChange;
   private final ZKClient zkClient;
   private final Multimap<String, ContainerInfo> containerStats;
+  private final Location applicationLocation;
+  private final Set<String> runnableNames;
+  private final Map<String, Map<String, String>> logLevels;
 
-  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient) {
+  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient,
+                    Location applicationLocation, Set<String> runnableNames) {
     containers = HashBasedTable.create();
     runnableInstances = Maps.newHashMap();
     completedContainerCount = Maps.newHashMap();
@@ -109,6 +125,9 @@ final class RunningContainers {
     resourceReport = new DefaultResourceReport(appId, appMasterResources);
     zkClient = zookeeperClient;
     containerStats = HashMultimap.create();
+    this.applicationLocation = applicationLocation;
+    this.runnableNames = runnableNames;
+    this.logLevels = new TreeMap<>();
   }
 
   /**
@@ -126,22 +145,22 @@ final class RunningContainers {
   /**
    * Start a container for a runnable.
    */
-  void start(String runnableName, ContainerInfo containerInfo, TwillContainerLauncher launcher,
-             LogEntry.Level logLevel) {
+  void start(String runnableName, ContainerInfo containerInfo, TwillContainerLauncher launcher) {
     containerLock.lock();
     try {
       int instanceId = getStartInstanceId(runnableName);
       RunId runId = getRunId(runnableName, instanceId);
       TwillContainerController controller = launcher.start(runId, instanceId,
-                                                           TwillContainerMain.class, "$HADOOP_CONF_DIR");
+                                                           TwillContainerMain.class, "$HADOOP_CONF_DIR",
+                                                           saveLogLevels());
       containers.put(runnableName, containerInfo.getId(), controller);
       TwillRunResources resources = new DynamicTwillRunResources(instanceId,
                                                                  containerInfo.getId(),
                                                                  containerInfo.getVirtualCores(),
                                                                  containerInfo.getMemoryMB(),
                                                                  containerInfo.getHost().getHostName(),
-                                                                 controller,
-                                                                 logLevel);
+                                                                 controller);
+
       resourceReport.addRunResources(runnableName, resources);
       containerStats.put(runnableName, containerInfo);
 
@@ -298,10 +317,12 @@ final class RunningContainers {
   void sendToAll(Message message, Runnable completion) {
     containerLock.lock();
     try {
+      for (String runnableName : runnableNames) {
+        checkAndUpdateLogLevels(message, runnableName);
+      }
       if (containers.isEmpty()) {
         completion.run();
       }
-
       // Sends the command to all running containers
       AtomicInteger count = new AtomicInteger(containers.size());
       for (Map.Entry<String, Map<String, TwillContainerController>> entry : containers.rowMap().entrySet()) {
@@ -318,6 +339,7 @@ final class RunningContainers {
     List<TwillContainerController> controllers;
     containerLock.lock();
     try {
+      checkAndUpdateLogLevels(message, runnableName);
       controllers = new ArrayList<>(containers.row(runnableName).values());
     } finally {
       containerLock.unlock();
@@ -575,18 +597,77 @@ final class RunningContainers {
     return false;
   }
 
+  private void checkAndUpdateLogLevels(Message message, String runnableName) {
+    String command = message.getCommand().getCommand();
+    if (message.getType() != Message.Type.SYSTEM || (!SystemMessages.LOG_LEVEL.equals(command) &&
+      !SystemMessages.RESET_LOG_LEVEL.equals(command))) {
+      return;
+    }
+
+    // Need to copy to a tree map to maintain the ordering since we compute the md5 of the tree
+    Map<String, String> messageOptions = message.getCommand().getOptions();
+    Map<String, String> runnableLogLevels = logLevels.get(runnableName);
+
+    if (SystemMessages.RESET_LOG_LEVEL.equals(command)) {
+      // Reset case, remove the log levels that were set before
+      if (runnableLogLevels != null) {
+        if (messageOptions.isEmpty()) {
+          logLevels.remove(runnableName);
+        } else {
+          runnableLogLevels.keySet().removeAll(messageOptions.keySet());
+        }
+      }
+      return;
+    }
+
+    if (runnableLogLevels == null) {
+      runnableLogLevels = new TreeMap<>();
+      logLevels.put(runnableName, runnableLogLevels);
+    }
+    runnableLogLevels.putAll(messageOptions);
+  }
+
+  private Location saveLogLevels() {
+    LOG.debug("save the log level file");
+    try {
+      Gson gson = new GsonBuilder().serializeNulls().create();
+      String jsonStr = gson.toJson(logLevels);
+      String fileName = Hashing.md5().hashString(jsonStr) + "." + Constants.Files.LOG_LEVELS;
+      Location location = applicationLocation.append(fileName);
+      if (!location.exists()) {
+        try (Writer writer = new OutputStreamWriter(location.getOutputStream(), Charsets.UTF_8)) {
+          writer.write(jsonStr);
+        }
+      }
+      LOG.debug("Done saving the log level file");
+      return location;
+    } catch (IOException e) {
+      LOG.error("Failed to save the log level file.");
+      return null;
+    }
+  }
+
   /**
    * A helper class that overrides the debug port of the resources with the live info from the container controller.
    */
-  private static class DynamicTwillRunResources extends DefaultTwillRunResources {
+  private static final class DynamicTwillRunResources extends DefaultTwillRunResources {
 
+    private static final Function<String, LogEntry.Level> LOG_LEVEL_CONVERTER = new Function<String, LogEntry.Level>() {
+      @Nullable
+      @Override
+      public LogEntry.Level apply(@Nullable String logLevel) {
+        // The logLevel is always a valid LogEntry.Level enum, because that's what the user can set through the
+        // Twill Preparer or Controller API
+        return logLevel == null ? null : LogEntry.Level.valueOf(logLevel);
+      }
+    };
     private final TwillContainerController controller;
     private Integer dynamicDebugPort = null;
 
     private DynamicTwillRunResources(int instanceId, String containerId,
                                      int cores, int memoryMB, String host,
-                                     TwillContainerController controller, LogEntry.Level logLevel) {
-      super(instanceId, containerId, cores, memoryMB, host, null, logLevel);
+                                     TwillContainerController controller) {
+      super(instanceId, containerId, cores, memoryMB, host, null);
       this.controller = controller;
     }
 
@@ -604,6 +685,15 @@ final class RunningContainers {
         }
       }
       return dynamicDebugPort;
+    }
+
+    @Override
+    public synchronized Map<String, LogEntry.Level> getLogLevels() {
+      ContainerLiveNodeData liveData = controller.getLiveNodeData();
+      if (liveData != null) {
+        return Maps.transformValues(liveData.getLogLevels(), LOG_LEVEL_CONVERTER);
+      }
+      return Collections.emptyMap();
     }
   }
 }
