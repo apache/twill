@@ -68,7 +68,7 @@ public final class ApplicationMasterMain extends ServiceMain {
     File twillSpec = new File(Constants.Files.TWILL_SPEC);
     TwillRuntimeSpecification twillRuntimeSpec = TwillRuntimeSpecificationAdapter.create().fromJson(twillSpec);
     String zkConnect = twillRuntimeSpec.getZkConnectStr();
-    RunId runId = twillRuntimeSpec.getTwillRunId();
+    RunId runId = twillRuntimeSpec.getTwillAppRunId();
 
     ZKClientService zkClientService = createZKClient(zkConnect, twillRuntimeSpec.getTwillAppName());
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
@@ -76,8 +76,9 @@ public final class ApplicationMasterMain extends ServiceMain {
 
     final YarnAMClient amClient = new VersionDetectYarnAMClientFactory(conf).create();
     ApplicationMasterService service =
-      new ApplicationMasterService(runId, zkClientService, twillRuntimeSpec, amClient, createAppLocation(
-        conf, twillRuntimeSpec.getFsUser(), twillRuntimeSpec.getTwillAppDir()));
+      new ApplicationMasterService(runId, zkClientService, twillRuntimeSpec, amClient,
+                                   createAppLocation(conf, twillRuntimeSpec.getFsUser(),
+                                                     twillRuntimeSpec.getTwillAppDir()));
     TrackerService trackerService = new TrackerService(service);
 
     new ApplicationMasterMain(service.getKafkaZKConnect())

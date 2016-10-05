@@ -52,7 +52,7 @@ public final class Constants {
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
 
   /**
-   * Common ZK paths constants
+   * Common ZK paths constants.
    */
   public static final String DISCOVERY_PATH_PREFIX = "/discoverable";
   public static final String INSTANCES_PATH_PREFIX = "/instances";
@@ -77,6 +77,7 @@ public final class Constants {
     public static final String LOGBACK_TEMPLATE = "logback-template.xml";
     public static final String JVM_OPTIONS = "jvm.opts";
     public static final String CREDENTIALS = "credentials.store";
+    public static final String LOG_LEVELS = "logLevel.json";
 
     private Files() {
     }

@@ -227,13 +227,34 @@ public interface TwillPreparer {
   TwillPreparer addSecureStore(SecureStore secureStore);
 
   /**
-   * Set the log level for Twill applications running in a container.
+   * Set the root log level for Twill applications in all containers.
    *
    * @param logLevel the {@link LogEntry.Level} that should be set.
    *                 The level match the {@code Logback} levels.
    * @return This {@link TwillPreparer}.
+   * @deprecated Use {@link #setLogLevels(Map)} with key {@link org.slf4j.Logger#ROOT_LOGGER_NAME} instead.
    */
+  @Deprecated
   TwillPreparer setLogLevel(LogEntry.Level logLevel);
+
+  /**
+   * Set the log levels for requested logger names for Twill applications running in a container. The log level of any
+   * logger cannot be {@code null}, if there is {@code null} value, a {@link IllegalArgumentException} will be thrown.
+   *
+   * @param logLevels The {@link Map} contains the requested logger names and log levels that need to be set.
+   * @return This {@link TwillPreparer}.
+   */
+  TwillPreparer setLogLevels(Map<String, LogEntry.Level> logLevels);
+
+  /**
+   * Set the log levels for requested logger names for a {@link TwillRunnable}. The log level of any logger cannot be
+   * {@code null}, if there is {@code null} value, a {@link IllegalArgumentException} will be thrown.
+   *
+   * @param runnableName The name of the runnable to set the log level.
+   * @param logLevelsForRunnable The {@link Map} contains the requested logger names and log levels that need to be set.
+   * @return This {@link TwillPreparer}.
+   */
+  TwillPreparer setLogLevels(String runnableName, Map<String, LogEntry.Level> logLevelsForRunnable);
 
   /**
    * Starts the application.

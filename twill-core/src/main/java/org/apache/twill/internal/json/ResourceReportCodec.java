@@ -27,6 +27,7 @@ import com.google.gson.JsonSerializer;
 import com.google.gson.reflect.TypeToken;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.DefaultResourceReport;
 
 import java.lang.reflect.Type;
@@ -45,12 +46,11 @@ public final class ResourceReportCodec implements JsonSerializer<ResourceReport>
     JsonObject json = new JsonObject();
 
     json.addProperty("appMasterId", src.getApplicationId());
-    json.add("appMasterResources", context.serialize(
-      src.getAppMasterResources(), new TypeToken<TwillRunResources>() { }.getType()));
+    json.add("appMasterResources", context.serialize(src.getAppMasterResources(), TwillRunResources.class));
     json.add("runnableResources", context.serialize(
       src.getResources(), new TypeToken<Map<String, Collection<TwillRunResources>>>() { }.getType()));
     json.add("services", context.serialize(
-      src.getServices(), new TypeToken<List<String>>() {}.getType()));
+      src.getServices(), new TypeToken<List<String>>() { }.getType()));
     return json;
   }
 
@@ -64,7 +64,7 @@ public final class ResourceReportCodec implements JsonSerializer<ResourceReport>
     Map<String, Collection<TwillRunResources>> resources = context.deserialize(
       jsonObj.get("runnableResources"), new TypeToken<Map<String, Collection<TwillRunResources>>>() { }.getType());
     List<String> services = context.deserialize(
-      jsonObj.get("services"), new TypeToken<List<String>>() {}.getType());
+      jsonObj.get("services"), new TypeToken<List<String>>() { }.getType());
 
     return new DefaultResourceReport(appMasterId, masterResources, resources, services);
   }
