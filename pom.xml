@@ -97,6 +97,14 @@
                 <role>PMC</role>
             </roles>
         </developer>
+        <developer>
+            <id>anwar</id>
+            <name>Ali Anwar</name>
+            <email>anwar@apache.org</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+        </developer>
     </developers>
 
     <modules>
