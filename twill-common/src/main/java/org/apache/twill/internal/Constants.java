@@ -57,6 +57,10 @@ public final class Constants {
   public static final String DISCOVERY_PATH_PREFIX = "/discoverable";
   public static final String INSTANCES_PATH_PREFIX = "/instances";
 
+  /**
+   * Constants for twill variable names.
+   */
+  public static final String TWILL_APP_NAME = "TWILL_APP_NAME";
 
   /**
    * Constants for names of internal files that are shared between client, AM and containers.
