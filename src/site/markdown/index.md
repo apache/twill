@@ -23,29 +23,29 @@
 ### What is Apache Twill?
 
 Apache Twill is an abstraction over Apache Hadoop® YARN that reduces the complexity of developing distributed applications,
-allowing developers to focus more on their application logic. Apache Twill allows you to use YARN’s distributed capabilities
-with a programming model that is similar to running threads.
+allowing developers to focus instead on their application logic. Apache Twill allows you to use YARN’s distributed
+capabilities with a programming model that is similar to running threads.
 
 ### Why do I need Apache Twill?
 
 Apache Twill dramatically simplifies and reduces development efforts, enabling you to quickly and
-easily develop and manage distributed applications through its simple abstraction layer on top of YARN.
+easily both develop and manage distributed applications through its simple abstraction layer on top of YARN.
 YARN, although originally designed for MapReduce v2, can be used as a generic cluster resource management framework
-that can run almost any type of applications on a Hadoop® cluster. With its powerful capabilities, YARN can 
-introduce complexities for developers. In contrast, Twill's abstraction model over YARN closely resembles 
-the Java thread model, with which many developers are familiar. Moreover, Twill provides application lifecycle management, 
-service discovery, distributed process coordination and resiliency to failure, which are required by many distributed applications.
+that can run almost any type of application on a Hadoop® cluster. However, with its powerful capabilities, YARN can 
+introduce complexities for developers. 
 
-Apache Twill allows you to develop, deploy and manage your distributed applications with a much simpler programming model,
-with rich build-in features for common distributed applications needs. Whether you are a developer or operating engineer
-will find Apache Twill helps you greatly reduces the effort in developing and operating your applications on a
-Hadoop® cluster.
+In contrast, Twill's abstraction model over YARN closely resembles the Java thread model, with which many developers are
+familiar. Moreover, Twill provides application lifecycle management, service discovery, distributed process coordination, and resiliency to failure, which are required by many distributed applications.
+
+Apache Twill allows you to develop, deploy, and manage your distributed applications with a simpler programming model,
+with rich built-in features for solving common distributed-application problems. Whether you are a developer or an
+operating engineer, you will find Apache Twill helps you greatly reduce the effort in developing and operating your
+applications on a Hadoop® cluster.
 
 ### Latest Release
 
 The latest release of Apache Twill is [0.8.0](releases/0.8.0.html). 
-Please go to the [release](releases/0.8.0.html) page
-to find out more.
+Please go to the [release](releases/0.8.0.html) page for additional information.
 
 ### Is it Building?
 
