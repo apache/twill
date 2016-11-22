@@ -29,6 +29,11 @@ public interface FetchedMessage {
   ByteBuffer getPayload();
 
   /**
+   * Returns the offset for the current message.
+   */
+  long getOffset();
+
+  /**
    * Returns the offset for the next message to be read.
    */
   long getNextOffset();
