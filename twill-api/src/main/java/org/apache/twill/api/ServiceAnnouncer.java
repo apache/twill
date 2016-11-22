@@ -32,7 +32,7 @@ public interface ServiceAnnouncer {
   Cancellable announce(String serviceName, int port);
 
   /**
-   * Registers an endpoint that could be discovered by external party with a payload
+   * Registers an endpoint that could be discovered by external party with a payload.
    * @param serviceName Name of the endpoint
    * @param port Port of the endpoint
    * @param payload byte array payload

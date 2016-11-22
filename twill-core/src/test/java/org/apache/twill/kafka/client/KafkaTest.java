@@ -42,10 +42,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -89,8 +87,8 @@ public class KafkaTest {
   @Test
   public void testKafkaClientReconnect() throws Exception {
     String topic = "backoff";
-    Properties kafkServerConfig = generateKafkaConfig(zkServer.getConnectionStr() + "/backoff");
-    EmbeddedKafkaServer server = new EmbeddedKafkaServer(kafkServerConfig);
+    Properties kafkaServerConfig = generateKafkaConfig(zkServer.getConnectionStr() + "/backoff");
+    EmbeddedKafkaServer server = new EmbeddedKafkaServer(kafkaServerConfig);
 
     ZKClientService zkClient = ZKClientService.Builder.of(zkServer.getConnectionStr() + "/backoff").build();
     zkClient.startAndWait();
@@ -106,15 +104,19 @@ public class KafkaTest {
           // Publish a messages
           createPublishThread(kafkaClient, topic, Compression.NONE, "First message", 1).start();
 
-          // Creater a consumer
+          // Create a consumer
           final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
           Cancellable cancel = kafkaClient.getConsumer().prepare().add(topic, 0, 0)
             .consume(new KafkaConsumer.MessageCallback() {
               @Override
-              public void onReceived(Iterator<FetchedMessage> messages) {
+              public long onReceived(Iterator<FetchedMessage> messages) {
+                long nextOffset = -1L;
                 while (messages.hasNext()) {
-                  queue.offer(Charsets.UTF_8.decode(messages.next().getPayload()).toString());
+                  FetchedMessage message = messages.next();
+                  nextOffset = message.getNextOffset();
+                  queue.offer(Charsets.UTF_8.decode(message.getPayload()).toString());
                 }
+                return nextOffset;
               }
 
               @Override
@@ -130,7 +132,7 @@ public class KafkaTest {
 
           // Start the server again.
           // Needs to create a new instance with the same config since guava service cannot be restarted
-          server = new EmbeddedKafkaServer(kafkServerConfig);
+          server = new EmbeddedKafkaServer(kafkaServerConfig);
           server.startAndWait();
 
           // Publish another message
@@ -170,11 +172,15 @@ public class KafkaTest {
     Cancellable cancel = kafkaClient.getConsumer().prepare().add(topic, 0, 0).consume(new KafkaConsumer
       .MessageCallback() {
       @Override
-      public void onReceived(Iterator<FetchedMessage> messages) {
+      public long onReceived(Iterator<FetchedMessage> messages) {
+        long nextOffset = -1;
         while (messages.hasNext()) {
-          LOG.info(Charsets.UTF_8.decode(messages.next().getPayload()).toString());
+          FetchedMessage message = messages.next();
+          nextOffset = message.getNextOffset();
+          LOG.info(Charsets.UTF_8.decode(message.getPayload()).toString());
           latch.countDown();
         }
+        return nextOffset;
       }
 
       @Override
@@ -184,6 +190,51 @@ public class KafkaTest {
     });
 
     Assert.assertTrue(latch.await(5, TimeUnit.SECONDS));
+    cancel.cancel();
+    Assert.assertTrue(stopLatch.await(1, TimeUnit.SECONDS));
+  }
+
+  @Test
+  public void testKafkaClientSkipNext() throws Exception {
+    String topic = "testClientSkipNext";
+    // Publish 30 messages with indecies the same as offsets within the range 0 - 29
+    Thread t1 = createPublishThread(kafkaClient, topic, Compression.GZIP, "GZIP Testing message", 10);
+    t1.start();
+    t1.join();
+    Thread t2 = createPublishThread(kafkaClient, topic, Compression.NONE, "Testing message", 10, 10);
+    t2.start();
+    t2.join();
+    Thread t3 = createPublishThread(kafkaClient, topic, Compression.SNAPPY, "Snappy Testing message", 10, 20);
+    t3.start();
+    t3.join();
+
+    final CountDownLatch stopLatch = new CountDownLatch(1);
+    final BlockingQueue<Long> offsetQueue = new LinkedBlockingQueue<>();
+    Cancellable cancel = kafkaClient.getConsumer().prepare().add(topic, 0, 0).consume(
+      new KafkaConsumer.MessageCallback() {
+      @Override
+      public long onReceived(Iterator<FetchedMessage> messages) {
+        long nextOffset = -1L;
+        if (messages.hasNext()) {
+          FetchedMessage message = messages.next();
+          nextOffset = message.getNextOffset() + 1;
+          offsetQueue.offer(message.getOffset());
+          LOG.info(Charsets.UTF_8.decode(message.getPayload()).toString());
+          return nextOffset;
+        }
+        return nextOffset;
+      }
+
+      @Override
+      public void finished() {
+        stopLatch.countDown();
+      }
+    });
+    // 15 messages should be in the queue since onReceived returns `message.getNextOffset() + 1` as next offset to read
+    for (long i = 0; i < 30; i += 2) {
+      Assert.assertEquals(i, (long) offsetQueue.poll(60, TimeUnit.SECONDS));
+    }
+    Assert.assertNull(offsetQueue.poll(2, TimeUnit.SECONDS));
     cancel.cancel();
     Assert.assertTrue(stopLatch.await(1, TimeUnit.SECONDS));
   }
@@ -207,13 +258,17 @@ public class KafkaTest {
 
     // Attach a consumer
     final BlockingQueue<String> consumedMessages = Queues.newLinkedBlockingQueue();
-    Cancellable cancelConsumer = kafkaClient.getConsumer()
+    kafkaClient.getConsumer()
       .prepare().addFromBeginning("test", 0).consume(new KafkaConsumer.MessageCallback() {
       @Override
-      public void onReceived(Iterator<FetchedMessage> messages) {
+      public long onReceived(Iterator<FetchedMessage> messages) {
+        long nextOffset = -1L;
         while (messages.hasNext()) {
-          consumedMessages.add(Charsets.UTF_8.decode(messages.next().getPayload()).toString());
+          FetchedMessage message = messages.next();
+          nextOffset = message.getNextOffset();
+          consumedMessages.add(Charsets.UTF_8.decode(message.getPayload()).toString());
         }
+        return nextOffset;
       }
 
       @Override
@@ -286,6 +341,7 @@ public class KafkaTest {
     prop.setProperty("log.flush.interval.messages", "10000");
     prop.setProperty("log.flush.interval.ms", "1000");
     prop.setProperty("log.segment.bytes", "536870912");
+    prop.setProperty("message.send.max.retries", "10");
     prop.setProperty("zookeeper.connect", zkConnectStr);
     prop.setProperty("zookeeper.connection.timeout.ms", "1000000");
     prop.setProperty("default.replication.factor", "1");

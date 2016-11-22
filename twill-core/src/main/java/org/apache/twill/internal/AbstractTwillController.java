@@ -229,9 +229,11 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
     }
 
     @Override
-    public void onReceived(Iterator<FetchedMessage> messages) {
+    public long onReceived(Iterator<FetchedMessage> messages) {
+      long nextOffset = -1L;
       while (messages.hasNext()) {
-        String json = Charsets.UTF_8.decode(messages.next().getPayload()).toString();
+        FetchedMessage message = messages.next();
+        String json = Charsets.UTF_8.decode(message.getPayload()).toString();
         try {
           LogEntry entry = GSON.fromJson(json, LogEntry.class);
           if (entry != null) {
@@ -240,7 +242,9 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
         } catch (Exception e) {
           LOG.error("Failed to decode log entry {}", json, e);
         }
+        nextOffset = message.getNextOffset();
       }
+      return nextOffset;
     }
 
     @Override

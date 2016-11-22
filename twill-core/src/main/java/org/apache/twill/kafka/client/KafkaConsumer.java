@@ -35,8 +35,9 @@ public interface KafkaConsumer {
      * Invoked when new messages is available.
      * @param messages Iterator of new messages. The {@link FetchedMessage} instance maybe reused in the Iterator
      *                 and across different invocation.
+     * @return The offset of the message to be fetched next.
      */
-    void onReceived(Iterator<FetchedMessage> messages);
+    long onReceived(Iterator<FetchedMessage> messages);
 
     /**
      * Invoked when message consumption is stopped. When this method is invoked,
