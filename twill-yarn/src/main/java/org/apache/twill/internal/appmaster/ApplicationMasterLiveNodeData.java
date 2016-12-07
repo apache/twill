@@ -17,6 +17,10 @@
  */
 package org.apache.twill.internal.appmaster;
 
+import org.apache.twill.api.LocalFile;
+
+import java.util.List;
+
 /**
  * Represents data being stored in the live node of the application master.
  */
@@ -25,11 +29,14 @@ public final class ApplicationMasterLiveNodeData {
   private final int appId;
   private final long appIdClusterTime;
   private final String containerId;
+  private final List<LocalFile> localFiles;
 
-  public ApplicationMasterLiveNodeData(int appId, long appIdClusterTime, String containerId) {
+  public ApplicationMasterLiveNodeData(int appId, long appIdClusterTime,
+                                       String containerId, List<LocalFile> localFiles) {
     this.appId = appId;
     this.appIdClusterTime = appIdClusterTime;
     this.containerId = containerId;
+    this.localFiles = localFiles;
   }
 
   public int getAppId() {
@@ -42,5 +49,19 @@ public final class ApplicationMasterLiveNodeData {
 
   public String getContainerId() {
     return containerId;
+  }
+
+  public List<LocalFile> getLocalFiles() {
+    return localFiles;
+  }
+
+  @Override
+  public String toString() {
+    return "ApplicationMasterLiveNodeData{" +
+      "appId=" + appId +
+      ", appIdClusterTime=" + appIdClusterTime +
+      ", containerId='" + containerId + '\'' +
+      ", localFiles=" + localFiles +
+      '}';
   }
 }

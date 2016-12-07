@@ -186,7 +186,7 @@ public abstract class ServiceMain {
     configurator.setContext(context);
 
     try {
-      File twillLogback = new File(Constants.Files.LOGBACK_TEMPLATE);
+      File twillLogback = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.LOGBACK_TEMPLATE);
       if (twillLogback.exists()) {
         configurator.doConfigure(twillLogback);
       }

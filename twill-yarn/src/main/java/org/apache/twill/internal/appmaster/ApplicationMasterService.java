@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal.appmaster;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
@@ -32,7 +31,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Ranges;
 import com.google.common.collect.Sets;
-import com.google.common.io.Files;
 import com.google.common.io.InputSupplier;
 import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.Futures;
@@ -88,6 +86,10 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -109,7 +111,10 @@ import javax.annotation.Nullable;
 public final class ApplicationMasterService extends AbstractYarnTwillService implements Supplier<ResourceReport> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApplicationMasterService.class);
-  private static final Gson GSON = new Gson();
+  private static final Gson GSON = new GsonBuilder()
+    .serializeNulls()
+    .registerTypeAdapter(LocalFile.class, new LocalFileCodec())
+    .create();
 
   // Copied from org.apache.hadoop.yarn.security.AMRMTokenIdentifier.KIND_NAME since it's missing in Hadoop-2.0
   private static final Text AMRM_TOKEN_KIND_NAME = new Text("YARN_AM_RM_TOKEN");
@@ -151,15 +156,15 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     this.amLiveNode = new ApplicationMasterLiveNodeData(Integer.parseInt(System.getenv(EnvKeys.YARN_APP_ID)),
                                                         Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
-                                                        amClient.getContainerId().toString());
+                                                        amClient.getContainerId().toString(), getLocalizeFiles());
 
-    expectedContainers = initExpectedContainers(twillSpec);
-    runningContainers = initRunningContainers(amClient.getContainerId(), amClient.getHost());
-    eventHandler = createEventHandler(twillSpec);
+    this.expectedContainers = initExpectedContainers(twillSpec);
+    this.runningContainers = initRunningContainers(amClient.getContainerId(), amClient.getHost());
+    this.eventHandler = createEventHandler(twillSpec);
   }
 
   private JvmOptions loadJvmOptions() throws IOException {
-    final File jvmOptsFile = new File(Constants.Files.JVM_OPTIONS);
+    final File jvmOptsFile = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.JVM_OPTIONS);
     if (!jvmOptsFile.exists()) {
       return new JvmOptions(null, JvmOptions.DebugOptions.NO_DEBUG);
     }
@@ -299,6 +304,11 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   @Override
   protected Object getLiveNodeData() {
     return amLiveNode;
+  }
+
+  @Override
+  protected Gson getLiveNodeGson() {
+    return GSON;
   }
 
   @Override
@@ -667,9 +677,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       // Override with system env
       env.put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect());
 
-      ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env, getLocalizeFiles(),
+      ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env,
+                                                                                         amLiveNode.getLocalFiles(),
                                                                                          credentials);
-
       TwillContainerLauncher launcher = new TwillContainerLauncher(
         twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
@@ -693,7 +703,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   private List<LocalFile> getLocalizeFiles() {
-    try (Reader reader = Files.newReader(new File(Constants.Files.LOCALIZE_FILES), Charsets.UTF_8)) {
+    try (Reader reader = Files.newBufferedReader(Paths.get(Constants.Files.LOCALIZE_FILES), StandardCharsets.UTF_8)) {
       return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
         .create().fromJson(reader, new TypeToken<List<LocalFile>>() {
         }.getType());
@@ -703,12 +713,12 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   }
 
   private Map<String, Map<String, String>> getEnvironments() {
-    File envFile = new File(Constants.Files.ENVIRONMENTS);
-    if (!envFile.exists()) {
+    Path envFile = Paths.get(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.ENVIRONMENTS);
+    if (!Files.exists(envFile)) {
       return new HashMap<>();
     }
 
-    try (Reader reader = Files.newReader(envFile, Charsets.UTF_8)) {
+    try (Reader reader = Files.newBufferedReader(envFile, StandardCharsets.UTF_8)) {
       return new Gson().fromJson(reader, new TypeToken<Map<String, Map<String, String>>>() {
       }.getType());
     } catch (IOException e) {

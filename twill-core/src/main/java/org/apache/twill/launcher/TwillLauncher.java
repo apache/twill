@@ -19,28 +19,25 @@ package org.apache.twill.launcher;
 
 import org.apache.twill.internal.Constants;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
 
 /**
  * A launcher for application from a archive jar.
@@ -49,42 +46,30 @@ import java.util.jar.JarInputStream;
  */
 public final class TwillLauncher {
 
-  private static final int TEMP_DIR_ATTEMPTS = 20;
-
   /**
    * Main method to unpackage a jar and run the mainClass.main() method.
-   * @param args args[0] is the path to jar file, args[1] is the class name of the mainClass.
-   *             The rest of args will be passed the mainClass unmodified.
+   * @param args args[0] is the class name of the mainClass, args[1] is a boolean, telling whether to append classpath
+   *             from the "classpath.txt" runtime config jar or not. The rest of args are arguments to the mainClass.
    */
   public static void main(String[] args) throws Exception {
-    if (args.length < 3) {
-      System.out.println("Usage: java " + TwillLauncher.class.getName() + " [jarFile] [mainClass] [use_classpath]");
+    if (args.length < 2) {
+      System.out.println("Usage: java " + TwillLauncher.class.getName() + " [mainClass] [use_classpath] [args...]");
       return;
     }
 
-    File file = new File(args[0]);
-    final File targetDir = createTempDir("twill.launcher");
-
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        System.out.println("Cleanup directory " + targetDir);
-        deleteDir(targetDir);
-      }
-    });
-
-    System.out.println("UnJar " + file + " to " + targetDir);
-    unJar(file, targetDir);
+    String mainClassName = args[0];
+    boolean userClassPath = Boolean.parseBoolean(args[1]);
 
     // Create ClassLoader
-    URLClassLoader classLoader = createClassLoader(targetDir, Boolean.parseBoolean(args[2]));
+    URLClassLoader classLoader = createClassLoader(userClassPath);
     Thread.currentThread().setContextClassLoader(classLoader);
 
-    System.out.println("Launch class (" + args[1] + ") with classpath: " + Arrays.toString(classLoader.getURLs()));
+    System.out.println("Launch class (" + mainClassName + ") with classpath: " +
+                         Arrays.toString(classLoader.getURLs()));
 
-    Class<?> mainClass = classLoader.loadClass(args[1]);
+    Class<?> mainClass = classLoader.loadClass(mainClassName);
     Method mainMethod = mainClass.getMethod("main", String[].class);
-    String[] arguments = Arrays.copyOfRange(args, 3, args.length);
+    String[] arguments = Arrays.copyOfRange(args, 2, args.length);
     System.out.println("Launching main: " + mainMethod + " " + Arrays.toString(arguments));
     mainMethod.invoke(mainClass, new Object[]{arguments});
     System.out.println("Main class completed.");
@@ -92,92 +77,50 @@ public final class TwillLauncher {
     System.out.println("Launcher completed");
   }
 
-  /**
-   * This method is copied from Guava Files.createTempDir().
-   */
-  private static File createTempDir(String prefix) throws IOException {
-    File baseDir = new File(System.getProperty("java.io.tmpdir"));
-    if (!baseDir.isDirectory() && !baseDir.mkdirs()) {
-      throw new IOException("Tmp directory not exists: " + baseDir.getAbsolutePath());
-    }
+  private static URLClassLoader createClassLoader(boolean useClassPath) throws Exception {
+    List<URL> urls = new ArrayList<>();
 
-    String baseName = prefix + "-" + System.currentTimeMillis() + "-";
+    File appJarDir = new File(Constants.Files.APPLICATION_JAR);
+    File resourceJarDir = new File(Constants.Files.RESOURCES_JAR);
+    File twillJarDir = new File(Constants.Files.TWILL_JAR);
 
-    for (int counter = 0; counter < TEMP_DIR_ATTEMPTS; counter++) {
-      File tempDir = new File(baseDir, baseName + counter);
-      if (tempDir.mkdir()) {
-        return tempDir;
+    // For backward compatibility, sort jars from twill and jars from application together
+    // With TWILL-179, this will change as the user can have control on how it should be.
+    List<File> libJarFiles = listJarFiles(new File(appJarDir, "lib"), new ArrayList<File>());
+    Collections.sort(listJarFiles(new File(twillJarDir, "lib"), libJarFiles), new Comparator<File>() {
+      @Override
+      public int compare(File file1, File file2) {
+        // order by the file name only. If the name are the same, the one in application jar will prevail.
+        return file1.getName().compareTo(file2.getName());
       }
-    }
-    throw new IOException("Failed to create directory within "
-                            + TEMP_DIR_ATTEMPTS + " attempts (tried "
-                            + baseName + "0 to " + baseName + (TEMP_DIR_ATTEMPTS - 1) + ')');
-  }
+    });
 
-  private static void unJar(File jarFile, File targetDir) throws IOException {
-    try (JarInputStream jarInput = new JarInputStream(new FileInputStream(jarFile))) {
-      JarEntry jarEntry = jarInput.getNextJarEntry();
-      while (jarEntry != null) {
-        File target = new File(targetDir, jarEntry.getName());
-        if (jarEntry.isDirectory()) {
-          target.mkdirs();
-        } else {
-          target.getParentFile().mkdirs();
-          copy(jarInput, target);
-        }
-        jarEntry = jarInput.getNextJarEntry();
-      }
-    }
-  }
-
-  private static void copy(InputStream is, File file) throws IOException {
-    byte[] buf = new byte[8192];
-    try (OutputStream os = new BufferedOutputStream(new FileOutputStream(file))) {
-      int len = is.read(buf);
-      while (len != -1) {
-        os.write(buf, 0, len);
-        len = is.read(buf);
-      }
-    }
-  }
-
-  private static URLClassLoader createClassLoader(File dir, boolean useClassPath) {
-    try {
-      List<URL> urls = new ArrayList<>();
+    // Add the app jar, resources jar and twill jar directories to the classpath as well
+    for (File dir : Arrays.asList(appJarDir, resourceJarDir, twillJarDir)) {
       urls.add(dir.toURI().toURL());
       urls.add(new File(dir, "classes").toURI().toURL());
       urls.add(new File(dir, "resources").toURI().toURL());
-
-      File libDir = new File(dir, "lib");
-      for (File file : listFiles(libDir)) {
-        if (file.getName().endsWith(".jar")) {
-          urls.add(file.toURI().toURL());
-        }
-      }
-
-      if (useClassPath) {
-        addClassPathsToList(urls, Constants.CLASSPATH);
-      }
-
-      addClassPathsToList(urls, Constants.APPLICATION_CLASSPATH);
-
-      return new URLClassLoader(urls.toArray(new URL[urls.size()]));
-
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
     }
+
+    // Add all lib jars
+    for (File jarFile : libJarFiles) {
+      urls.add(jarFile.toURI().toURL());
+    }
+
+    if (useClassPath) {
+      addClassPathsToList(urls, new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.CLASSPATH));
+    }
+
+    addClassPathsToList(urls, new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.APPLICATION_CLASSPATH));
+    return new URLClassLoader(urls.toArray(new URL[urls.size()]));
   }
 
-  private static void addClassPathsToList(List<URL> urls, String resource) throws IOException {
-    try (InputStream is = ClassLoader.getSystemResourceAsStream(resource)) {
-      if (is != null) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")))) {
-          String line = reader.readLine();
-          if (line != null) {
-            for (String path : line.split(":")) {
-              urls.addAll(getClassPaths(path.trim()));
-            }
-          }
+  private static void addClassPathsToList(List<URL> urls, File classpathFile) throws IOException {
+    try (BufferedReader reader = Files.newBufferedReader(classpathFile.toPath(), StandardCharsets.UTF_8)) {
+      String line = reader.readLine();
+      if (line != null) {
+        for (String path : line.split(":")) {
+          urls.addAll(getClassPaths(path.trim()));
         }
       }
     }
@@ -188,7 +131,8 @@ public final class TwillLauncher {
     if (classpath.endsWith("/*")) {
       // Grab all .jar files
       File dir = new File(classpath.substring(0, classpath.length() - 2));
-      List<File> files = listFiles(dir);
+      List<File> files = listJarFiles(dir, new ArrayList<File>());
+      Collections.sort(files);
       if (files.isEmpty()) {
         return singleItem(dir.toURI().toURL());
       }
@@ -220,29 +164,20 @@ public final class TwillLauncher {
     return result;
   }
 
-  private static void deleteDir(File dir) {
+  /**
+   * Populates a list of {@link File} under the given directory that has ".jar" as extension.
+   */
+  private static List<File> listJarFiles(File dir, List<File> result) {
+    System.out.println("listing jars for " + dir.getAbsolutePath());
     File[] files = dir.listFiles();
     if (files == null || files.length == 0) {
-      dir.delete();
-      return;
+      return result;
     }
     for (File file : files) {
-      deleteDir(file);
+      if (file.getName().endsWith(".jar")) {
+        result.add(file);
+      }
     }
-    dir.delete();
-  }
-
-  /**
-   * Returns a sorted list of {@link File} under the given directory. The list will be empty if
-   * the given directory is empty, not exist or not a directory.
-   */
-  private static List<File> listFiles(File dir) {
-    File[] files = dir.listFiles();
-    if (files == null || files.length == 0) {
-      return Collections.emptyList();
-    }
-    List<File> fileList = Arrays.asList(files);
-    Collections.sort(fileList);
-    return fileList;
+    return result;
   }
 }

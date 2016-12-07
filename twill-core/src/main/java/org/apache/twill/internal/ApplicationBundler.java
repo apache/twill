@@ -26,7 +26,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
-import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 import org.apache.twill.api.ClassAcceptor;
 import org.apache.twill.filesystem.Location;
@@ -58,37 +57,17 @@ public final class ApplicationBundler {
 
   private static final Logger LOG = LoggerFactory.getLogger(ApplicationBundler.class);
 
-  public static final String SUBDIR_CLASSES = "classes/";
-  public static final String SUBDIR_LIB = "lib/";
-  public static final String SUBDIR_RESOURCES = "resources/";
-
   private final ClassAcceptor classAcceptor;
   private final Set<String> bootstrapClassPaths;
   private final CRC32 crc32;
 
-  /**
-   * Constructs a ApplicationBundler.
-   *
-   * @param classAcceptor ClassAcceptor for class packages to include
-   */
-  public ApplicationBundler(ClassAcceptor classAcceptor) {
-    this.classAcceptor = classAcceptor;
-    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-    for (String classpath : Splitter.on(File.pathSeparatorChar).split(System.getProperty("sun.boot.class.path"))) {
-      File file = new File(classpath);
-      builder.add(file.getAbsolutePath());
-      try {
-        builder.add(file.getCanonicalPath());
-      } catch (IOException e) {
-        // Ignore the exception and proceed.
-      }
-    }
-    this.bootstrapClassPaths = builder.build();
-    this.crc32 = new CRC32();
-  }
+  private File tempDir;
+  private String classesDir;
+  private String libDir;
+  private String resourcesDir;
 
   /**
-   * Constructs a ApplicationBundler.
+   * Constructs an ApplicationBundler.
    *
    * @param excludePackages Class packages to exclude
    */
@@ -97,7 +76,7 @@ public final class ApplicationBundler {
   }
 
   /**
-   * Constructs a ApplicationBundler.
+   * Constructs an ApplicationBundler.
    *
    * @param excludePackages Class packages to exclude
    * @param includePackages Class packages that should be included. Anything in this list will override the
@@ -122,6 +101,82 @@ public final class ApplicationBundler {
     });
   }
 
+  /**
+   * Constructs an ApplicationBundler.
+   *
+   * @param classAcceptor ClassAcceptor for class packages to include
+   */
+  public ApplicationBundler(ClassAcceptor classAcceptor) {
+    this.classAcceptor = classAcceptor;
+    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+    for (String classpath : Splitter.on(File.pathSeparatorChar).split(System.getProperty("sun.boot.class.path"))) {
+      File file = new File(classpath);
+      builder.add(file.getAbsolutePath());
+      try {
+        builder.add(file.getCanonicalPath());
+      } catch (IOException e) {
+        // Ignore the exception and proceed.
+      }
+    }
+    this.bootstrapClassPaths = builder.build();
+    this.crc32 = new CRC32();
+    this.tempDir = new File(System.getProperty("java.io.tmpdir"));
+    this.classesDir = "classes/";
+    this.libDir = "lib/";
+    this.resourcesDir = "resources/";
+  }
+
+  /**
+   * Sets the temporary directory used by this class when generating new jars.
+   * By default it is using the {@code java.io.tmpdir} property.
+   */
+  public ApplicationBundler setTempDir(File tempDir) {
+    if (tempDir == null) {
+      throw new IllegalArgumentException("Temporary directory cannot be null");
+    }
+    this.tempDir = tempDir;
+    return this;
+  }
+
+  /**
+   * Sets the name of the directory inside the bundle jar that all ".class" files stored in.
+   * Passing in an empty string will store files at the root level inside the jar file.
+   * By default it is "classes".
+   */
+  public ApplicationBundler setClassesDir(String classesDir) {
+    if (classesDir == null) {
+      throw new IllegalArgumentException("Directory cannot be null");
+    }
+    this.classesDir = classesDir.endsWith("/") ? classesDir : classesDir + "/";
+    return this;
+  }
+
+  /**
+   * Sets the name of the directory inside the bundle jar that all ".jar" files stored in.
+   * Passing in an empty string will store files at the root level inside the jar file.
+   * By default it is "lib".
+   */
+  public ApplicationBundler setLibDir(String libDir) {
+    if (classesDir == null) {
+      throw new IllegalArgumentException("Directory cannot be null");
+    }
+    this.libDir = libDir.endsWith("/") ? libDir : libDir + "/";
+    return this;
+  }
+
+  /**
+   * Sets the name of the directory inside the bundle jar that all resource files stored in.
+   * Passing in an empty string will store files at the root level inside the jar file.
+   * By default it is "resources".
+   */
+  public ApplicationBundler setResourcesDir(String resourcesDir) {
+    if (classesDir == null) {
+      throw new IllegalArgumentException("Directory cannot be null");
+    }
+    this.resourcesDir = resourcesDir.endsWith("/") ? resourcesDir : resourcesDir + "/";
+    return this;
+  }
+
   public void createBundle(Location target, Iterable<Class<?>> classes) throws IOException {
     createBundle(target, classes, ImmutableList.<URI>of());
   }
@@ -142,12 +197,13 @@ public final class ApplicationBundler {
    * @param resources Extra resources to put into the jar file. If resource is a jar file, it'll be put under
    *                  lib/ entry, otherwise under the resources/ entry.
    * @param classes Set of classes to start the dependency traversal.
-   * @throws IOException
+   * @throws IOException if failed to create the bundle
    */
   public void createBundle(Location target, Iterable<Class<?>> classes, Iterable<URI> resources) throws IOException {
-    LOG.debug("start creating bundle {}. building a temporary file locally at first", target.getName());
+    LOG.debug("Start creating bundle at {}", target);
     // Write the jar to local tmp file first
-    File tmpJar = File.createTempFile(target.getName(), ".tmp");
+    File tmpJar = File.createTempFile(target.getName(), ".tmp", tempDir);
+    LOG.debug("First create bundle locally at {}", tmpJar);
     try {
       Set<String> entries = Sets.newHashSet();
       try (JarOutputStream jarOut = new JarOutputStream(new FileOutputStream(tmpJar))) {
@@ -159,22 +215,20 @@ public final class ApplicationBundler {
           copyResource(resource, entries, jarOut);
         }
       }
-      LOG.debug("copying temporary bundle to destination {} ({} bytes)", target, tmpJar.length());
+      LOG.debug("Copying temporary bundle to destination {} ({} bytes)", target, tmpJar.length());
       // Copy the tmp jar into destination.
-      try {
-        OutputStream os = new BufferedOutputStream(target.getOutputStream());
-        try {
-          Files.copy(tmpJar, os);
-        } finally {
-          Closeables.closeQuietly(os);
-        }
+      try (OutputStream os = new BufferedOutputStream(target.getOutputStream())) {
+        Files.copy(tmpJar, os);
       } catch (IOException e) {
-        throw new IOException("failed to copy bundle from " + tmpJar.toURI() + " to " + target, e);
+        throw new IOException("Failed to copy bundle from " + tmpJar + " to " + target, e);
       }
-      LOG.debug("finished creating bundle at {}", target);
+      LOG.debug("Finished creating bundle at {}", target);
     } finally {
-      tmpJar.delete();
-      LOG.debug("cleaned up local temporary for bundle {}", tmpJar.toURI());
+      if (!tmpJar.delete()) {
+        LOG.warn("Failed to cleanup local temporary file {}", tmpJar);
+      } else {
+        LOG.debug("Cleaned up local temporary file {}", tmpJar);
+      }
     }
   }
 
@@ -219,29 +273,29 @@ public final class ApplicationBundler {
       /* need unique name or else we lose classes (TWILL-181) we know the classPath is unique because it is
        * coming from a set, preserve as much as possible of it by prepending elements of the path until it is
        * unique. */
-      if (entries.contains(SUBDIR_LIB + entryName)) {
+      if (entries.contains(libDir + entryName)) {
         String[] parts = classPath.split("/");
         for (int i = parts.length - 2; i >= 0; i--) {
           entryName = parts[i] + "-" + entryName;
-          if (!entries.contains(SUBDIR_LIB + entryName)) {
+          if (!entries.contains(libDir + entryName)) {
             break;
           }
         }
       }
-      saveDirEntry(SUBDIR_LIB, entries, jarOut);
-      saveEntry(SUBDIR_LIB + entryName, classPathUrl, entries, jarOut, false);
+      saveDirEntry(libDir, entries, jarOut);
+      saveEntry(libDir + entryName, classPathUrl, entries, jarOut, false);
     } else {
       // Class file, put it under the classes directory
-      saveDirEntry(SUBDIR_CLASSES, entries, jarOut);
+      saveDirEntry(classesDir, entries, jarOut);
       if ("file".equals(classPathUrl.getProtocol())) {
         // Copy every files under the classPath
         try {
-          copyDir(new File(classPathUrl.toURI()), SUBDIR_CLASSES, entries, jarOut);
+          copyDir(new File(classPathUrl.toURI()), classesDir, entries, jarOut);
         } catch (Exception e) {
           throw Throwables.propagate(e);
         }
       } else {
-        String entry = SUBDIR_CLASSES + className.replace('.', '/') + ".class";
+        String entry = classesDir + className.replace('.', '/') + ".class";
         saveDirEntry(entry.substring(0, entry.lastIndexOf('/') + 1), entries, jarOut);
         saveEntry(entry, classUrl, entries, jarOut, true);
       }
@@ -349,15 +403,15 @@ public final class ApplicationBundler {
     if ("file".equals(resource.getScheme())) {
       File file = new File(resource);
       if (file.isDirectory()) {
-        saveDirEntry(SUBDIR_RESOURCES, entries, jarOut);
-        copyDir(file, SUBDIR_RESOURCES, entries, jarOut);
+        saveDirEntry(resourcesDir, entries, jarOut);
+        copyDir(file, resourcesDir, entries, jarOut);
         return;
       }
     }
 
     URL url = resource.toURL();
     String path = url.getFile();
-    String prefix = path.endsWith(".jar") ? SUBDIR_LIB : SUBDIR_RESOURCES;
+    String prefix = path.endsWith(".jar") ? libDir : resourcesDir;
     path = prefix + path.substring(path.lastIndexOf('/') + 1);
 
     if (entries.add(path)) {
@@ -371,7 +425,7 @@ public final class ApplicationBundler {
 
   private static final class TransferByteOutputStream extends ByteArrayOutputStream {
 
-    public void transfer(OutputStream os) throws IOException {
+    void transfer(OutputStream os) throws IOException {
       os.write(buf, 0, count);
     }
   }
