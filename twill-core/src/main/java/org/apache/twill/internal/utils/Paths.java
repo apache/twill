@@ -17,15 +17,25 @@
  */
 package org.apache.twill.internal.utils;
 
-import com.google.common.io.Files;
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 
 /**
- *
+ * A utility class for manipulating paths.
  */
 public final class Paths {
 
-
-  public static String appendSuffix(String extractFrom, String appendTo) {
+  /**
+   * Returns a new path by appending an extension.
+   *
+   * @param extractFrom the path to extract the extension from
+   * @param appendTo the path to append the extension to
+   */
+  public static String addExtension(String extractFrom, String appendTo) {
     String suffix = getExtension(extractFrom);
     if (!suffix.isEmpty()) {
       return appendTo + '.' + suffix;
@@ -33,12 +43,37 @@ public final class Paths {
     return appendTo;
   }
 
+  /**
+   * Returns the file extension of the given file path. The file extension is defined by the suffix after the last
+   * dot character {@code .}. If there is no dot, an empty string will be returned.
+   */
   public static String getExtension(String path) {
     if (path.endsWith(".tar.gz")) {
       return "tar.gz";
     }
 
-    return Files.getFileExtension(path);
+    int idx = path.lastIndexOf('.');
+    return (idx >= 0) ? path.substring(idx + 1) : "";
+  }
+
+  /**
+   * Deletes the given path. If the path represents a directory, the content of it will be emptied recursively,
+   * followed by the removal of the directory itself.
+   */
+  public static void deleteRecursively(Path path) throws IOException {
+    Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+      @Override
+      public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+        Files.delete(file);
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override
+      public FileVisitResult postVisitDirectory(Path dir, IOException ex) throws IOException {
+        Files.delete(dir);
+        return FileVisitResult.CONTINUE;
+      }
+    });
   }
 
   private Paths() {

@@ -70,13 +70,13 @@ public final class TwillContainerMain extends ServiceMain {
    * a {@link org.apache.twill.api.TwillRunnable}.
    */
   public static void main(String[] args) throws Exception {
-    new TwillContainerMain().doMain(args);
+    new TwillContainerMain().doMain();
   }
 
-  private void doMain(String[] args) throws Exception {
+  private void doMain() throws Exception {
     // Try to load the secure store from localized file, which AM requested RM to localize it for this container.
     loadSecureStore();
-    File twillSpecFile = new File(Constants.Files.TWILL_SPEC);
+    File twillSpecFile = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.TWILL_SPEC);
     TwillRuntimeSpecification twillRuntimeSpec = loadTwillSpec(twillSpecFile);
     String zkConnectStr = twillRuntimeSpec.getZkConnectStr();
     RunId appRunId = twillRuntimeSpec.getTwillAppRunId();
@@ -183,7 +183,8 @@ public final class TwillContainerMain extends ServiceMain {
   }
 
   private static Arguments decodeArgs() throws IOException {
-    return ArgumentsCodec.decode(Files.newReaderSupplier(new File(Constants.Files.ARGUMENTS), Charsets.UTF_8));
+    return ArgumentsCodec.decode(
+      Files.newReaderSupplier(new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.ARGUMENTS), Charsets.UTF_8));
   }
 
   @Override

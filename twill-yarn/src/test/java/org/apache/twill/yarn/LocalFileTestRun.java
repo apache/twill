@@ -19,7 +19,6 @@ package org.apache.twill.yarn;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
-import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import com.google.common.io.LineReader;
 import org.apache.twill.api.TwillApplication;
@@ -36,12 +35,13 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -53,15 +53,23 @@ public final class LocalFileTestRun extends BaseYarnTest {
 
   @Test
   public void testLocalFile() throws Exception {
-    String header = Files.readFirstLine(new File(getClass().getClassLoader().getResource("header.txt").toURI()),
-                                        Charsets.UTF_8);
+    // Generate a header and a footer files.
+    File headerFile = tmpFolder.newFile("header.txt");
+    File footerFile = tmpFolder.newFile("footer.txt");
+
+    String headerMsg = "Header Message";
+    String footerMsg = "Footer Message";
+
+    Files.write(headerMsg, headerFile, StandardCharsets.UTF_8);
+    Files.write(footerMsg, footerFile, StandardCharsets.UTF_8);
 
     TwillRunner runner = getTwillRunner();
 
-    TwillController controller = runner.prepare(new LocalFileApplication())
+    TwillController controller = runner.prepare(new LocalFileApplication(headerFile))
       .addJVMOptions(" -verbose:gc -Xloggc:gc.log -XX:+PrintGCDetails")
       .withApplicationArguments("local")
       .withArguments("LocalFileSocketServer", "local2")
+      .withResources(footerFile.toURI())
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
 
@@ -75,8 +83,9 @@ public final class LocalFileTestRun extends BaseYarnTest {
 
       String msg = "Local file test";
       writer.println(msg);
-      Assert.assertEquals(header, reader.readLine());
+      Assert.assertEquals(headerMsg, reader.readLine());
       Assert.assertEquals(msg, reader.readLine());
+      Assert.assertEquals(footerMsg, reader.readLine());
     }
 
     controller.terminate().get(120, TimeUnit.SECONDS);
@@ -91,14 +100,14 @@ public final class LocalFileTestRun extends BaseYarnTest {
    */
   public static final class LocalFileApplication implements TwillApplication {
 
-    private final File headerFile;
+    private final File headerJar;
 
-    public LocalFileApplication() throws Exception {
+    public LocalFileApplication(File headerFile) throws Exception {
       // Create a jar file that contains the header.txt file inside.
-      headerFile = tmpFolder.newFile("header.jar");
-      try (JarOutputStream os = new JarOutputStream(new FileOutputStream(headerFile))) {
-        os.putNextEntry(new JarEntry("header.txt"));
-        ByteStreams.copy(getClass().getClassLoader().getResourceAsStream("header.txt"), os);
+      headerJar = tmpFolder.newFile("header.jar");
+      try (JarOutputStream os = new JarOutputStream(new FileOutputStream(headerJar))) {
+        os.putNextEntry(new JarEntry(headerFile.getName()));
+        Files.copy(headerFile, os);
       }
     }
 
@@ -109,7 +118,7 @@ public final class LocalFileTestRun extends BaseYarnTest {
         .withRunnable()
           .add(new LocalFileSocketServer())
             .withLocalFiles()
-              .add("header", headerFile, true).apply()
+              .add("header", headerJar, true).apply()
         .anyOrder()
         .build();
     }
@@ -123,14 +132,21 @@ public final class LocalFileTestRun extends BaseYarnTest {
     private static final Logger LOG = LoggerFactory.getLogger(LocalFileSocketServer.class);
 
     @Override
-    public void handleRequest(BufferedReader reader, PrintWriter writer) throws IOException {
+    public void handleRequest(BufferedReader reader, PrintWriter writer) throws Exception {
       // Verify there is a gc.log file locally
       Preconditions.checkState(new File("gc.log").exists());
 
+      // Get the footer file from classloader. Since it was added as resources as well, it should be loadable from CL.
+      URL footerURL = getClass().getClassLoader().getResource("footer.txt");
+      Preconditions.checkState(footerURL != null, "Missing footer.txt file from classloader");
+
       LOG.info("handleRequest");
-      String header = Files.toString(new File("header/header.txt"), Charsets.UTF_8);
-      writer.write(header);
+      // Read from the localized file
+      writer.println(Files.readFirstLine(new File("header/header.txt"), Charsets.UTF_8));
+      // Read from the request
       writer.println(reader.readLine());
+      // Read from resource
+      writer.println(Files.readFirstLine(new File(footerURL.toURI()), Charsets.UTF_8));
       LOG.info("Flushed response");
     }
   }

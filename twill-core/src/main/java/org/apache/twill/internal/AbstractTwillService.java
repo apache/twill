@@ -127,6 +127,13 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
   }
 
   /**
+   * Returns a {@link Gson} instance for serializing object returned by the {@link #getLiveNodeData()} method.
+   */
+  protected Gson getLiveNodeGson() {
+    return GSON;
+  }
+
+  /**
    * Handles message by simply logging it. Child class should override this method for custom handling of message.
    *
    * @see org.apache.twill.internal.state.MessageCallback
@@ -204,16 +211,16 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
    * @return A {@link OperationFuture} that will be completed when the update is done.
    */
   protected final OperationFuture<?> updateLiveNode() {
-    String liveNode = getLiveNodePath();
-    LOG.info("Update live node {}{}", zkClient.getConnectString(), liveNode);
-    return zkClient.setData(liveNode, toJson(getLiveNodeJsonObject()));
+    String liveNodePath = getLiveNodePath();
+    LOG.info("Update live node {}{}", zkClient.getConnectString(), liveNodePath);
+    return zkClient.setData(liveNodePath, serializeLiveNode());
   }
 
   private OperationFuture<String> createLiveNode() {
-    String liveNode = getLiveNodePath();
-    LOG.info("Create live node {}{}", zkClient.getConnectString(), liveNode);
-    return ZKOperations.ignoreError(zkClient.create(liveNode, toJson(getLiveNodeJsonObject()), CreateMode.EPHEMERAL),
-                                    KeeperException.NodeExistsException.class, liveNode);
+    String liveNodePath = getLiveNodePath();
+    LOG.info("Create live node {}{}", zkClient.getConnectString(), liveNodePath);
+    return ZKOperations.ignoreError(zkClient.create(liveNodePath, serializeLiveNode(), CreateMode.EPHEMERAL),
+                                    KeeperException.NodeExistsException.class, liveNodePath);
   }
 
   private OperationFuture<String> removeLiveNode() {
@@ -374,16 +381,12 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
     return String.format("%s/%s", Constants.INSTANCES_PATH_PREFIX, runId.getId());
   }
 
-  private JsonObject getLiveNodeJsonObject() {
+  private byte[] serializeLiveNode() {
     JsonObject content = new JsonObject();
     Object liveNodeData = getLiveNodeData();
     if (liveNodeData != null) {
-      content.add("data", GSON.toJsonTree(liveNodeData));
+      content.add("data", getLiveNodeGson().toJsonTree(liveNodeData));
     }
-    return content;
-  }
-
-  private <T> byte[] toJson(T obj) {
-    return GSON.toJson(obj).getBytes(Charsets.UTF_8);
+    return GSON.toJson(content).getBytes(Charsets.UTF_8);
   }
 }
