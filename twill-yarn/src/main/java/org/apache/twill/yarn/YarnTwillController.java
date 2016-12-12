@@ -98,7 +98,7 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
       YarnApplicationReport report = processController.getReport();
       ApplicationId appId = report.getApplicationId();
-      LOG.debug("Application {} with id {} submitted", appName, appId);
+      LOG.info("Application {} with id {} submitted", appName, appId);
 
       YarnApplicationState state = report.getYarnApplicationState();
       Stopwatch stopWatch = new Stopwatch();
