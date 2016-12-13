@@ -45,7 +45,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
@@ -113,45 +115,22 @@ public final class TwillContainerService extends AbstractYarnTwillService {
     }
 
     String commandStr = command.getCommand();
-    if (message.getType() == Message.Type.SYSTEM &&
-      (SystemMessages.LOG_LEVEL.equals(commandStr) || SystemMessages.RESET_LOG_LEVEL.equals(commandStr))) {
-      if (SystemMessages.RESET_LOG_LEVEL.equals(commandStr)) {
-        Map<String, String> loggerNames = command.getOptions();
-        // Reset
-        for (Map.Entry<String, String> entry : oldLogLevels.entrySet()) {
-          String loggerName = entry.getKey();
-          // logger name is empty if we are resetting all loggers.
-          if (loggerNames.isEmpty() || loggerNames.containsKey(loggerName)) {
-            String oldLogLevel = entry.getValue();
-
-            setLogLevel(loggerName, oldLogLevel);
-            if (oldLogLevel == null || !defaultLogLevels.containsKey(loggerName)) {
-              containerLiveNodeData.removeLogLevel(loggerName);
-              oldLogLevels.remove(loggerName);
-            } else {
-              containerLiveNodeData.setLogLevel(loggerName, oldLogLevel);
-            }
-          }
-        }
-      } else {
-        // Set log levels
-        for (Map.Entry<String, String> entry : command.getOptions().entrySet()) {
-          String loggerName = entry.getKey();
-          String logLevel = entry.getValue();
-
-          // Setting the log level in logging system as well as in the container live node
-          String oldLogLevel = setLogLevel(loggerName, logLevel);
-          containerLiveNodeData.setLogLevel(loggerName, logLevel);
-
-          if (!oldLogLevels.containsKey(loggerName)) {
-            String defaultLogLevel = defaultLogLevels.get(loggerName);
-            oldLogLevels.put(loggerName, defaultLogLevel == null ? oldLogLevel : defaultLogLevel);
-          }
-        }
+    if (message.getType() == Message.Type.SYSTEM) {
+      boolean handled = false;
+      if (SystemMessages.SET_LOG_LEVEL.equals(commandStr)) {
+        // The options is a map from logger name to log level.
+        setLogLevels(command.getOptions());
+        handled = true;
+      } else if (SystemMessages.RESET_LOG_LEVEL.equals(commandStr)) {
+        // The options is a set of loggers to reset in the form of loggerName -> loggerName map.
+        resetLogLevels(command.getOptions().keySet());
+        handled = true;
       }
 
-      updateLiveNode();
-      return Futures.immediateFuture(messageId);
+      if (handled) {
+        updateLiveNode();
+        return Futures.immediateFuture(messageId);
+      }
     }
 
     commandExecutor.execute(new Runnable() {
@@ -167,6 +146,52 @@ public final class TwillContainerService extends AbstractYarnTwillService {
       }
     });
     return result;
+  }
+
+  /**
+   * Sets the log levels for the given set of loggers.
+   *
+   * @param logLevels a map from logger name to log level to be set
+   */
+  private void setLogLevels(Map<String, String> logLevels) {
+    for (Map.Entry<String, String> entry : logLevels.entrySet()) {
+      String loggerName = entry.getKey();
+      String logLevel = entry.getValue();
+
+      // Setting the log level in logging system as well as in the container live node
+      String oldLogLevel = setLogLevel(loggerName, logLevel);
+      containerLiveNodeData.setLogLevel(loggerName, logLevel);
+
+      if (!oldLogLevels.containsKey(loggerName)) {
+        String defaultLogLevel = defaultLogLevels.get(loggerName);
+        oldLogLevels.put(loggerName, defaultLogLevel == null ? oldLogLevel : defaultLogLevel);
+      }
+    }
+  }
+
+  /**
+   * Resets the log levels for the given set of loggers. If the set is empty, reset all loggers that have been set
+   * before.
+   */
+  private void resetLogLevels(Set<String> loggerNames) {
+    Iterator<Map.Entry<String, String>> entryIterator = oldLogLevels.entrySet().iterator();
+    while (entryIterator.hasNext()) {
+      Map.Entry<String, String> entry = entryIterator.next();
+
+      String loggerName = entry.getKey();
+      // logger name is empty if we are resetting all loggers.
+      if (loggerNames.isEmpty() || loggerNames.contains(loggerName)) {
+        String oldLogLevel = entry.getValue();
+
+        setLogLevel(loggerName, oldLogLevel);
+        if (oldLogLevel == null || !defaultLogLevels.containsKey(loggerName)) {
+          containerLiveNodeData.removeLogLevel(loggerName);
+          entryIterator.remove();
+        } else {
+          containerLiveNodeData.setLogLevel(loggerName, oldLogLevel);
+        }
+      }
+    }
   }
 
   @SuppressWarnings("unchecked")

@@ -599,7 +599,7 @@ final class RunningContainers {
 
   private void checkAndUpdateLogLevels(Message message, String runnableName) {
     String command = message.getCommand().getCommand();
-    if (message.getType() != Message.Type.SYSTEM || (!SystemMessages.LOG_LEVEL.equals(command) &&
+    if (message.getType() != Message.Type.SYSTEM || (!SystemMessages.SET_LOG_LEVEL.equals(command) &&
       !SystemMessages.RESET_LOG_LEVEL.equals(command))) {
       return;
     }
