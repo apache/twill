@@ -225,12 +225,13 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
 
     // change the log level of LogLevelTestSecondRunnable to DEBUG and change instances of it to test if the log level
     // request get applied to container started up later
-    logLevelSecondRunnable = ImmutableMap.of(Logger.ROOT_LOGGER_NAME, LogEntry.Level.DEBUG);
+    logLevelSecondRunnable = ImmutableMap.of(Logger.ROOT_LOGGER_NAME, LogEntry.Level.DEBUG, "test",
+                                             LogEntry.Level.WARN);
     controller.updateLogLevels(LogLevelTestSecondRunnable.class.getSimpleName(), logLevelSecondRunnable).get();
     controller.changeInstances(LogLevelTestSecondRunnable.class.getSimpleName(), 2).get();
     TimeUnit.SECONDS.sleep(5);
-    waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG));
+    waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(), 20L, TimeUnit.SECONDS,
+                    LogEntry.Level.DEBUG, logLevelSecondRunnable);
 
     // reset the log levels back to default.
     controller.resetLogLevels().get();
