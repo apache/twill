@@ -127,6 +127,7 @@ public final class TwillContainerService extends AbstractYarnTwillService {
             setLogLevel(loggerName, oldLogLevel);
             if (oldLogLevel == null || !defaultLogLevels.containsKey(loggerName)) {
               containerLiveNodeData.removeLogLevel(loggerName);
+              oldLogLevels.remove(loggerName);
             } else {
               containerLiveNodeData.setLogLevel(loggerName, oldLogLevel);
             }
@@ -150,6 +151,7 @@ public final class TwillContainerService extends AbstractYarnTwillService {
       }
 
       updateLiveNode();
+      return Futures.immediateFuture(messageId);
     }
 
     commandExecutor.execute(new Runnable() {
@@ -171,7 +173,11 @@ public final class TwillContainerService extends AbstractYarnTwillService {
   @Override
   protected void doStart() throws Exception {
     for (Map.Entry<String, String> entry : containerLiveNodeData.getLogLevels().entrySet()) {
-      setLogLevel(entry.getKey(), entry.getValue());
+      String loggerName = entry.getKey();
+      String oldLogLevel = setLogLevel(loggerName, entry.getValue());
+      if (!defaultLogLevels.containsKey(loggerName)) {
+        oldLogLevels.put(loggerName, oldLogLevel);
+      }
     }
 
     commandExecutor = Executors.newSingleThreadExecutor(
