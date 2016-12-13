@@ -970,7 +970,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     }
 
     String command = message.getCommand().getCommand();
-    if (!command.equals(SystemMessages.LOG_LEVEL) && !command.equals(SystemMessages.RESET_LOG_LEVEL)) {
+    if (!command.equals(SystemMessages.SET_LOG_LEVEL) && !command.equals(SystemMessages.RESET_LOG_LEVEL)) {
       return false;
     }
 

@@ -33,7 +33,7 @@ import javax.annotation.Nullable;
  */
 public final class SystemMessages {
 
-  public static final String LOG_LEVEL = "logLevels";
+  public static final String SET_LOG_LEVEL = "setLogLevels";
   public static final String RESET_LOG_LEVEL = "resetLogLevels";
   public static final Command STOP_COMMAND = Command.Builder.of("stop").build();
   public static final Message SECURE_STORE_UPDATED = new SimpleMessage(
@@ -101,7 +101,7 @@ public final class SystemMessages {
     Map<String, String> options = convertLogEntryToString(logLevels);
     return new SimpleMessage(Message.Type.SYSTEM,
                              runnableName == null ? Message.Scope.ALL_RUNNABLE : Message.Scope.RUNNABLE,
-                             runnableName, Command.Builder.of(LOG_LEVEL).addOptions(options).build());
+                             runnableName, Command.Builder.of(SET_LOG_LEVEL).addOptions(options).build());
   }
 
   /**
