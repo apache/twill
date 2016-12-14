@@ -102,9 +102,6 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     public void run() {
       this.runThread = Thread.currentThread();
 
-      // check if the initial log level is DEBUG
-      Assert.assertTrue(LOG.isDebugEnabled() && !LOG.isTraceEnabled());
-
       int i = 0;
       while (!Thread.interrupted()) {
         if (i == 0 && !LOG.isDebugEnabled()) {
@@ -223,15 +220,15 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
                     20L, TimeUnit.SECONDS, LogEntry.Level.WARN, result);
 
-    // change the log level of LogLevelTestSecondRunnable to DEBUG and change instances of it to test if the log level
+    // change the log level of LogLevelTestSecondRunnable to INFO and change instances of it to test if the log level
     // request get applied to container started up later
-    logLevelSecondRunnable = ImmutableMap.of(Logger.ROOT_LOGGER_NAME, LogEntry.Level.DEBUG, "test",
+    logLevelSecondRunnable = ImmutableMap.of(Logger.ROOT_LOGGER_NAME, LogEntry.Level.INFO, "test",
                                              LogEntry.Level.WARN);
     controller.updateLogLevels(LogLevelTestSecondRunnable.class.getSimpleName(), logLevelSecondRunnable).get();
     controller.changeInstances(LogLevelTestSecondRunnable.class.getSimpleName(), 2).get();
     TimeUnit.SECONDS.sleep(5);
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(), 20L, TimeUnit.SECONDS,
-                    LogEntry.Level.DEBUG, logLevelSecondRunnable);
+                    LogEntry.Level.INFO, logLevelSecondRunnable);
 
     // reset the log levels back to default.
     controller.resetLogLevels().get();

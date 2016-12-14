@@ -65,8 +65,6 @@ public final class TwillContainerMain extends ServiceMain {
 
   private static final Logger LOG = LoggerFactory.getLogger(TwillContainerMain.class);
 
-  private final Map<String, String> logLevels = new HashMap<>();
-
   /**
    * Main method for launching a {@link TwillContainerService} which runs
    * a {@link org.apache.twill.api.TwillRunnable}.
@@ -89,6 +87,7 @@ public final class TwillContainerMain extends ServiceMain {
     Map<String, String> defaultLogLevels = twillRuntimeSpec.getLogLevels().get(runnableName);
     Map<String, String> dynamicLogLevels = loadLogLevels().get(runnableName);
 
+    Map<String, String> logLevels = new HashMap<>();
     logLevels.putAll(defaultLogLevels);
     if (dynamicLogLevels != null) {
       logLevels.putAll(dynamicLogLevels);
@@ -98,7 +97,7 @@ public final class TwillContainerMain extends ServiceMain {
     ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
     ZKClient appRunZkClient = getAppRunZKClient(zkClientService, appRunId);
-    
+
     TwillRunnableSpecification runnableSpec =
       twillRuntimeSpec.getTwillSpecification().getRunnables().get(runnableName).getRunnableSpecification();
     ContainerInfo containerInfo = new EnvContainerInfo();
@@ -125,12 +124,6 @@ public final class TwillContainerMain extends ServiceMain {
       new TwillZKPathService(containerZKClient, runId),
       new CloseableServiceWrapper(discoveryService)
     );
-  }
-
-  @Override
-  protected String getLoggerLevel(Logger logger) {
-    String logLevel = logLevels.get(Logger.ROOT_LOGGER_NAME);
-    return logLevel == null ? super.getLoggerLevel(logger) : logLevel;
   }
 
   private static void loadSecureStore() throws IOException {
