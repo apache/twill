@@ -19,6 +19,8 @@ package org.apache.twill.api;
 
 import org.apache.twill.api.logging.LogEntry;
 
+import java.util.Map;
+
 /**
  * Information about the container the {@link TwillRunnable}
  * is running in.
@@ -58,7 +60,13 @@ public interface TwillRunResources {
 
   /**
    * @return the enabled log level for the container where the runnable is running in.
+   * @deprecated Use {@link #getLogLevels()} to get the log levels map and get root level from the map instead.
    */
+  @Deprecated
   LogEntry.Level getLogLevel();
 
+  /**
+   * @return the enabled log level arguments for the container where the runnable is running in.
+   */
+  Map<String, LogEntry.Level> getLogLevels();
 }

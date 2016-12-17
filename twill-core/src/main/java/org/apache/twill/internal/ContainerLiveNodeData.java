@@ -17,19 +17,25 @@
  */
 package org.apache.twill.internal;
 
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
+
 /**
  *
  */
 public final class ContainerLiveNodeData {
-
   private final String containerId;
   private final String host;
   private final String debugPort;
+  private final Map<String, String> logLevels;
 
-  public ContainerLiveNodeData(String containerId, String host, String debugPort) {
+  public ContainerLiveNodeData(String containerId, String host, String debugPort,
+                               Map<String, String> logLevels) {
     this.containerId = containerId;
     this.host = host;
     this.debugPort = debugPort;
+    this.logLevels = new HashMap<>(logLevels);
   }
 
   public String getContainerId() {
@@ -42,5 +48,17 @@ public final class ContainerLiveNodeData {
 
   public String getDebugPort() {
     return debugPort;
+  }
+
+  public Map<String, String> getLogLevels() {
+    return logLevels;
+  }
+
+  public void setLogLevel(String loggerName, @Nullable String logLevel) {
+    logLevels.put(loggerName, logLevel);
+  }
+
+  public void removeLogLevel(String loggerName) {
+    logLevels.remove(loggerName);
   }
 }

@@ -26,12 +26,12 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillRuntimeSpecification;
 
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.util.Map;
 
 /**
  * Codec for serializing and deserializing a {@link TwillRuntimeSpecification} object using json.
@@ -46,8 +46,8 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   private static final String TWILL_APP_NAME = "twillAppName";
   private static final String RESERVED_MEMORY = "reservedMemory";
   private static final String RM_SCHEDULER_ADDR = "rmSchedulerAddr";
-  private static final String LOG_LEVEL = "logLevel";
   private static final String TWILL_SPEC = "twillSpecification";
+  private static final String LOG_LEVELS = "logLevels";
 
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
@@ -55,17 +55,16 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     json.addProperty(FS_USER, src.getFsUser());
     json.addProperty(TWILL_APP_DIR, src.getTwillAppDir().toASCIIString());
     json.addProperty(ZK_CONNECT_STR, src.getZkConnectStr());
-    json.addProperty(TWILL_RUNID, src.getTwillRunId().getId());
+    json.addProperty(TWILL_RUNID, src.getTwillAppRunId().getId());
     json.addProperty(TWILL_APP_NAME, src.getTwillAppName());
     json.addProperty(RESERVED_MEMORY, src.getReservedMemory());
     if (src.getRmSchedulerAddr() != null) {
       json.addProperty(RM_SCHEDULER_ADDR, src.getRmSchedulerAddr());
     }
-    if (src.getLogLevel() != null) {
-      json.addProperty(LOG_LEVEL, src.getLogLevel().name());
-    }
-    json.add(TWILL_SPEC, context.serialize(src.getTwillSpecification(),
-                                           new TypeToken<TwillSpecification>() { }.getType()));
+    json.add(TWILL_SPEC,
+             context.serialize(src.getTwillSpecification(), new TypeToken<TwillSpecification>() { }.getType()));
+    json.add(LOG_LEVELS,
+             context.serialize(src.getLogLevels(), new TypeToken<Map<String, Map<String, String>>>() { }.getType()));
     return json;
   }
 
@@ -76,6 +75,8 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
 
     TwillSpecification twillSpecification = context.deserialize(
       jsonObj.get(TWILL_SPEC), new TypeToken<TwillSpecification>() { }.getType());
+    Map<String, Map<String, String>> logLevels =
+      context.deserialize(jsonObj.get(LOG_LEVELS), new TypeToken<Map<String, Map<String, String>>>() { }.getType());
     return new TwillRuntimeSpecification(twillSpecification,
                                          jsonObj.get(FS_USER).getAsString(),
                                          URI.create(jsonObj.get(TWILL_APP_DIR).getAsString()),
@@ -84,8 +85,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                          jsonObj.get(TWILL_APP_NAME).getAsString(),
                                          jsonObj.get(RESERVED_MEMORY).getAsInt(),
                                          jsonObj.has(RM_SCHEDULER_ADDR) ?
-                                                  jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
-                                         jsonObj.has(LOG_LEVEL) ?
-                                           LogEntry.Level.valueOf(jsonObj.get(LOG_LEVEL).getAsString()) : null);
+                                           jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
+                                         logLevels);
   }
 }

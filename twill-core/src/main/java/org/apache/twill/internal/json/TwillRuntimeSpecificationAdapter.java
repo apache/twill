@@ -46,6 +46,7 @@ import java.io.Writer;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  *
@@ -108,6 +109,7 @@ public final class TwillRuntimeSpecificationAdapter {
 
     @SuppressWarnings("unchecked")
     @Override
+    @Nullable
     public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
       Class<?> rawType = type.getRawType();
       if (!Map.class.isAssignableFrom(rawType)) {
@@ -141,6 +143,7 @@ public final class TwillRuntimeSpecificationAdapter {
         }
 
         @Override
+        @Nullable
         public Map<String, V> read(JsonReader reader) throws IOException {
           if (reader.peek() == JsonToken.NULL) {
             reader.nextNull();

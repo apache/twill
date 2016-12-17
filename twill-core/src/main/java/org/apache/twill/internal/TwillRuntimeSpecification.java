@@ -20,9 +20,9 @@ package org.apache.twill.internal;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.api.logging.LogEntry;
 
 import java.net.URI;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
@@ -39,12 +39,12 @@ public class TwillRuntimeSpecification {
   private final String twillAppName;
   private final int reservedMemory;
   private final String rmSchedulerAddr;
-  private final LogEntry.Level logLevel;
+  private final Map<String, Map<String, String>> logLevels;
 
   public TwillRuntimeSpecification(TwillSpecification twillSpecification, String fsUser, URI twillAppDir,
                                    String zkConnectStr, RunId twillRunId, String twillAppName,
                                    int reservedMemory, @Nullable String rmSchedulerAddr,
-                                   @Nullable LogEntry.Level logLevel) {
+                                   Map<String, Map<String, String>> logLevels) {
     this.twillSpecification = twillSpecification;
     this.fsUser = fsUser;
     this.twillAppDir = twillAppDir;
@@ -53,7 +53,7 @@ public class TwillRuntimeSpecification {
     this.twillAppName = twillAppName;
     this.reservedMemory = reservedMemory;
     this.rmSchedulerAddr = rmSchedulerAddr;
-    this.logLevel = logLevel;
+    this.logLevels = logLevels;
   }
 
   public TwillSpecification getTwillSpecification() {
@@ -72,7 +72,7 @@ public class TwillRuntimeSpecification {
     return zkConnectStr;
   }
 
-  public RunId getTwillRunId() {
+  public RunId getTwillAppRunId() {
     return twillRunId;
   }
 
@@ -89,8 +89,7 @@ public class TwillRuntimeSpecification {
     return rmSchedulerAddr;
   }
 
-  @Nullable
-  public LogEntry.Level getLogLevel() {
-    return logLevel;
+  public Map<String, Map<String, String>> getLogLevels() {
+    return logLevels;
   }
 }

@@ -17,6 +17,7 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.discovery.Discoverable;
 import org.apache.twill.discovery.ServiceDiscovered;
@@ -89,4 +90,52 @@ public interface TwillController extends ServiceController {
    * @return A {@link Future} that will be completed when the restart operation has been done.
    */
   Future<String> restartInstances(String runnable, int instanceId, int... moreInstanceIds);
+
+  /**
+   * Update the log levels for requested logger names for Twill applications running in a container.
+   * The log level for a logger name can be {@code null} except for the root logger, which will reset the log level for
+   * the specified logger.
+   *
+   * @param logLevels The {@link Map} contains the requested logger names and log levels that need to be updated.
+   * @return A {@link Future} that will be completed when the log level update has been done. It will carry the
+   *         {@link Map} of log levels as the result.
+   */
+  Future<Map<String, LogEntry.Level>> updateLogLevels(Map<String, LogEntry.Level> logLevels);
+
+  /**
+   * Update the log levels for requested logger names for a {@link TwillRunnable}.
+   * The log level for a logger name can be {@code null} except for the root logger, which will reset the log level for
+   * the specified logger.
+   *
+   * @param runnableName The name of the runnable to update the log level.
+   * @param logLevelsForRunnable The {@link Map} contains the requested logger name and log level that
+   *                             need to be updated.
+   * @return A {@link Future} that will be completed when the log level update has been done. It will carry the
+   *         {@link Map} of log levels as the result.
+   */
+  Future<Map<String, LogEntry.Level>> updateLogLevels(String runnableName,
+                                                      Map<String, LogEntry.Level> logLevelsForRunnable);
+
+  /**
+   * Reset the log levels of all runnables.
+   * The log levels will be the same as when the runnables start up.
+   *
+   * @param loggerNames The optional logger names to be reset for all runnables, if not provided, all log levels will
+   *                    be reset.
+   * @return A {@link Future} that will be completed when the set log level operation has been done. The future result
+   *         is the logger names provided in the parameter.
+   */
+  Future<String[]> resetLogLevels(String...loggerNames);
+
+  /**
+   * Reset the log levels of the given runnable.
+   * The log levels will be same as when the runnable starts up.
+   *
+   * @param loggerNames The optional logger names to be reset for the runnable, if not provided, all log levels will
+   *                    be reset.
+   * @return A {@link Future} that will be completed when the set log level operation has been done. The future result
+   *         is the logger names provided in the parameter.
+   */
+  Future<String[]> resetRunnableLogLevels(String runnableName, String...loggerNames);
+
 }

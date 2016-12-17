@@ -18,10 +18,12 @@
 package org.apache.twill.yarn;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableMap;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillPreparer;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.LogEntry;
@@ -34,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -41,6 +44,8 @@ import java.util.concurrent.TimeUnit;
  * Test class whether enable certain log level for application container works.
  */
 public class LogLevelTestRun extends BaseYarnTest {
+
+  private final Map<String, LogEntry.Level> defaultLogArguments = ImmutableMap.of("ROOT", LogEntry.Level.DEBUG);
 
   /**
    * A test of TwillRunnable to see if the DEBUG log level is enabled.
@@ -92,13 +97,36 @@ public class LogLevelTestRun extends BaseYarnTest {
   }
 
   @Test
-  public void testDebugLogLevel()throws Exception {
+  public void testSetRootLogLevel() throws Exception {
+    testLogLevel("ROOT");
+  }
+
+  @Test
+  public void testSetRunnableLogLevel() throws Exception {
+    testLogLevel("RUNNABLE");
+  }
+
+  @Test
+  public void testSetAllLogLevel() throws Exception {
+    testLogLevel("ALL");
+  }
+
+  private void testLogLevel(String method) throws Exception {
     YarnTwillRunnerService runner = getTwillRunner();
     runner.start();
 
+    TwillPreparer preparer = runner.prepare(new LogLevelTestApplication());
+    if (method.equals("ROOT")) {
+      preparer.setLogLevel(LogEntry.Level.DEBUG);
+    }
+    if (method.equals("ALL")) {
+      preparer.setLogLevels(defaultLogArguments);
+    }
+    if (method.equals("RUNNABLE")) {
+      preparer.setLogLevels(LogLevelTestRunnable.class.getSimpleName(), defaultLogArguments);
+    }
     // Set log level to DEBUG
-    TwillController controller = runner.prepare(new LogLevelTestApplication())
-      .setLogLevel(LogEntry.Level.DEBUG)
+    TwillController controller = preparer
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
       .start();
 
@@ -137,8 +165,9 @@ public class LogLevelTestRun extends BaseYarnTest {
         continue;
       }
       for (TwillRunResources resources : report.getRunnableResources(runnable)) {
-        if (resources.getLogLevel() != null) {
-           return resources.getLogLevel();
+        LogEntry.Level level = resources.getLogLevels().get(Logger.ROOT_LOGGER_NAME);
+        if (level != null) {
+           return level;
         }
       }
       TimeUnit.MILLISECONDS.sleep(100);

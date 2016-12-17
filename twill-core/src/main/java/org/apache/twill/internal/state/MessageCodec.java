@@ -40,6 +40,7 @@ public final class MessageCodec {
 
   private static final Type OPTIONS_TYPE = new TypeToken<Map<String, String>>() { }.getType();
   private static final Gson GSON = new GsonBuilder()
+                                        .serializeNulls()
                                         .registerTypeAdapter(Message.class, new MessageAdapter())
                                         .registerTypeAdapter(Command.class, new CommandAdapter())
                                         .create();

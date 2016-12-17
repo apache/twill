@@ -59,7 +59,6 @@ import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.Location;
-import org.apache.twill.internal.Configs;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ContainerInfo;
 import org.apache.twill.internal.DefaultTwillRunResources;
@@ -72,6 +71,7 @@ import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
 import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.state.Message;
+import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.internal.utils.Instances;
 import org.apache.twill.internal.yarn.AbstractYarnTwillService;
 import org.apache.twill.internal.yarn.YarnAMClient;
@@ -198,9 +198,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       appMasterContainerId.toString(),
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_VIRTUAL_CORES)),
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
-      appMasterHost, null, null);
+      appMasterHost, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
-    return new RunningContainers(appId, appMasterResources, zkClient);
+    return new RunningContainers(appId, appMasterResources, zkClient,
+                                 applicationLocation, twillSpec.getRunnables().keySet());
   }
 
   private ExpectedContainers initExpectedContainers(TwillSpecification twillSpec) {
@@ -317,6 +318,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     }
 
     if (handleRestartRunnablesInstances(message, completion)) {
+      return result;
+    }
+
+    if (handleLogLevelMessages(message, completion)) {
       return result;
     }
 
@@ -649,7 +654,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       String runnableName = provisionRequest.getRuntimeSpec().getName();
       LOG.info("Starting runnable {} with {}", runnableName, processLauncher);
 
-      LOG.debug("Log level for Twill runnable {} is {}", runnableName, twillRuntimeSpec.getLogLevel());
+      LOG.debug("Log level for Twill runnable {} is {}", runnableName,
+                twillRuntimeSpec.getLogLevels().get(runnableName).get(Logger.ROOT_LOGGER_NAME));
 
       int containerCount = expectedContainers.getExpected(runnableName);
 
@@ -669,8 +675,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
         containerCount, jvmOpts, reservedMemory, getSecureStoreLocation());
 
-      runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher,
-                              twillRuntimeSpec.getLogLevel());
+      runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher);
 
       // Need to call complete to workaround bug in YARN AMRMClient
       if (provisionRequest.containerAcquired()) {
@@ -725,7 +730,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
    * @return {@code true} if the message does requests for changes in number of running instances of a runnable,
    * {@code false} otherwise.
    */
-  private boolean handleSetInstances(final Message message, final Runnable completion) {
+  private boolean handleSetInstances(Message message, Runnable completion) {
     if (message.getType() != Message.Type.SYSTEM || message.getScope() != Message.Scope.RUNNABLE) {
       return false;
     }
@@ -860,7 +865,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
    *
    * @return {@code true} if the message requests restarting some instances and {@code false} otherwise.
    */
-  private boolean handleRestartRunnablesInstances(final Message message, final Runnable completion) {
+  private boolean handleRestartRunnablesInstances(Message message, Runnable completion) {
     LOG.debug("Check if it should process a restart runnable instances.");
 
     if (message.getType() != Message.Type.SYSTEM) {
@@ -950,5 +955,35 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         completion.run();
       }
     };
+  }
+
+  /**
+   * Attempt to change the log level from a runnable or all runnables.
+   *
+   * @return {@code true} if the message requests changing log levels and {@code false} otherwise.
+   */
+  private boolean handleLogLevelMessages(Message message, Runnable completion) {
+    Message.Scope scope = message.getScope();
+    if (message.getType() != Message.Type.SYSTEM ||
+      (scope != Message.Scope.RUNNABLE && scope != Message.Scope.ALL_RUNNABLE)) {
+      return false;
+    }
+
+    String command = message.getCommand().getCommand();
+    if (!command.equals(SystemMessages.SET_LOG_LEVEL) && !command.equals(SystemMessages.RESET_LOG_LEVEL)) {
+      return false;
+    }
+
+    if (scope == Message.Scope.ALL_RUNNABLE) {
+      runningContainers.sendToAll(message, completion);
+    } else {
+      final String runnableName = message.getRunnableName();
+      if (runnableName == null || !twillSpec.getRunnables().containsKey(runnableName)) {
+        LOG.info("Unknown runnable {}", runnableName);
+        return false;
+      }
+      runningContainers.sendToRunnable(runnableName, message, completion);
+    }
+    return true;
   }
 }

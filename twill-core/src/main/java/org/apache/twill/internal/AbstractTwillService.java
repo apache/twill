@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.apache.twill.api.RunId;
 import org.apache.twill.common.Cancellable;
@@ -84,7 +85,7 @@ import java.util.concurrent.TimeUnit;
 public abstract class AbstractTwillService extends AbstractExecutionThreadService implements MessageCallback {
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractTwillService.class);
-  private static final Gson GSON = new Gson();
+  private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
   protected final ZKClient zkClient;
   protected final RunId runId;
@@ -197,16 +198,21 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
     }
   }
 
+  /**
+   * Update the live node for the runnable.
+   *
+   * @return A {@link OperationFuture} that will be completed when the update is done.
+   */
+  protected final OperationFuture<?> updateLiveNode() {
+    String liveNode = getLiveNodePath();
+    LOG.info("Update live node {}{}", zkClient.getConnectString(), liveNode);
+    return zkClient.setData(liveNode, toJson(getLiveNodeJsonObject()));
+  }
+
   private OperationFuture<String> createLiveNode() {
     String liveNode = getLiveNodePath();
     LOG.info("Create live node {}{}", zkClient.getConnectString(), liveNode);
-
-    JsonObject content = new JsonObject();
-    Object liveNodeData = getLiveNodeData();
-    if (liveNodeData != null) {
-      content.add("data", GSON.toJsonTree(liveNodeData));
-    }
-    return ZKOperations.ignoreError(zkClient.create(liveNode, toJson(content), CreateMode.EPHEMERAL),
+    return ZKOperations.ignoreError(zkClient.create(liveNode, toJson(getLiveNodeJsonObject()), CreateMode.EPHEMERAL),
                                     KeeperException.NodeExistsException.class, liveNode);
   }
 
@@ -366,6 +372,15 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
 
   private String getLiveNodePath() {
     return String.format("%s/%s", Constants.INSTANCES_PATH_PREFIX, runId.getId());
+  }
+
+  private JsonObject getLiveNodeJsonObject() {
+    JsonObject content = new JsonObject();
+    Object liveNodeData = getLiveNodeData();
+    if (liveNodeData != null) {
+      content.add("data", GSON.toJsonTree(liveNodeData));
+    }
+    return content;
   }
 
   private <T> byte[] toJson(T obj) {

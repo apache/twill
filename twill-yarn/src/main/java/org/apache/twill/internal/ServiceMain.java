@@ -28,8 +28,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FileContext;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.twill.api.RunId;
 import org.apache.twill.filesystem.FileContextLocationFactory;
@@ -52,7 +50,6 @@ import org.xml.sax.InputSource;
 import java.io.File;
 import java.io.StringReader;
 import java.net.URI;
-import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -236,12 +233,12 @@ public abstract class ServiceMain {
   }
 
   /**
-   * Override to return the right log level for the service.
+   * Return the right log level for the service.
    *
    * @param logger the {@link Logger} instance of the service context.
    * @return String of log level based on {@code slf4j} log levels.
    */
-  protected String getLoggerLevel(Logger logger) {
+  private String getLoggerLevel(Logger logger) {
     if (logger instanceof ch.qos.logback.classic.Logger) {
       return ((ch.qos.logback.classic.Logger) logger).getLevel().toString();
     }
