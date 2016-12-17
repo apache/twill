@@ -21,9 +21,28 @@ Apache Twill Site Update Instructions
 
 1. Publish snapshot artifacts to maven
 
-    git checkout master
+        git checkout master
 
-    mvn clean prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.0 &&
-    mvn prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 &&
-    mvn deploy -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 -P apache-release
-1.
+        mvn clean prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.0 &&
+        mvn prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 &&
+        mvn deploy -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 -P apache-release
+1. Build javadocs for the newly released version
+
+        git checkout branch-${RELEASE_VERSION}
+
+        mvn javadoc:aggregate
+1. Copy the javadocs generated in previous step to site directory
+
+        git checkout site
+        
+        cp -r target/site/apidocs src/site/resources/apidocs-${RELEASE_VERSION}
+1. Update release version and link in `src/site/markdown/index.md`
+1. Create new release page markdown file `src/site/markdown/release/${RELEASE_VERSION}.md`.
+   You can base on the previous release page and update accordingly.
+1. Update the `src/site/site.xml` file to add new release information.
+1. Build the site
+
+        mvn clean site -DskipTests -P site
+   All Twill website files will be generated at the `target/site` directory
+1. Update and check-in changes in SVN `https://svn.apache.org/repos/asf/twill/site`.
+        
