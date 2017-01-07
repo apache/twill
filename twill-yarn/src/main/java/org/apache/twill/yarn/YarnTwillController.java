@@ -58,6 +58,8 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
   private final String appName;
   private final Callable<ProcessController<YarnApplicationReport>> startUp;
+  private final long startTimeout;
+  private final TimeUnit startTimeoutUnit;
   private ProcessController<YarnApplicationReport> processController;
   private ResourceReportClient resourcesClient;
 
@@ -70,14 +72,18 @@ final class YarnTwillController extends AbstractTwillController implements Twill
    */
   YarnTwillController(String appName, RunId runId, ZKClient zkClient,
                       Callable<ProcessController<YarnApplicationReport>> startUp) {
-    this(appName, runId, zkClient, ImmutableList.<LogHandler>of(), startUp);
+    this(appName, runId, zkClient, ImmutableList.<LogHandler>of(), startUp,
+         Constants.APPLICATION_MAX_START_SECONDS, TimeUnit.SECONDS);
   }
 
   YarnTwillController(String appName, RunId runId, ZKClient zkClient, Iterable<LogHandler> logHandlers,
-                      Callable<ProcessController<YarnApplicationReport>> startUp) {
+                      Callable<ProcessController<YarnApplicationReport>> startUp,
+                      long startTimeout, TimeUnit startTimeoutUnit) {
     super(runId, zkClient, logHandlers);
     this.appName = appName;
     this.startUp = startUp;
+    this.startTimeout = startTimeout;
+    this.startTimeoutUnit = startTimeoutUnit;
   }
 
 
@@ -101,23 +107,18 @@ final class YarnTwillController extends AbstractTwillController implements Twill
       LOG.info("Application {} with id {} submitted", appName, appId);
 
       YarnApplicationState state = report.getYarnApplicationState();
-      Stopwatch stopWatch = new Stopwatch();
-      stopWatch.start();
-      long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_START_SECONDS, TimeUnit.SECONDS);
+      Stopwatch stopWatch = new Stopwatch().start();
 
       LOG.debug("Checking yarn application status for {} {}", appName, appId);
-      while (!hasRun(state) && stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
+      while (!hasRun(state) && stopWatch.elapsedTime(startTimeoutUnit) < startTimeout) {
         report = processController.getReport();
         state = report.getYarnApplicationState();
         LOG.debug("Yarn application status for {} {}: {}", appName, appId, state);
         TimeUnit.SECONDS.sleep(1);
-        stopWatch.reset();
-        stopWatch.start();
       }
       LOG.info("Yarn application {} {} is in state {}", appName, appId, state);
       if (state != YarnApplicationState.RUNNING) {
-        LOG.info("Yarn application {} {} is not in running state. Shutting down controller.",
-                 appName, appId, Constants.APPLICATION_MAX_START_SECONDS);
+        LOG.info("Yarn application {} {} is not in running state. Shutting down controller.", appName, appId);
         forceShutDown();
       } else {
         try {
@@ -155,8 +156,7 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
     // Poll application status from yarn
     try (ProcessController<YarnApplicationReport> processController = this.processController) {
-      Stopwatch stopWatch = new Stopwatch();
-      stopWatch.start();
+      Stopwatch stopWatch = new Stopwatch().start();
       long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_STOP_SECONDS, TimeUnit.SECONDS);
 
       YarnApplicationReport report = processController.getReport();
@@ -166,8 +166,6 @@ final class YarnTwillController extends AbstractTwillController implements Twill
           stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
         LOG.debug("Yarn application final status for {} {}: {}", appName, appId, finalStatus);
         TimeUnit.SECONDS.sleep(1);
-        stopWatch.reset();
-        stopWatch.start();
         finalStatus = processController.getReport().getFinalApplicationStatus();
       }
       LOG.debug("Yarn application {} {} completed with status {}", appName, appId, finalStatus);
