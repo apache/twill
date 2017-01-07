@@ -22,6 +22,7 @@ import org.apache.twill.api.logging.LogHandler;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This interface exposes methods to set up the Twill runtime environment and start a Twill application.
@@ -257,8 +258,19 @@ public interface TwillPreparer {
   TwillPreparer setLogLevels(String runnableName, Map<String, LogEntry.Level> logLevelsForRunnable);
 
   /**
-   * Starts the application.
+   * Starts the application. It's the same as calling {@link #start(long, TimeUnit)} with timeout of 60 seconds.
+   *
    * @return A {@link TwillController} for controlling the running application.
    */
   TwillController start();
+
+  /**
+   * Starts the application. The application must be started within the given timeout. An application may fail to start
+   * within a given time if there is insufficient resources.
+   *
+   * @param timeout maximum time to wait for the application to start
+   * @param timeoutUnit unit for the timeout
+   * @return A {@link TwillController} for controlling the running application.
+   */
+  TwillController start(long timeout, TimeUnit timeoutUnit);
 }

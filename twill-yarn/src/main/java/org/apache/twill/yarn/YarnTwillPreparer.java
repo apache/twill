@@ -102,6 +102,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -322,6 +323,11 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillController start() {
+    return start(Constants.APPLICATION_MAX_START_SECONDS, TimeUnit.SECONDS);
+  }
+
+  @Override
+  public TwillController start(long timeout, TimeUnit timeoutUnit) {
     try {
       final ProcessLauncher<ApplicationMasterInfo> launcher = yarnAppClient.createLauncher(twillSpec, schedulerQueue);
       final ApplicationMasterInfo appMasterInfo = launcher.getContainerInfo();
@@ -376,7 +382,7 @@ final class YarnTwillPreparer implements TwillPreparer {
         }
       };
 
-      YarnTwillController controller = controllerFactory.create(runId, logHandlers, submitTask);
+      YarnTwillController controller = controllerFactory.create(runId, logHandlers, submitTask, timeout, timeoutUnit);
       controller.start();
       return controller;
     } catch (Exception e) {

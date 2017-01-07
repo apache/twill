@@ -282,10 +282,12 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
                                  locationFactory, jvmOptions, LogEntry.Level.INFO, new YarnTwillControllerFactory() {
       @Override
       public YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
-                                        Callable<ProcessController<YarnApplicationReport>> startUp) {
+                                        Callable<ProcessController<YarnApplicationReport>> startUp,
+                                        long startTimeout, TimeUnit startTimeoutUnit) {
         ZKClient zkClient = ZKClients.namespace(zkClientService, "/" + appName);
         YarnTwillController controller = listenController(new YarnTwillController(appName, runId, zkClient,
-                                                                                  logHandlers, startUp));
+                                                                                  logHandlers, startUp,
+                                                                                  startTimeout, startTimeoutUnit));
         synchronized (YarnTwillRunnerService.this) {
           Preconditions.checkArgument(!controllers.contains(appName, runId),
                                       "Application %s with runId %s is already running.", appName, runId);
