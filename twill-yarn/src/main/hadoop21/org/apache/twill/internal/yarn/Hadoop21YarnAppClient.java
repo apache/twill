@@ -50,7 +50,7 @@ import javax.annotation.Nullable;
 /**
  * <p>
  * The service implementation of {@link YarnAppClient} for Apache Hadoop 2.1 and beyond.
- *
+ * <p>
  * The {@link VersionDetectYarnAppClientFactory} class will decide to return instance of this class for
  * Apache Hadoop 2.1 and beyond.
  * </p>
@@ -93,10 +93,10 @@ public final class Hadoop21YarnAppClient implements YarnAppClient {
     // TODO: Make it adjustable through TwillSpec (TWILL-90)
     // Set the resource requirement for AM
     final Resource capability = adjustMemory(response, Resource.newInstance(
-            twillSpec.getAmResourceSpecification().getMemorySize(),
-            twillSpec.getAmResourceSpecification().getVirtualCores()));
+        twillSpec.getAmResourceSpecification().getMemorySize(),
+        twillSpec.getAmResourceSpecification().getVirtualCores()));
     ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(),
-                                                                    capability.getVirtualCores());
+        capability.getVirtualCores());
 
     ApplicationSubmitter submitter = new ApplicationSubmitter() {
       @Override
@@ -142,8 +142,8 @@ public final class Hadoop21YarnAppClient implements YarnAppClient {
 
       Configuration config = yarnClient.getConfig();
       Token<TokenIdentifier> token = ConverterUtils.convertFromYarn(
-        yarnClient.getRMDelegationToken(new Text(YarnUtils.getYarnTokenRenewer(config))),
-        YarnUtils.getRMAddress(config));
+          yarnClient.getRMDelegationToken(new Text(YarnUtils.getYarnTokenRenewer(config))),
+          YarnUtils.getRMAddress(config));
 
       LOG.info("Added RM delegation token {}", token);
       credentials.addToken(token.getService(), token);

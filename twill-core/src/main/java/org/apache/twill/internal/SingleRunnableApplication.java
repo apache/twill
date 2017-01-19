@@ -28,34 +28,34 @@ import org.apache.twill.api.TwillSpecification;
  */
 public class SingleRunnableApplication implements TwillApplication {
 
-    private final TwillRunnable runnable;
-    private final ResourceSpecification resourceSpec;
-    private final ResourceSpecification amResourceSpec;
+  private final TwillRunnable runnable;
+  private final ResourceSpecification resourceSpec;
+  private final ResourceSpecification amResourceSpec;
 
-    public SingleRunnableApplication(TwillRunnable runnable, ResourceSpecification amResourceSpec,
-                                     ResourceSpecification resourceSpec
-                                     ) {
-        this.runnable = runnable;
-        this.resourceSpec = resourceSpec;
-        this.amResourceSpec = amResourceSpec;
-    }
+  public SingleRunnableApplication(TwillRunnable runnable, ResourceSpecification amResourceSpec,
+                                   ResourceSpecification resourceSpec
+  ) {
+    this.runnable = runnable;
+    this.resourceSpec = resourceSpec;
+    this.amResourceSpec = amResourceSpec;
+  }
 
-    public SingleRunnableApplication(TwillRunnable runnable, ResourceSpecification resourceSpec) {
-        this(runnable,
-                resourceSpec,
-                new DefaultResourceSpecification(Constants.APP_MASTER_CPU_VCORES, Constants.APP_MASTER_MEMORY_MB,
-                        1, -1, -1));
-    }
+  public SingleRunnableApplication(TwillRunnable runnable, ResourceSpecification resourceSpec) {
+    this(runnable,
+        resourceSpec,
+        new DefaultResourceSpecification(Constants.APP_MASTER_CPU_VCORES, Constants.APP_MASTER_MEMORY_MB,
+            1, -1, -1));
+  }
 
-    @Override
-    public TwillSpecification configure() {
-        TwillRunnableSpecification runnableSpec = runnable.configure();
-        return TwillSpecification.Builder.with()
-                .setName(runnableSpec.getName())
-                .withAMResources(this.amResourceSpec)
-                .withRunnable().add(runnableSpec.getName(), runnable, resourceSpec)
-                .noLocalFiles()
-                .anyOrder()
-                .build();
-    }
+  @Override
+  public TwillSpecification configure() {
+    TwillRunnableSpecification runnableSpec = runnable.configure();
+    return TwillSpecification.Builder.with()
+        .setName(runnableSpec.getName())
+        .withAMResources(this.amResourceSpec)
+        .withRunnable().add(runnableSpec.getName(), runnable, resourceSpec)
+        .noLocalFiles()
+        .anyOrder()
+        .build();
+  }
 }

@@ -28,51 +28,51 @@ import java.util.Map;
  */
 public interface TwillRunnableSpecification {
 
-    String getClassName();
+  String getClassName();
 
-    String getName();
+  String getName();
 
-    Map<String, String> getConfigs();
+  Map<String, String> getConfigs();
 
-    /**
-     * Builder for constructing {@link TwillRunnableSpecification}.
-     */
-    final class Builder {
+  /**
+   * Builder for constructing {@link TwillRunnableSpecification}.
+   */
+  final class Builder {
 
-        private String name;
-        private Map<String, String> args;
+    private String name;
+    private Map<String, String> args;
 
-        public static NameSetter with() {
-            return new Builder().new NameSetter();
-        }
-
-        public final class NameSetter {
-            public AfterName setName(String name) {
-                Builder.this.name = name;
-                return new AfterName();
-            }
-        }
-
-        public final class AfterName {
-
-            public AfterConfigs withConfigs(Map<String, String> args) {
-                Builder.this.args = args;
-                return new AfterConfigs();
-            }
-
-            public AfterConfigs noConfigs() {
-                Builder.this.args = Collections.emptyMap();
-                return new AfterConfigs();
-            }
-        }
-
-        public final class AfterConfigs {
-            public TwillRunnableSpecification build() {
-                return new DefaultTwillRunnableSpecification(null, name, args);
-            }
-        }
-
-        private Builder() {
-        }
+    public static NameSetter with() {
+      return new Builder().new NameSetter();
     }
+
+    public final class NameSetter {
+      public AfterName setName(String name) {
+        Builder.this.name = name;
+        return new AfterName();
+      }
+    }
+
+    public final class AfterName {
+
+      public AfterConfigs withConfigs(Map<String, String> args) {
+        Builder.this.args = args;
+        return new AfterConfigs();
+      }
+
+      public AfterConfigs noConfigs() {
+        Builder.this.args = Collections.emptyMap();
+        return new AfterConfigs();
+      }
+    }
+
+    public final class AfterConfigs {
+      public TwillRunnableSpecification build() {
+        return new DefaultTwillRunnableSpecification(null, name, args);
+      }
+    }
+
+    private Builder() {
+    }
+  }
 }

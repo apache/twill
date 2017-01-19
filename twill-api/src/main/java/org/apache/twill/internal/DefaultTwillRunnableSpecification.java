@@ -28,35 +28,35 @@ import java.util.Map;
  */
 public final class DefaultTwillRunnableSpecification implements TwillRunnableSpecification {
 
-    private final String className;
-    private final String name;
-    private final Map<String, String> arguments;
+  private final String className;
+  private final String name;
+  private final Map<String, String> arguments;
 
 
-    public DefaultTwillRunnableSpecification(String className, String name, Map<String, String> arguments) {
-        this.className = className;
-        this.name = name;
-        this.arguments = Collections.unmodifiableMap(new HashMap<String, String>(arguments));
-    }
+  public DefaultTwillRunnableSpecification(String className, String name, Map<String, String> arguments) {
+    this.className = className;
+    this.name = name;
+    this.arguments = Collections.unmodifiableMap(new HashMap<String, String>(arguments));
+  }
 
-    public DefaultTwillRunnableSpecification(String className, TwillRunnableSpecification other) {
-        this.className = className;
-        this.name = other.getName();
-        this.arguments = Collections.unmodifiableMap(new HashMap<String, String>(other.getConfigs()));
-    }
+  public DefaultTwillRunnableSpecification(String className, TwillRunnableSpecification other) {
+    this.className = className;
+    this.name = other.getName();
+    this.arguments = Collections.unmodifiableMap(new HashMap<String, String>(other.getConfigs()));
+  }
 
-    @Override
-    public String getClassName() {
-        return className;
-    }
+  @Override
+  public String getClassName() {
+    return className;
+  }
 
-    @Override
-    public String getName() {
-        return name;
-    }
+  @Override
+  public String getName() {
+    return name;
+  }
 
-    @Override
-    public Map<String, String> getConfigs() {
-        return arguments;
-    }
+  @Override
+  public Map<String, String> getConfigs() {
+    return arguments;
+  }
 }

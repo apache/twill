@@ -113,9 +113,9 @@ public final class DefaultTwillSpecification implements TwillSpecification {
     @Override
     public String toString() {
       return "DefaultOrder{" +
-        "names=" + names +
-        ", type=" + type +
-        '}';
+          "names=" + names +
+          ", type=" + type +
+          '}';
     }
   }
 
@@ -177,11 +177,11 @@ public final class DefaultTwillSpecification implements TwillSpecification {
     @Override
     public String toString() {
       return "DefaultPlacementPolicy{" +
-        "hosts=" + hosts +
-        ", names=" + names +
-        ", type=" + type +
-        ", racks=" + racks +
-        '}';
+          "hosts=" + hosts +
+          ", names=" + names +
+          ", type=" + type +
+          ", racks=" + racks +
+          '}';
     }
   }
 }

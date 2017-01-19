@@ -124,7 +124,7 @@ public interface TwillSpecification {
 
   /**
    * @return The {@link EventHandlerSpecification} for the {@link EventHandler} to be used for this application,
-   *         or {@code null} if no event handler has been provided.
+   * or {@code null} if no event handler has been provided.
    */
   @Nullable
   EventHandlerSpecification getEventHandler();
@@ -171,7 +171,6 @@ public interface TwillSpecification {
     }
 
 
-
     public interface MoreRunnable {
       RuntimeSpecificationAdder add(TwillRunnable runnable);
 
@@ -179,7 +178,8 @@ public interface TwillSpecification {
 
       /**
        * Adds a {@link TwillRunnable} with {@link ResourceSpecification#BASIC} resource specification.
-       * @param name Name of runnable
+       *
+       * @param name     Name of runnable
        * @param runnable {@link TwillRunnable} to be run
        * @return instance of {@link RuntimeSpecificationAdder}
        */
@@ -217,12 +217,12 @@ public interface TwillSpecification {
       public RuntimeSpecificationAdder add(String name, TwillRunnable runnable,
                                            final ResourceSpecification resourceSpec) {
         final TwillRunnableSpecification spec = new DefaultTwillRunnableSpecification(
-                                            runnable.getClass().getName(), name, runnable.configure().getConfigs());
+            runnable.getClass().getName(), name, runnable.configure().getConfigs());
         return new RuntimeSpecificationAdder(new LocalFileCompleter() {
           @Override
           public RunnableSetter complete(Collection<LocalFile> files) {
             runnables.put(spec.getName(), new DefaultRuntimeSpecification(spec.getName(), spec,
-                    resourceSpec, files));
+                resourceSpec, files));
             return RunnableSetter.this;
           }
         });
@@ -338,8 +338,9 @@ public interface TwillSpecification {
 
       /**
        * Specify hosts for a list of runnables.
-       * @param hosts {@link org.apache.twill.api.Hosts} specifying a set of hosts.
-       * @param runnableName a runnable name.
+       *
+       * @param hosts         {@link org.apache.twill.api.Hosts} specifying a set of hosts.
+       * @param runnableName  a runnable name.
        * @param runnableNames a list of runnable names.
        * @return A reference to either add more placement policies or skip to defining execution order.
        */
@@ -347,8 +348,9 @@ public interface TwillSpecification {
 
       /**
        * Specify racks for a list of runnables.
-       * @param racks {@link org.apache.twill.api.Racks} specifying a set of racks.
-       * @param runnableName a runnable name.
+       *
+       * @param racks         {@link org.apache.twill.api.Racks} specifying a set of racks.
+       * @param runnableName  a runnable name.
        * @param runnableNames a list of runnable names.
        * @return A reference to either add more placement policies or skip to defining execution order.
        */
@@ -356,9 +358,10 @@ public interface TwillSpecification {
 
       /**
        * Specify hosts and racks for a list of runnables.
-       * @param hosts {@link org.apache.twill.api.Hosts} specifying a set of hosts.
-       * @param racks {@link org.apache.twill.api.Racks} specifying a set of racks.
-       * @param runnableName a runnable name.
+       *
+       * @param hosts         {@link org.apache.twill.api.Hosts} specifying a set of hosts.
+       * @param racks         {@link org.apache.twill.api.Racks} specifying a set of racks.
+       * @param runnableName  a runnable name.
        * @param runnableNames a list of runnable names.
        * @return A reference to either add more placement policies or skip to defining execution order.
        */
@@ -366,8 +369,9 @@ public interface TwillSpecification {
 
       /**
        * Specify a placement policy for a list of runnables.
-       * @param type {@link PlacementPolicy.Type} specifying a specific placement policy type.
-       * @param runnableName a runnable name.
+       *
+       * @param type          {@link PlacementPolicy.Type} specifying a specific placement policy type.
+       * @param runnableName  a runnable name.
        * @param runnableNames a list of runnable names.
        * @return A reference to either add more placement policies or skip to defining execution order.
        */
@@ -407,26 +411,26 @@ public interface TwillSpecification {
       }
 
       @Override
-      public PlacementPolicySetter add(PlacementPolicy.Type type, String runnableName, String...runnableNames) {
+      public PlacementPolicySetter add(PlacementPolicy.Type type, String runnableName, String... runnableNames) {
         return addPlacementPolicy(type, null, null, runnableName, runnableNames);
       }
 
       private PlacementPolicySetter addPlacementPolicy(PlacementPolicy.Type type, Hosts hosts, Racks racks,
-                                                       String runnableName, String...runnableNames) {
+                                                       String runnableName, String... runnableNames) {
         checkArgument(runnableName != null, "Name cannot be null.");
         checkArgument(runnables.containsKey(runnableName), "Runnable not exists.");
         checkArgument(!contains(runnableName),
-                      "Runnable (" + runnableName + ") cannot belong to more than one Placement Policy");
+            "Runnable (" + runnableName + ") cannot belong to more than one Placement Policy");
         Set<String> runnableNamesSet = new HashSet<String>(Collections.singleton(runnableName));
         for (String name : runnableNames) {
           checkArgument(name != null, "Name cannot be null.");
           checkArgument(runnables.containsKey(name), "Runnable not exists.");
           checkArgument(!contains(name),
-                        "Runnable (" + name + ") cannot belong to more than one Placement Policy");
+              "Runnable (" + name + ") cannot belong to more than one Placement Policy");
           runnableNamesSet.add(name);
         }
         placementPolicies.add(
-          new DefaultTwillSpecification.DefaultPlacementPolicy(runnableNamesSet, type, hosts, racks));
+            new DefaultTwillSpecification.DefaultPlacementPolicy(runnableNamesSet, type, hosts, racks));
         return this;
       }
 
@@ -451,13 +455,13 @@ public interface TwillSpecification {
     }
 
     public interface FirstOrder {
-      NextOrder begin(String name, String...names);
+      NextOrder begin(String name, String... names);
     }
 
     public interface NextOrder extends AfterOrder {
-      NextOrder nextWhenStarted(String name, String...names);
+      NextOrder nextWhenStarted(String name, String... names);
 
-      NextOrder nextWhenCompleted(String name, String...names);
+      NextOrder nextWhenCompleted(String name, String... names);
     }
 
     public interface AfterOrder {
@@ -504,7 +508,7 @@ public interface TwillSpecification {
         return new DefaultTwillSpecification(name, amResourceSpec, runnables, orders, placementPolicies, eventHandler);
       }
 
-      private void addOrder(final Order.Type type, String name, String...names) {
+      private void addOrder(final Order.Type type, String name, String... names) {
         checkArgument(name != null, "Name cannot be null.");
         checkArgument(runnables.containsKey(name), "Runnable not exists.");
 
@@ -519,12 +523,13 @@ public interface TwillSpecification {
       }
     }
 
-    private void checkArgument(boolean condition, String msgFormat, Object...args) {
+    private void checkArgument(boolean condition, String msgFormat, Object... args) {
       if (!condition) {
         throw new IllegalArgumentException(String.format(msgFormat, args));
       }
     }
 
-    private Builder() {}
+    private Builder() {
+    }
   }
 }

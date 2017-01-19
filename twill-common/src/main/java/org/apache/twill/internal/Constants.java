@@ -24,9 +24,13 @@ public final class Constants {
 
   public static final String LOG_TOPIC = "log";
 
-  /** Maximum number of seconds for AM to start. */
+  /**
+   * Maximum number of seconds for AM to start.
+   */
   public static final int APPLICATION_MAX_START_SECONDS = 60;
-  /** Maximum number of seconds for AM to stop. */
+  /**
+   * Maximum number of seconds for AM to stop.
+   */
   public static final int APPLICATION_MAX_STOP_SECONDS = 60;
 
   public static final long PROVISION_TIMEOUT = 30000;
@@ -39,10 +43,14 @@ public final class Constants {
 
   public static final double HEAP_MIN_RATIO = 0.7d;
 
-  /** Memory size of AM. */
+  /**
+   * Memory size of AM.
+   */
   public static final int APP_MASTER_MEMORY_MB = 512;
 
-  /** CPUs for the AM. */
+  /**
+   * CPUs for the AM.
+   */
   public static final int APP_MASTER_CPU_VCORES = 1;
 
   public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;
@@ -50,7 +58,9 @@ public final class Constants {
   public static final String CLASSPATH = "classpath";
   public static final String APPLICATION_CLASSPATH = "application-classpath";
 
-  /** Command names for the restart runnable instances. */
+  /**
+   * Command names for the restart runnable instances.
+   */
   public static final String RESTART_ALL_RUNNABLE_INSTANCES = "restartAllRunnableInstances";
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
 
