@@ -44,16 +44,6 @@ public final class DefaultTwillSpecification implements TwillSpecification {
   private final List<PlacementPolicy> placementPolicies;
   private final EventHandlerSpecification eventHandler;
 
-//  public DefaultTwillSpecification(String name, Map<String, RuntimeSpecification> runnables,
-//                                   List<Order> orders, List<PlacementPolicy> placementPolicies,
-//                                   EventHandlerSpecification eventHandler) {
-//    this.name = name;
-//    this.runnables = Collections.unmodifiableMap(new HashMap<String, RuntimeSpecification>(runnables));
-//    this.orders = Collections.unmodifiableList(new ArrayList<Order>(orders));
-//    this.placementPolicies = placementPolicies;
-//    this.eventHandler = eventHandler;
-//  }
-
   public DefaultTwillSpecification(String name, ResourceSpecification amResourceSpec,
                                    Map<String, RuntimeSpecification> runnables, List<Order> orders,
                                    List<PlacementPolicy> placementPolicies,
