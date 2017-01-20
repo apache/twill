@@ -28,12 +28,17 @@ import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.GroupPrincipal;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipalLookupService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -128,6 +133,23 @@ final class LocalLocation implements Location {
     } catch (FileAlreadyExistsException e) {
       return false;
     }
+  }
+
+  @Override
+  public String getOwner() throws IOException {
+    return Files.getOwner(file.toPath()).getName();
+  }
+
+  @Override
+  public String getGroup() throws IOException {
+    return Files.readAttributes(file.toPath(), PosixFileAttributes.class).group().getName();
+  }
+
+  @Override
+  public void setGroup(String group) throws IOException {
+    UserPrincipalLookupService lookupService = FileSystems.getDefault().getUserPrincipalLookupService();
+    GroupPrincipal groupPrincipal = lookupService.lookupPrincipalByGroupName(group);
+    Files.getFileAttributeView(file.toPath(), PosixFileAttributeView.class).setGroup(groupPrincipal);
   }
 
   @Override

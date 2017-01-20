@@ -78,14 +78,40 @@ public interface Location {
    * specified by the {@link PosixFilePermissions#fromString(String)} method.
    *
    * @throws IOException if failed to get the permissions of the location
+   * @throws UnsupportedOperationException if Posix file permissions are not supported by the local file system
    */
   String getPermissions() throws IOException;
+
+  /**
+   * Returns the owner of the location.
+   *
+   * @throws IOException if failed to get the owner of the location
+   */
+  String getOwner() throws IOException;
+
+  /**
+   * Returns the group of the location.
+   *
+   * @throws IOException if failed to get the group of the location
+   * @throws UnsupportedOperationException if Posix style groups are not supported by the local file system
+   */
+  String getGroup() throws IOException;
+
+  /**
+   * Sets the group of the location.
+   *
+   * @throws IOException if failed to set the group of the location
+   * @throws UnsupportedOperationException if Posix style groups are not supported by the local file system
+   */
+  void setGroup(String group) throws IOException;
 
   /**
    * Sets the permissions on this location.
    *
    * @param permission A permission string. See {@link #createNew(String)} for the format.
+   *
    * @throws IOException if failed to set the permission
+   * @throws UnsupportedOperationException if Posix file permissions are not supported by the local file system
    */
   void setPermissions(String permission) throws IOException;
 

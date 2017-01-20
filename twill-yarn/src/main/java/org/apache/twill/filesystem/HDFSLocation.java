@@ -156,6 +156,21 @@ final class HDFSLocation implements Location {
   }
 
   @Override
+  public String getOwner() throws IOException {
+    return fs.getFileStatus(path).getOwner();
+  }
+
+  @Override
+  public String getGroup() throws IOException {
+    return fs.getFileStatus(path).getGroup();
+  }
+
+  @Override
+  public void setGroup(String group) throws IOException {
+    fs.setOwner(path, null, group);
+  }
+
+  @Override
   public String getPermissions() throws IOException {
     FsPermission permission = fs.getFileStatus(path).getPermission();
     return permission.getUserAction().SYMBOL + permission.getGroupAction().SYMBOL + permission.getOtherAction().SYMBOL;
