@@ -93,6 +93,21 @@ final class FileContextLocation implements Location {
   }
 
   @Override
+  public String getOwner() throws IOException {
+    return fc.getFileStatus(path).getOwner();
+  }
+
+  @Override
+  public String getGroup() throws IOException {
+    return fc.getFileStatus(path).getGroup();
+  }
+
+  @Override
+  public void setGroup(String group) throws IOException {
+    fc.setOwner(path, null, group);
+  }
+
+  @Override
   public String getPermissions() throws IOException {
     FsPermission permission = fc.getFileStatus(path).getPermission();
     return permission.getUserAction().SYMBOL + permission.getGroupAction().SYMBOL + permission.getOtherAction().SYMBOL;

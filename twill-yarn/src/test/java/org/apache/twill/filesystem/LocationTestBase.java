@@ -188,6 +188,22 @@ public abstract class LocationTestBase {
   }
 
   @Test
+  public void testOwnerGroup() throws Exception {
+    LocationFactory factory = locationFactoryCache.getUnchecked("ownergroup");
+    Location location = factory.create("ogtest");
+    location.createNew();
+    Assert.assertEquals(System.getProperty("user.name"), location.getOwner());
+    String group = location.getGroup();
+    // we only have one group and user in a unit test (or at least that is all we know)
+    // this allows us to pass in a new group name via system property if another group is known
+    String newGroup = System.getProperty("new.group.name");
+    newGroup = newGroup == null ? group : newGroup;
+    location.setGroup(newGroup);
+    Assert.assertEquals(newGroup, location.getGroup());
+  }
+
+
+  @Test
   public void testPermissions() throws IOException {
     LocationFactory factory = locationFactoryCache.getUnchecked("permission1");
 
