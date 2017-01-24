@@ -98,8 +98,8 @@ final class LocalLocation implements Location {
 
   @Override
   public OutputStream getOutputStream(String permission) throws IOException {
-    ensureDirectory(file.getParentFile());
     Set<PosixFilePermission> permissions = parsePermissions(permission);
+    ensureDirectory(file.getParentFile(), permissions);
     Path path = file.toPath();
     WritableByteChannel channel = Files.newByteChannel(path,
                                                        EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE),
@@ -110,7 +110,7 @@ final class LocalLocation implements Location {
   }
 
   /**
-   * @return Returns the name of the file or directory denoteed by this abstract pathname.
+   * @return Returns the name of the file or directory denoted by this abstract pathname.
    */
   @Override
   public String getName() {
@@ -251,6 +251,34 @@ final class LocalLocation implements Location {
     return file.mkdirs();
   }
 
+  @Override
+  public boolean mkdirs(String permission) throws IOException {
+    Set<PosixFilePermission> posixPermissions = parsePermissions(permission);
+    return mkdirs(file, posixPermissions);
+  }
+
+  private boolean mkdirs(File file, Set<PosixFilePermission> permissions) throws IOException {
+    if (file.exists()) {
+      return false;
+    }
+    if (file.mkdir()) {
+      Files.setPosixFilePermissions(file.toPath(), permissions);
+      return true;
+    }
+    File parent = file.getParentFile();
+    if (parent == null) {
+      return false;
+    }
+    if (!mkdirs(parent, permissions) && !parent.exists()) {
+      return false;
+    }
+    if (file.mkdir()) {
+      Files.setPosixFilePermissions(file.toPath(), permissions);
+      return true;
+    }
+    return false;
+  }
+
   /**
    * @return Length of file.
    */
@@ -317,6 +345,16 @@ final class LocalLocation implements Location {
   private void ensureDirectory(File dir) throws IOException {
     // Check, create, check to resolve race conditions if there are concurrent creation of the directory.
     if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
+      throw new IOException("Failed to create directory " + dir);
+    }
+  }
+
+  /**
+   * Ensures the given {@link File} is a directory. If it doesn't exist, it will be created.
+   */
+  private void ensureDirectory(File dir, Set<PosixFilePermission> permission) throws IOException {
+    // Check, create, check to resolve race conditions if there are concurrent creation of the directory.
+    if (!dir.isDirectory() && !mkdirs(dir, permission) && !dir.isDirectory()) {
       throw new IOException("Failed to create directory " + dir);
     }
   }

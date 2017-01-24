@@ -199,10 +199,67 @@ final class FileContextLocation implements Location {
 
   @Override
   public boolean mkdirs() throws IOException {
+    if (fc.util().exists(path)) {
+      return false;
+    }
     try {
       fc.mkdir(path, null, true);
       return true;
     } catch (FileAlreadyExistsException e) {
+      return false;
+    }
+  }
+
+  @Override
+  public boolean mkdirs(String permission) throws IOException {
+    return mkdirs(path, parsePermissions(permission));
+  }
+
+  /**
+   * Helper to create a directory and its parents id necessary, all with the given permissions.
+   * We cannot use the fs.mkdirs() because that would apply the umask to the permissions.
+   */
+  private boolean mkdirs(Path path, FsPermission permission) throws IOException {
+    if (fc.util().exists(path)) {
+      return false;
+    }
+    Path parent = path.getParent();
+    if (null == parent) {
+      return false;
+    }
+    // if parent exists, attempt to create the path as a directory.
+    if (fc.util().exists(parent)) {
+      return mkdir(path, permission);
+    }
+    // attempt to create the parent with the proper permissions
+    if (!mkdirs(parent, permission) && !isDirectory(parent)) {
+      return false;
+    }
+    // now the parent exists and we can create this directory
+    return mkdir(path, permission);
+  }
+
+  /**
+   * Helper to create a directory (but not its parents) with the given permissions.
+   * We cannot use fs.mkdirs() and then apply the permissions to override the umask.
+   */
+  private boolean mkdir(Path path, FsPermission permission) throws IOException {
+    try {
+      fc.mkdir(path, null, true);
+    } catch (FileAlreadyExistsException e) {
+      if (!isDirectory(path)) {
+        return false;
+      }
+    }
+    // explicitly set permissions to get around the umask
+    fc.setPermission(path, permission);
+    return true;
+  }
+
+  private boolean isDirectory(Path path) throws IOException {
+    try {
+      return fc.getFileStatus(path).isDirectory();
+    } catch (FileNotFoundException e) {
       return false;
     }
   }
@@ -219,11 +276,7 @@ final class FileContextLocation implements Location {
 
   @Override
   public boolean isDirectory() throws IOException {
-    try {
-      return fc.getFileStatus(path).isDirectory();
-    } catch (FileNotFoundException e) {
-      return false;
-    }
+    return isDirectory(path);
   }
 
   @Override

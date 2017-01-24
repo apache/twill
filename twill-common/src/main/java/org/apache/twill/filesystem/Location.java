@@ -173,7 +173,7 @@ public interface Location {
    * pathname denotes a directory, then the directory must be empty in order
    * to be deleted.
    *
-   * @return true if and only if the file or directory is successfully delete; false otherwise.
+   * @return true if and only if the file or directory is successfully deleted; false otherwise.
    */
   boolean delete() throws IOException;
 
@@ -185,7 +185,7 @@ public interface Location {
    * failure during deletion will have some entries inside the directory being deleted while some are not.
    *
    * @param recursive Indicate if recursively delete a directory. Ignored if the pathname represents a file.
-   * @return true if and only if the file or directory is successfully delete; false otherwise.
+   * @return true if and only if the file or directory is successfully deleted; false otherwise.
    */
   boolean delete(boolean recursive) throws IOException;
 
@@ -202,9 +202,25 @@ public interface Location {
    * Creates the directory named by this abstract pathname, including any necessary
    * but nonexistent parent directories.
    *
-   * @return true if and only if the renaming succeeded; false otherwise
+   * @return true if and only if the directory was created; false otherwise
    */
   boolean mkdirs() throws IOException;
+
+  /**
+   * Creates the directory named by this abstract pathname, including any necessary
+   * but nonexistent parent directories. The directories will be created with the
+   * exact given permissions, regardless of a possible umask setting.
+   *
+   * @param permission A permission string. It has to be either a three digit or a nine character string.
+   *                   For the three digit string, it is similar to the UNIX permission numeric representation.
+   *                   The first digit is the permission for owner, second digit is the permission for group and
+   *                   the third digit is the permission for all.
+   *                   For the nine character string, it uses the format as specified by the
+   *                   {@link PosixFilePermissions#fromString(String)} method.
+   *
+   * @return true if and only if the directory was created; false otherwise
+   */
+  boolean mkdirs(String permission) throws IOException;
 
   /**
    * @return Length of file.
