@@ -17,34 +17,15 @@
  */
 package org.apache.twill.filesystem;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-
 import java.io.IOException;
 
 /**
- *
+ * Everything here is set up the same as for FileContextLocation; except that we use an HDFSLocationFactory.
  */
-public class HDFSLocationTest extends LocationTestBase {
-
-  private static MiniDFSCluster dfsCluster;
-
-  @BeforeClass
-  public static void init() throws IOException {
-    Configuration conf = new Configuration();
-    conf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, tmpFolder.newFolder().getAbsolutePath());
-    dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
-  }
-
-  @AfterClass
-  public static void finish() {
-    dfsCluster.shutdown();
-  }
+public class HDFSLocationTest extends FileContextLocationTest {
 
   @Override
-  protected LocationFactory createLocationFactory(String pathBase) throws Exception {
+  protected LocationFactory doCreateLocationFactory(String pathBase) throws IOException {
     return new HDFSLocationFactory(dfsCluster.getFileSystem(), pathBase);
   }
 }

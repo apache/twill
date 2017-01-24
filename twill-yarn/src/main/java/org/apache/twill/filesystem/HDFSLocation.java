@@ -221,15 +221,62 @@ final class HDFSLocation implements Location {
     }
   }
 
-  /**
-   * Creates the directory named by this abstract pathname, including any necessary
-   * but nonexistent parent directories.
-   *
-   * @return true if and only if the renaming succeeded; false otherwise
-   */
   @Override
   public boolean mkdirs() throws IOException {
-    return fs.mkdirs(path);
+    if (fs.exists(path)) {
+      return false;
+    }
+    try {
+      return fs.mkdirs(path);
+    } catch (FileAlreadyExistsException e) {
+      return false;
+    }
+  }
+
+  @Override
+  public boolean mkdirs(String permission) throws IOException {
+    return mkdirs(path, parsePermissions(permission));
+  }
+
+  /**
+   * Helper to create a directory and its parents id necessary, all with the given permissions.
+   * We cannot use the fs.mkdirs() because that would apply the umask to the permissions.
+   */
+  private boolean mkdirs(Path path, FsPermission permission) throws IOException {
+    if (fs.exists(path)) {
+      return false;
+    }
+    Path parent = path.getParent();
+    if (null == parent) {
+      return false;
+    }
+    // if parent exists, attempt to create the path as a directory.
+    if (fs.exists(parent)) {
+      return mkdir(path, permission);
+    }
+    // attempt to create the parent with the proper permissions
+    if (!mkdirs(parent, permission) && !fs.isDirectory(parent)) {
+      return false;
+    }
+    // now the parent exists and we can create this directory
+    return mkdir(path, permission);
+  }
+
+  /**
+   * Helper to create a directory (but not its parents) with the given permissions.
+   * We cannot use fs.mkdirs() and then apply the permissions to override the umask.
+   */
+  private boolean mkdir(Path path, FsPermission permission) throws IOException {
+    try {
+      if (!fs.mkdirs(path) && !fs.isDirectory(path)) {
+        return false;
+      }
+    } catch (FileAlreadyExistsException e) {
+      return false;
+    }
+    // explicitly set permissions to get around the umask
+    fs.setPermission(path, permission);
+    return true;
   }
 
   /**
