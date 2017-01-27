@@ -300,7 +300,7 @@ public abstract class LocationTestBase {
     Assert.assertFalse(textfile.isDirectory());
     Assert.assertEquals(permissions, child.getPermissions());
     Assert.assertEquals(permissions, grandchild.getPermissions());
-    Assert.assertEquals(permissions, textfile.getPermissions());
+    Assert.assertEquals(correctFilePermissions(permissions), textfile.getPermissions());
 
     // mkdirs of existing file
     Location file = factory.create("existingfile");
@@ -363,4 +363,12 @@ public abstract class LocationTestBase {
    * If no suitable group name is known, the passed-in group name can be returned.
    */
   protected abstract String getUserGroup(String groupName);
+
+  /**
+   * Some older versions of Hadoop always strip the execute permission from files (but keep it for directories).
+   * This allows subclasses to correct the expected file permissions, based on the Hadoop version (if any).
+   */
+  protected String correctFilePermissions(String expectedFilePermissions) {
+    return expectedFilePermissions; // unchanged by default
+  }
 }

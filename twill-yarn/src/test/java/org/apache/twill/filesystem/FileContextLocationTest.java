@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.twill.internal.yarn.YarnUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
@@ -89,5 +90,15 @@ public class FileContextLocationTest extends LocationTestBase {
 
   protected LocationFactory doCreateLocationFactory(String pathBase) throws IOException {
     return new FileContextLocationFactory(dfsCluster.getFileSystem().getConf(), pathBase);
+  }
+
+  @Override
+  protected String correctFilePermissions(String original) {
+    if (YarnUtils.HadoopVersions.HADOOP_20.equals(YarnUtils.getHadoopVersion())) {
+      return original.substring(0, 2) + '-' + // strip the x for owner
+        original.substring(3, 5) + '-' + // strip the x for group
+        original.substring(6, 8) + '-'; // strip the x for world;
+    }
+    return original;
   }
 }
