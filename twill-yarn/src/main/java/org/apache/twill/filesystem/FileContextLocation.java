@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.HAUtil;
+import org.apache.hadoop.security.AccessControlException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -199,13 +200,16 @@ final class FileContextLocation implements Location {
 
   @Override
   public boolean mkdirs() throws IOException {
-    if (fc.util().exists(path)) {
-      return false;
-    }
     try {
+      if (fc.util().exists(path)) {
+        return false;
+      }
       fc.mkdir(path, null, true);
       return true;
-    } catch (FileAlreadyExistsException e) {
+    } catch (FileAlreadyExistsException | AccessControlException e) {
+      // curiously, if one of the parent dirs exists but is a file, Hadoop throws this:
+      // org.apache...AccessControlException: Permission denied: user=..., access=EXECUTE, inode=".../existingfile"
+      // however, if the directory itself exists, it will throw FileAlreadyExistsException
       return false;
     }
   }
@@ -220,9 +224,16 @@ final class FileContextLocation implements Location {
    * We cannot use the fs.mkdirs() because that would apply the umask to the permissions.
    */
   private boolean mkdirs(Path path, FsPermission permission) throws IOException {
-    if (fc.util().exists(path)) {
+    try {
+      if (fc.util().exists(path)) {
+        return false;
+      }
+    } catch (AccessControlException e) {
+      // curiously, if one of the parent dirs exists but is a file, Hadoop throws this:
+      // org.apache...AccessControlException: Permission denied: user=..., access=EXECUTE, inode=".../existingfile"
       return false;
     }
+
     Path parent = path.getParent();
     if (null == parent) {
       return false;
