@@ -53,6 +53,7 @@ these steps to get your contributions in:
 ### Coding Style
 
 * IntelliJ IDEA 2016 [settings](twill-idea-settings.jar)
+* Eclipse IDE Neon [settings](twill-eclipse-settings.epf)
 
 ### How to Merge Code Changes
 
