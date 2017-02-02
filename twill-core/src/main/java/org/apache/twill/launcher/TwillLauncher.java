@@ -96,10 +96,14 @@ public final class TwillLauncher {
     });
 
     // Add the app jar, resources jar and twill jar directories to the classpath as well
-    for (File dir : Arrays.asList(appJarDir, resourceJarDir, twillJarDir)) {
+    for (File dir : Arrays.asList(appJarDir, twillJarDir)) {
       urls.add(dir.toURI().toURL());
       urls.add(new File(dir, "classes").toURI().toURL());
-      urls.add(new File(dir, "resources").toURI().toURL());
+    }
+
+    // this indicates that we are not in the ApplicationMaster
+    if (useClassPath) {
+      urls.add(new File(resourceJarDir, "resources").toURI().toURL());
     }
 
     // Add all lib jars
