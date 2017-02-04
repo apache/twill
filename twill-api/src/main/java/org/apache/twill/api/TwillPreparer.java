@@ -220,6 +220,16 @@ public interface TwillPreparer {
   TwillPreparer withBundlerClassAcceptor(ClassAcceptor classAcceptor);
 
   /**
+   * Sets the maximum number of times (per instance) a runnable will be retried if it exits without success. The default
+   * behavior is to retry indefinitely.
+   * 
+   * @param runnableName Name of the {@link TwillRunnable}.
+   * @param maxRetries maximum number of retries per instance
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withMaxRetries(String runnableName, int maxRetries);
+
+  /**
    * Adds security credentials for the runtime environment to gives application access to resources.
    *
    * @param secureStore Contains security token available for the runtime environment.

@@ -40,11 +40,12 @@ public class TwillRuntimeSpecification {
   private final int reservedMemory;
   private final String rmSchedulerAddr;
   private final Map<String, Map<String, String>> logLevels;
+  private final Map<String, Integer> maxRetries;
 
   public TwillRuntimeSpecification(TwillSpecification twillSpecification, String fsUser, URI twillAppDir,
                                    String zkConnectStr, RunId twillRunId, String twillAppName,
                                    int reservedMemory, @Nullable String rmSchedulerAddr,
-                                   Map<String, Map<String, String>> logLevels) {
+                                   Map<String, Map<String, String>> logLevels, Map<String, Integer> maxRetries) {
     this.twillSpecification = twillSpecification;
     this.fsUser = fsUser;
     this.twillAppDir = twillAppDir;
@@ -54,6 +55,7 @@ public class TwillRuntimeSpecification {
     this.reservedMemory = reservedMemory;
     this.rmSchedulerAddr = rmSchedulerAddr;
     this.logLevels = logLevels;
+    this.maxRetries = maxRetries;
   }
 
   public TwillSpecification getTwillSpecification() {
@@ -91,5 +93,9 @@ public class TwillRuntimeSpecification {
 
   public Map<String, Map<String, String>> getLogLevels() {
     return logLevels;
+  }
+
+  public Map<String, Integer> getMaxRetries() {
+    return maxRetries;
   }
 }

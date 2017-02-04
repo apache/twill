@@ -48,6 +48,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   private static final String RM_SCHEDULER_ADDR = "rmSchedulerAddr";
   private static final String TWILL_SPEC = "twillSpecification";
   private static final String LOG_LEVELS = "logLevels";
+  private static final String MAX_RETRIES = "maxRetries";
 
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
@@ -65,6 +66,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
              context.serialize(src.getTwillSpecification(), new TypeToken<TwillSpecification>() { }.getType()));
     json.add(LOG_LEVELS,
              context.serialize(src.getLogLevels(), new TypeToken<Map<String, Map<String, String>>>() { }.getType()));
+    json.add(MAX_RETRIES,
+             context.serialize(src.getMaxRetries(), new TypeToken<Map<String, Integer>>() { }.getType()));
+
     return json;
   }
 
@@ -77,6 +81,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
       jsonObj.get(TWILL_SPEC), new TypeToken<TwillSpecification>() { }.getType());
     Map<String, Map<String, String>> logLevels =
       context.deserialize(jsonObj.get(LOG_LEVELS), new TypeToken<Map<String, Map<String, String>>>() { }.getType());
+    Map<String, Integer> maxRetries = 
+      context.deserialize(jsonObj.get(MAX_RETRIES), new TypeToken<Map<String, Integer>>() { }.getType());
+    
     return new TwillRuntimeSpecification(twillSpecification,
                                          jsonObj.get(FS_USER).getAsString(),
                                          URI.create(jsonObj.get(TWILL_APP_DIR).getAsString()),
@@ -85,7 +92,8 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                          jsonObj.get(TWILL_APP_NAME).getAsString(),
                                          jsonObj.get(RESERVED_MEMORY).getAsInt(),
                                          jsonObj.has(RM_SCHEDULER_ADDR) ?
-                                           jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
-                                         logLevels);
+                                         jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
+                                         logLevels,
+                                         maxRetries);
   }
 }

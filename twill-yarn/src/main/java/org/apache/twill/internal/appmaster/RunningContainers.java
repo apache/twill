@@ -37,9 +37,11 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
+import org.apache.twill.api.RuntimeSpecification;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.filesystem.Location;
@@ -79,6 +81,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
 import javax.annotation.Nullable;
 
 /**
@@ -113,9 +116,11 @@ final class RunningContainers {
   private final Location applicationLocation;
   private final Set<String> runnableNames;
   private final Map<String, Map<String, String>> logLevels;
+  private final Map<String, Integer> maxRetries;
+  private final Map<String, Map<Integer, AtomicInteger>> numRetries;
 
   RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient,
-                    Location applicationLocation, Set<String> runnableNames) {
+    Location applicationLocation, Map<String, RuntimeSpecification> runnables, Map<String, Integer> maxRetriesMap) {
     containers = HashBasedTable.create();
     runnableInstances = Maps.newHashMap();
     completedContainerCount = Maps.newHashMap();
@@ -126,8 +131,10 @@ final class RunningContainers {
     zkClient = zookeeperClient;
     containerStats = HashMultimap.create();
     this.applicationLocation = applicationLocation;
-    this.runnableNames = runnableNames;
+    this.runnableNames = runnables.keySet();
     this.logLevels = new TreeMap<>();
+    this.maxRetries = Maps.newHashMap(maxRetriesMap);
+    this.numRetries = Maps.newHashMap();
   }
 
   /**
@@ -256,6 +263,10 @@ final class RunningContainers {
       if (removeContainerInfo(containerId)) {
         containers.remove(runnableName, containerId);
         removeInstanceId(runnableName, instanceId);
+
+        // clear the entry from numRetries since we are intentionally stopping this instance
+        numRetries.get(runnableName).remove(instanceId);
+
         resourceReport.removeRunnableResources(runnableName, containerId);
         containerChange.signalAll();
       }
@@ -394,6 +405,7 @@ final class RunningContainers {
     try {
       containers.clear();
       runnableInstances.clear();
+      numRetries.clear();
       containerStats.clear();
     } finally {
       containerLock.unlock();
@@ -434,9 +446,12 @@ final class RunningContainers {
       }
 
       boolean containerStopped = false;
+      final String runnableName = lookup.keySet().iterator().next();
+      int instanceId = 0;
+
       for (Map.Entry<String, TwillContainerController> completedEntry : lookup.entrySet()) {
-        String runnableName = completedEntry.getKey();
         TwillContainerController controller = completedEntry.getValue();
+        instanceId = getInstanceId(controller.getRunId());
 
         // TODO: Can there be multiple controllers for a single container?
         // TODO: What is the best way to determine whether to restart container when there are multiple controllers?
@@ -456,13 +471,14 @@ final class RunningContainers {
         removeInstanceId(runnableName, getInstanceId(controller.getRunId()));
         resourceReport.removeRunnableResources(runnableName, containerId);
       }
+      
 
       if (exitStatus != ContainerExitCodes.SUCCESS) {
         LOG.warn("Container {} exited abnormally with state {}, exit code {}.",
                  containerId, state, exitStatus);
-        if (!containerStopped && shouldRetry(exitStatus)) {
+        if (!containerStopped && shouldRetry(runnableName, instanceId, exitStatus)) {
           LOG.info("Re-request the container {} for exit code {}.", containerId, exitStatus);
-          restartRunnables.add(lookup.keySet().iterator().next());
+          restartRunnables.add(runnableName);
         } else if (containerStopped) {
           LOG.info("Container {} is being stopped, will not re-request", containerId);
         }
@@ -477,10 +493,30 @@ final class RunningContainers {
     }
   }
 
-  private boolean shouldRetry(int exitCode) {
-    return exitCode != ContainerExitCodes.SUCCESS
-      && exitCode != ContainerExitCodes.DISKS_FAILED
-      && exitCode != ContainerExitCodes.INIT_FAILED;
+  private boolean shouldRetry(String runnableName, int instanceId, int exitCode) {
+    boolean possiblyRetry = 
+      exitCode != ContainerExitCodes.SUCCESS && 
+      exitCode != ContainerExitCodes.DISKS_FAILED && 
+      exitCode != ContainerExitCodes.INIT_FAILED;
+    
+    if (possiblyRetry) {
+      int max = getMaxRetries(runnableName);
+      if (max == Integer.MAX_VALUE) {
+        return true; // retry without special log msg
+      }
+
+      final int retryCount = getRetryCount(runnableName, instanceId);
+      if (retryCount == max) {
+        LOG.info("Retries exhausted for instance {} of runnable {}.", instanceId, runnableName);
+        return false;
+      } else {
+        LOG.info("Attempting {} of {} retries for instance {} of runnable {}.",
+          retryCount + 1, max, instanceId, runnableName);
+        return true;
+      }
+    } else {
+      return false;
+    }
   }
 
   private boolean isControllerStopped(TwillContainerController controller) {
@@ -525,7 +561,15 @@ final class RunningContainers {
       instances = new BitSet();
       runnableInstances.put(runnableName, instances);
     }
-    int instanceId = instances.nextClearBit(0);
+    
+    // get the next free instance that has not exceeded its maximum retries.
+    int instanceId = 0;
+    int maxRetries = getMaxRetries(runnableName);
+    while (getRetryCount(runnableName, (instanceId = instances.nextClearBit(instanceId))) == maxRetries) {
+      instanceId++;
+    }
+    // count starts at -1, so first increment makes it 0
+    incrementRetryCount(runnableName, instanceId);
     instances.set(instanceId);
     return instanceId;
   }
@@ -561,6 +605,38 @@ final class RunningContainers {
   private int getRunningInstances(String runableName) {
     BitSet instances = runnableInstances.get(runableName);
     return instances == null ? 0 : instances.cardinality();
+  }
+
+  /**
+   * Returns the maximum number of retries for the runnable.
+   */
+  private int getMaxRetries(String runnableName) {
+    int max = Integer.MAX_VALUE;
+    if (maxRetries.containsKey(runnableName)) {
+      max = maxRetries.get(runnableName);
+    }
+    return max;
+  }
+
+  /**
+   * Returns the retry count for the runnable and instance, while initializing a counter if one doesn't already exist.
+   */
+  private int getRetryCount(String runnableName, int instanceId) {
+    Map<Integer, AtomicInteger> runnableNumRetries = numRetries.get(runnableName);
+    if (runnableNumRetries == null) {
+      runnableNumRetries = Maps.newHashMap();
+      numRetries.put(runnableName, runnableNumRetries);
+    }
+    AtomicInteger cnt = runnableNumRetries.get(instanceId);
+    if (cnt == null) {
+      cnt = new AtomicInteger(-1);
+      runnableNumRetries.put(instanceId, cnt);
+    }
+    return cnt.get();
+  }
+
+  private void incrementRetryCount(String runnableName, int instanceId) {
+    numRetries.get(runnableName).get(instanceId).incrementAndGet();
   }
 
   private RunId getRunId(String runnableName, int instanceId) {
