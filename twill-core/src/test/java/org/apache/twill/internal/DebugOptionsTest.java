@@ -24,7 +24,7 @@ import org.junit.Test;
 import java.util.Set;
 
 /**
- * Unit test for {@link org.apache.twill.internal.JvmOptions.DebugOptions} class
+ * Unit test for {@link org.apache.twill.internal.JvmOptions.DebugOptions} class.
  */
 public class DebugOptionsTest {
 

@@ -17,6 +17,7 @@
  */
 package org.apache.twill.filesystem;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 
 import java.io.File;
@@ -27,10 +28,26 @@ import java.io.File;
 public class LocalLocationTest extends LocationTestBase {
 
   @Override
+  protected String getUserName() {
+    return System.getProperty("user.name");
+  }
+
+  @Override
+  protected String getUserGroup(String groupName) {
+    String newGroup = System.getProperty("new.group.name");
+    return newGroup != null ? newGroup : groupName;
+  }
+
+  @Override
   protected LocationFactory createLocationFactory(String pathBase) throws Exception {
     File basePath = new File(tmpFolder.newFolder(), pathBase);
+    //noinspection ResultOfMethodCallIgnored
     basePath.mkdirs();
     return new LocalLocationFactory(basePath);
+  }
+
+  protected LocationFactory createLocationFactory(String pathBase, UserGroupInformation ugi) throws Exception {
+    return null;
   }
 
   @Override

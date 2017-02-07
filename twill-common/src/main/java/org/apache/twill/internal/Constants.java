@@ -44,9 +44,6 @@ public final class Constants {
 
   public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;
 
-  public static final String CLASSPATH = "classpath";
-  public static final String APPLICATION_CLASSPATH = "application-classpath";
-
   /** Command names for the restart runnable instances. */
   public static final String RESTART_ALL_RUNNABLE_INSTANCES = "restartAllRunnableInstances";
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
@@ -68,14 +65,21 @@ public final class Constants {
   public static final class Files {
 
     public static final String LAUNCHER_JAR = "launcher.jar";
-    public static final String APP_MASTER_JAR = "appMaster.jar";
-    public static final String CONTAINER_JAR = "container.jar";
+    public static final String TWILL_JAR = "twill.jar";
+    public static final String APPLICATION_JAR = "application.jar";
+    public static final String RESOURCES_JAR = "resources.jar";
+    public static final String RUNTIME_CONFIG_JAR = "runtime.config.jar";
+
     public static final String LOCALIZE_FILES = "localizeFiles.json";
     public static final String TWILL_SPEC = "twillSpec.json";
     public static final String ARGUMENTS = "arguments.json";
     public static final String ENVIRONMENTS = "environments.json";
     public static final String LOGBACK_TEMPLATE = "logback-template.xml";
-    public static final String JVM_OPTIONS = "jvm.opts";
+    public static final String JVM_OPTIONS = "jvm.opts.json";
+
+    public static final String CLASSPATH = "classpath.txt";
+    public static final String APPLICATION_CLASSPATH = "application-classpath.txt";
+
     public static final String CREDENTIALS = "credentials.store";
     public static final String LOG_LEVELS = "logLevel.json";
 

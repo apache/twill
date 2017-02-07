@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.net.URI;
 
 /**
- * Providers helper methods for creating different {@link LocationFactory}.
+ * Provides helper methods for creating different {@link LocationFactory}.
  */
 public final class LocationFactories {
 

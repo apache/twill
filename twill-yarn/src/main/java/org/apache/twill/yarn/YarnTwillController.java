@@ -19,7 +19,6 @@ package org.apache.twill.yarn;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -32,9 +31,12 @@ import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.internal.AbstractTwillController;
 import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ProcessController;
+import org.apache.twill.internal.appmaster.ApplicationMasterLiveNodeData;
 import org.apache.twill.internal.appmaster.TrackerService;
 import org.apache.twill.internal.state.SystemMessages;
+import org.apache.twill.internal.yarn.YarnAppClient;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
+import org.apache.twill.internal.yarn.YarnUtils;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.zookeeper.data.Stat;
@@ -44,10 +46,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
+import java.util.Collections;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 
 /**
  * A {@link org.apache.twill.api.TwillController} that controllers application running on Hadoop YARN.
@@ -58,6 +62,9 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
   private final String appName;
   private final Callable<ProcessController<YarnApplicationReport>> startUp;
+  private final long startTimeout;
+  private final TimeUnit startTimeoutUnit;
+  private volatile ApplicationMasterLiveNodeData amLiveNodeData;
   private ProcessController<YarnApplicationReport> processController;
   private ResourceReportClient resourcesClient;
 
@@ -66,18 +73,32 @@ final class YarnTwillController extends AbstractTwillController implements Twill
   private Thread statusPollingThread;
 
   /**
-   * Creates an instance without any {@link LogHandler}.
+   * Creates an instance with an existing {@link ApplicationMasterLiveNodeData}.
    */
   YarnTwillController(String appName, RunId runId, ZKClient zkClient,
-                      Callable<ProcessController<YarnApplicationReport>> startUp) {
-    this(appName, runId, zkClient, ImmutableList.<LogHandler>of(), startUp);
+                      final ApplicationMasterLiveNodeData amLiveNodeData, final YarnAppClient yarnAppClient) {
+    super(runId, zkClient, Collections.<LogHandler>emptyList());
+    this.appName = appName;
+    this.amLiveNodeData = amLiveNodeData;
+    this.startUp = new Callable<ProcessController<YarnApplicationReport>>() {
+      @Override
+      public ProcessController<YarnApplicationReport> call() throws Exception {
+        return yarnAppClient.createProcessController(
+          YarnUtils.createApplicationId(amLiveNodeData.getAppIdClusterTime(), amLiveNodeData.getAppId()));
+      }
+    };
+    this.startTimeout = Constants.APPLICATION_MAX_START_SECONDS;
+    this.startTimeoutUnit = TimeUnit.SECONDS;
   }
 
   YarnTwillController(String appName, RunId runId, ZKClient zkClient, Iterable<LogHandler> logHandlers,
-                      Callable<ProcessController<YarnApplicationReport>> startUp) {
+                      Callable<ProcessController<YarnApplicationReport>> startUp,
+                      long startTimeout, TimeUnit startTimeoutUnit) {
     super(runId, zkClient, logHandlers);
     this.appName = appName;
     this.startUp = startUp;
+    this.startTimeout = startTimeout;
+    this.startTimeoutUnit = startTimeoutUnit;
   }
 
 
@@ -86,6 +107,11 @@ final class YarnTwillController extends AbstractTwillController implements Twill
    */
   ListenableFuture<Void> secureStoreUpdated() {
     return sendMessage(SystemMessages.SECURE_STORE_UPDATED, null);
+  }
+
+  @Nullable
+  ApplicationMasterLiveNodeData getApplicationMasterLiveNodeData() {
+    return amLiveNodeData;
   }
 
   @Override
@@ -101,23 +127,18 @@ final class YarnTwillController extends AbstractTwillController implements Twill
       LOG.info("Application {} with id {} submitted", appName, appId);
 
       YarnApplicationState state = report.getYarnApplicationState();
-      Stopwatch stopWatch = new Stopwatch();
-      stopWatch.start();
-      long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_START_SECONDS, TimeUnit.SECONDS);
+      Stopwatch stopWatch = new Stopwatch().start();
 
       LOG.debug("Checking yarn application status for {} {}", appName, appId);
-      while (!hasRun(state) && stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
+      while (!hasRun(state) && stopWatch.elapsedTime(startTimeoutUnit) < startTimeout) {
         report = processController.getReport();
         state = report.getYarnApplicationState();
         LOG.debug("Yarn application status for {} {}: {}", appName, appId, state);
         TimeUnit.SECONDS.sleep(1);
-        stopWatch.reset();
-        stopWatch.start();
       }
       LOG.info("Yarn application {} {} is in state {}", appName, appId, state);
       if (state != YarnApplicationState.RUNNING) {
-        LOG.info("Yarn application {} {} is not in running state. Shutting down controller.",
-                 appName, appId, Constants.APPLICATION_MAX_START_SECONDS);
+        LOG.info("Yarn application {} {} is not in running state. Shutting down controller.", appName, appId);
         forceShutDown();
       } else {
         try {
@@ -155,8 +176,7 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
     // Poll application status from yarn
     try (ProcessController<YarnApplicationReport> processController = this.processController) {
-      Stopwatch stopWatch = new Stopwatch();
-      stopWatch.start();
+      Stopwatch stopWatch = new Stopwatch().start();
       long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_STOP_SECONDS, TimeUnit.SECONDS);
 
       YarnApplicationReport report = processController.getReport();
@@ -166,8 +186,6 @@ final class YarnTwillController extends AbstractTwillController implements Twill
           stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
         LOG.debug("Yarn application final status for {} {}: {}", appName, appId, finalStatus);
         TimeUnit.SECONDS.sleep(1);
-        stopWatch.reset();
-        stopWatch.start();
         finalStatus = processController.getReport().getFinalApplicationStatus();
       }
       LOG.debug("Yarn application {} {} completed with status {}", appName, appId, finalStatus);
@@ -197,6 +215,10 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
   @Override
   protected void instanceNodeUpdated(NodeData nodeData) {
+    ApplicationMasterLiveNodeData data = ApplicationMasterLiveNodeDecoder.decode(nodeData);
+    if (data != null) {
+      amLiveNodeData = data;
+    }
   }
 
   @Override

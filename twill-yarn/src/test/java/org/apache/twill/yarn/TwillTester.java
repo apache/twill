@@ -19,9 +19,11 @@ package org.apache.twill.yarn;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.yarn.api.protocolrecords.GetApplicationReportRequest;
@@ -32,8 +34,12 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.MiniYARNCluster;
 import org.apache.hadoop.yarn.server.resourcemanager.ClientRMService;
 import org.apache.hadoop.yarn.util.Records;
+import org.apache.twill.api.Configs;
+import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillRunnerService;
+import org.apache.twill.filesystem.FileContextLocationFactory;
+import org.apache.twill.filesystem.LocationFactory;
 import org.apache.twill.internal.yarn.VersionDetectYarnAppClientFactory;
 import org.apache.twill.internal.yarn.YarnAppClient;
 import org.apache.twill.internal.yarn.YarnUtils;
@@ -45,7 +51,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A TwillTester rule allows creation of mini Yarn cluster and {@link TwillRunner} used for testing that is
@@ -69,12 +78,33 @@ public class TwillTester extends ExternalResource {
   private static final Logger LOG = LoggerFactory.getLogger(TwillTester.class);
 
   private final TemporaryFolder tmpFolder = new TemporaryFolder();
+  private final Map<String, String> extraConfig;
+
   private InMemoryZKServer zkServer;
   private MiniDFSCluster dfsCluster;
   private MiniYARNCluster cluster;
   private YarnConfiguration config;
   private TwillRunnerService twillRunner;
   private YarnAppClient yarnAppClient;
+
+  /**
+   * Creates a new instance with the give list of configurations.
+   *
+   * @param configs list of configuration pairs.
+   *                The list must be in the form of {@code (key1, value1, key2, value2, ...)},
+   *                hence the length of configs must be even.
+   *                The {@link Object#toString()} method will be called to obtain the keys and values that go into
+   *                the configuration.
+   */
+  public TwillTester(Object...configs) {
+    Preconditions.checkArgument(configs.length % 2 == 0,
+                                "Arguments must be in pair form like (k1, v1, k2, v2): %s", Arrays.toString(configs));
+
+    this.extraConfig = new HashMap<>();
+    for (int i = 0; i < configs.length; i += 2) {
+      this.extraConfig.put(configs[i].toString(), configs[i + 1].toString());
+    }
+  }
 
   @Override
   protected void before() throws Throwable {
@@ -89,6 +119,11 @@ public class TwillTester extends ExternalResource {
     LOG.info("Starting Mini DFS on path {}", miniDFSDir);
     Configuration fsConf = new HdfsConfiguration(new Configuration());
     fsConf.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, miniDFSDir.getAbsolutePath());
+
+    for (Map.Entry<String, String> entry : extraConfig.entrySet()) {
+      fsConf.set(entry.getKey(), entry.getValue());
+    }
+
     dfsCluster = new MiniDFSCluster.Builder(fsConf).numDataNodes(1).build();
 
     Configuration conf = new YarnConfiguration(dfsCluster.getFileSystem().getConf());
@@ -108,11 +143,13 @@ public class TwillTester extends ExternalResource {
     conf.set("yarn.scheduler.minimum-allocation-mb", "128");
     conf.set("yarn.nodemanager.delete.debug-delay-sec", "3600");
 
+    conf.set(Configs.Keys.LOCAL_STAGING_DIRECTORY, tmpFolder.newFolder().getAbsolutePath());
+
     cluster = new MiniYARNCluster("test-cluster", 3, 1, 1);
     cluster.init(conf);
     cluster.start();
 
-    this.config = new YarnConfiguration(cluster.getConfig());
+    config = new YarnConfiguration(cluster.getConfig());
 
     twillRunner = createTwillRunnerService();
     twillRunner.start();
@@ -122,6 +159,17 @@ public class TwillTester extends ExternalResource {
 
   @Override
   protected void after() {
+    // Stop all runnable applications
+    for (TwillRunner.LiveInfo info : twillRunner.lookupLive()) {
+      for (TwillController controller : info.getControllers()) {
+        try {
+          controller.terminate().get();
+        } catch (Exception e) {
+          LOG.warn("Exception raised when awaiting termination of {}", info.getApplicationName());
+        }
+      }
+    }
+
     try {
       twillRunner.stop();
     } catch (Exception e) {
@@ -146,10 +194,23 @@ public class TwillTester extends ExternalResource {
    * Creates an unstarted instance of {@link org.apache.twill.api.TwillRunnerService}.
    */
   public TwillRunnerService createTwillRunnerService() throws IOException {
-    YarnTwillRunnerService runner = new YarnTwillRunnerService(config, zkServer.getConnectionStr() + "/twill");
+    YarnTwillRunnerService runner = new YarnTwillRunnerService(config, zkServer.getConnectionStr() + "/twill",
+                                                               createLocationFactory());
     // disable tests stealing focus
     runner.setJVMOptions("-Djava.awt.headless=true");
     return runner;
+  }
+
+  /**
+   * Creates a {@link LocationFactory} for the mini YARN cluster.
+   */
+  public LocationFactory createLocationFactory() {
+    try {
+      FileContext fc = FileContext.getFileContext(config);
+      return new FileContextLocationFactory(config, fc, fc.getHomeDirectory().toUri().getPath());
+    } catch (IOException e) {
+      throw Throwables.propagate(e);
+    }
   }
 
   /**

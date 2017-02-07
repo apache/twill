@@ -73,4 +73,16 @@ public final class DefaultLocalFile implements LocalFile {
   public String getPattern() {
     return pattern;
   }
+
+  @Override
+  public String toString() {
+    return "DefaultLocalFile{" +
+      "name='" + name + '\'' +
+      ", uri=" + uri +
+      ", lastModified=" + lastModified +
+      ", size=" + size +
+      ", archive=" + archive +
+      ", pattern='" + pattern + '\'' +
+      '}';
+  }
 }

@@ -15,17 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.filesystem;
+package org.apache.twill.internal.io;
+
+import org.apache.twill.filesystem.Location;
+import org.apache.twill.internal.utils.Paths;
 
 import java.io.IOException;
 
 /**
- * Everything here is set up the same as for FileContextLocation; except that we use an HDFSLocationFactory.
+ * A implementation of {@link LocationCache} that never cache any content.
+ * It always invokes {@link Loader#load(String, Location)} to load the content.
  */
-public class HDFSLocationTest extends FileContextLocationTest {
+public class NoCachingLocationCache implements LocationCache {
+
+  private final Location baseDir;
+
+  public NoCachingLocationCache(Location baseDir) {
+    this.baseDir = baseDir;
+  }
 
   @Override
-  protected LocationFactory doCreateLocationFactory(String pathBase) throws IOException {
-    return new HDFSLocationFactory(dfsCluster.getFileSystem(), pathBase);
+  public Location get(String name, Loader loader) throws IOException {
+    String suffix = Paths.getExtension(name);
+    String prefix = name.substring(0, name.length() - suffix.length() - 1);
+    Location targetLocation = baseDir.append(prefix).getTempFile('.' + suffix);
+    loader.load(name, targetLocation);
+    return targetLocation;
   }
 }

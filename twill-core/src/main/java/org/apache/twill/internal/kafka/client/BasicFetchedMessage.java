@@ -29,6 +29,7 @@ final class BasicFetchedMessage implements FetchedMessage {
 
   private final TopicPartition topicPartition;
   private ByteBuffer payload;
+  private long offset;
   private long nextOffset;
 
   BasicFetchedMessage(TopicPartition topicPartition) {
@@ -37,6 +38,10 @@ final class BasicFetchedMessage implements FetchedMessage {
 
   void setPayload(ByteBuffer payload) {
     this.payload = payload;
+  }
+
+  void setOffset(long offset) {
+    this.offset = offset;
   }
 
   void setNextOffset(long nextOffset) {
@@ -51,6 +56,11 @@ final class BasicFetchedMessage implements FetchedMessage {
   @Override
   public ByteBuffer getPayload() {
     return payload;
+  }
+
+  @Override
+  public long getOffset() {
+    return offset;
   }
 
   @Override

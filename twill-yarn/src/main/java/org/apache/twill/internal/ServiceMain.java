@@ -147,7 +147,14 @@ public abstract class ServiceMain {
         @Override
         public Location run() throws Exception {
           Configuration hConf = new Configuration(conf);
-          URI defaultURI = new URI(appDir.getScheme(), appDir.getAuthority(), null, null, null);
+          final URI defaultURI;
+          if (appDir.getAuthority() == null || appDir.getAuthority().isEmpty()) {
+            // some FileSystems do not have authority. E.g. maprfs or s3 (similar to file:///)
+            // need to handle URI differently for those
+            defaultURI = new URI(appDir.getScheme(), "", "/", null, null);
+          } else {
+            defaultURI = new URI(appDir.getScheme(), appDir.getAuthority(), null, null, null);
+          }
           hConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, defaultURI.toString());
           return new FileContextLocationFactory(hConf).create(appDir);
         }
@@ -186,7 +193,7 @@ public abstract class ServiceMain {
     configurator.setContext(context);
 
     try {
-      File twillLogback = new File(Constants.Files.LOGBACK_TEMPLATE);
+      File twillLogback = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.LOGBACK_TEMPLATE);
       if (twillLogback.exists()) {
         configurator.doConfigure(twillLogback);
       }

@@ -23,6 +23,7 @@ import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Factory for creating {@link YarnTwillController}.
@@ -30,5 +31,6 @@ import java.util.concurrent.Callable;
 interface YarnTwillControllerFactory {
 
   YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
-                             Callable<ProcessController<YarnApplicationReport>> startUp);
+                             Callable<ProcessController<YarnApplicationReport>> startUp,
+                             long startTimeout, TimeUnit startTimeoutUnit);
 }

@@ -28,12 +28,17 @@ import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.GroupPrincipal;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipalLookupService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -93,8 +98,8 @@ final class LocalLocation implements Location {
 
   @Override
   public OutputStream getOutputStream(String permission) throws IOException {
-    ensureDirectory(file.getParentFile());
     Set<PosixFilePermission> permissions = parsePermissions(permission);
+    ensureDirectory(file.getParentFile(), permissions);
     Path path = file.toPath();
     WritableByteChannel channel = Files.newByteChannel(path,
                                                        EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE),
@@ -105,7 +110,7 @@ final class LocalLocation implements Location {
   }
 
   /**
-   * @return Returns the name of the file or directory denoteed by this abstract pathname.
+   * @return Returns the name of the file or directory denoted by this abstract pathname.
    */
   @Override
   public String getName() {
@@ -128,6 +133,23 @@ final class LocalLocation implements Location {
     } catch (FileAlreadyExistsException e) {
       return false;
     }
+  }
+
+  @Override
+  public String getOwner() throws IOException {
+    return Files.getOwner(file.toPath()).getName();
+  }
+
+  @Override
+  public String getGroup() throws IOException {
+    return Files.readAttributes(file.toPath(), PosixFileAttributes.class).group().getName();
+  }
+
+  @Override
+  public void setGroup(String group) throws IOException {
+    UserPrincipalLookupService lookupService = FileSystems.getDefault().getUserPrincipalLookupService();
+    GroupPrincipal groupPrincipal = lookupService.lookupPrincipalByGroupName(group);
+    Files.getFileAttributeView(file.toPath(), PosixFileAttributeView.class).setGroup(groupPrincipal);
   }
 
   @Override
@@ -229,6 +251,34 @@ final class LocalLocation implements Location {
     return file.mkdirs();
   }
 
+  @Override
+  public boolean mkdirs(String permission) throws IOException {
+    Set<PosixFilePermission> posixPermissions = parsePermissions(permission);
+    return mkdirs(file, posixPermissions);
+  }
+
+  private boolean mkdirs(File file, Set<PosixFilePermission> permissions) throws IOException {
+    if (file.exists()) {
+      return false;
+    }
+    if (file.mkdir()) {
+      Files.setPosixFilePermissions(file.toPath(), permissions);
+      return true;
+    }
+    File parent = file.getParentFile();
+    if (parent == null) {
+      return false;
+    }
+    if (!mkdirs(parent, permissions) && !parent.exists()) {
+      return false;
+    }
+    if (file.mkdir()) {
+      Files.setPosixFilePermissions(file.toPath(), permissions);
+      return true;
+    }
+    return false;
+  }
+
   /**
    * @return Length of file.
    */
@@ -295,6 +345,16 @@ final class LocalLocation implements Location {
   private void ensureDirectory(File dir) throws IOException {
     // Check, create, check to resolve race conditions if there are concurrent creation of the directory.
     if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
+      throw new IOException("Failed to create directory " + dir);
+    }
+  }
+
+  /**
+   * Ensures the given {@link File} is a directory. If it doesn't exist, it will be created.
+   */
+  private void ensureDirectory(File dir, Set<PosixFilePermission> permission) throws IOException {
+    // Check, create, check to resolve race conditions if there are concurrent creation of the directory.
+    if (!dir.isDirectory() && !mkdirs(dir, permission) && !dir.isDirectory()) {
       throw new IOException("Failed to create directory " + dir);
     }
   }

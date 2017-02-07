@@ -21,6 +21,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
 import org.apache.hadoop.yarn.api.records.NodeReport;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.junit.After;
@@ -51,7 +52,7 @@ public abstract class BaseYarnTest {
    * A singleton wrapper so that yarn cluster only bring up once across all tests in the YarnTestSuite.
    */
   @ClassRule
-  public static final TwillTester TWILL_TESTER = new TwillTester() {
+  public static final TwillTester TWILL_TESTER = new TwillTester(Configs.Keys.LOCATION_CACHE_DIR, ".cache") {
     private final AtomicInteger instances = new AtomicInteger();
 
     @Override

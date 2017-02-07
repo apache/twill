@@ -57,6 +57,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -273,17 +274,17 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
       final AtomicBoolean stopped = new AtomicBoolean();
       return new MessageCallback() {
         @Override
-        public void onReceived(final Iterator<FetchedMessage> messages) {
+        public long onReceived(final Iterator<FetchedMessage> messages) {
           if (stopped.get()) {
-            return;
+            return -1L;
           }
-          Futures.getUnchecked(executor.submit(new Runnable() {
+          return Futures.getUnchecked(executor.submit(new Callable<Long>() {
             @Override
-            public void run() {
+            public Long call() {
               if (stopped.get()) {
-                return;
+                return -1L;
               }
-              callback.onReceived(messages);
+              return callback.onReceived(messages);
             }
           }));
         }
@@ -450,7 +451,7 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
     private void invokeCallback(ByteBufferMessageSet messages, AtomicLong offset) {
       long savedOffset = offset.get();
       try {
-        callback.onReceived(createFetchedMessages(messages, offset));
+        offset.set(callback.onReceived(createFetchedMessages(messages, offset)));
       } catch (Throwable t) {
         LOG.error("Callback throws exception. Retry from offset {} for {}", startOffset, topicPart, t);
         offset.set(savedOffset);
@@ -475,9 +476,9 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
               continue;
             }
 
-            offset.set(message.nextOffset());
             fetchedMessage.setPayload(message.message().payload());
-            fetchedMessage.setNextOffset(offset.get());
+            fetchedMessage.setOffset(message.offset());
+            fetchedMessage.setNextOffset(message.nextOffset());
 
             return fetchedMessage;
           }

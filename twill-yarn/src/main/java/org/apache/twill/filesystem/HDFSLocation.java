@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.security.AccessControlException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -156,6 +157,21 @@ final class HDFSLocation implements Location {
   }
 
   @Override
+  public String getOwner() throws IOException {
+    return fs.getFileStatus(path).getOwner();
+  }
+
+  @Override
+  public String getGroup() throws IOException {
+    return fs.getFileStatus(path).getGroup();
+  }
+
+  @Override
+  public void setGroup(String group) throws IOException {
+    fs.setOwner(path, null, group);
+  }
+
+  @Override
   public String getPermissions() throws IOException {
     FsPermission permission = fs.getFileStatus(path).getPermission();
     return permission.getUserAction().SYMBOL + permission.getGroupAction().SYMBOL + permission.getOtherAction().SYMBOL;
@@ -206,15 +222,71 @@ final class HDFSLocation implements Location {
     }
   }
 
-  /**
-   * Creates the directory named by this abstract pathname, including any necessary
-   * but nonexistent parent directories.
-   *
-   * @return true if and only if the renaming succeeded; false otherwise
-   */
   @Override
   public boolean mkdirs() throws IOException {
-    return fs.mkdirs(path);
+    try {
+      if (fs.exists(path)) {
+        return false;
+      }
+      return fs.mkdirs(path);
+    } catch (FileAlreadyExistsException | AccessControlException e) {
+      // curiously, if one of the parent dirs exists but is a file, Hadoop throws this:
+      // org.apache...AccessControlException: Permission denied: user=..., access=EXECUTE, inode=".../existingfile"
+      // however, if the directory itself exists, it will throw FileAlreadyExistsException
+      return false;
+    }
+  }
+
+  @Override
+  public boolean mkdirs(String permission) throws IOException {
+    return mkdirs(path, parsePermissions(permission));
+  }
+
+  /**
+   * Helper to create a directory and its parents id necessary, all with the given permissions.
+   * We cannot use the fs.mkdirs() because that would apply the umask to the permissions.
+   */
+  private boolean mkdirs(Path path, FsPermission permission) throws IOException {
+    try {
+      if (fs.exists(path)) {
+        return false;
+      }
+    } catch (AccessControlException e) {
+      // curiously, if one of the parent dirs exists but is a file, Hadoop throws this:
+      // org.apache...AccessControlException: Permission denied: user=..., access=EXECUTE, inode=".../existingfile"
+      return false;
+    }
+    Path parent = path.getParent();
+    if (null == parent) {
+      return false;
+    }
+    // if parent exists, attempt to create the path as a directory.
+    if (fs.exists(parent)) {
+      return mkdir(path, permission);
+    }
+    // attempt to create the parent with the proper permissions
+    if (!mkdirs(parent, permission) && !fs.isDirectory(parent)) {
+      return false;
+    }
+    // now the parent exists and we can create this directory
+    return mkdir(path, permission);
+  }
+
+  /**
+   * Helper to create a directory (but not its parents) with the given permissions.
+   * We cannot use fs.mkdirs() and then apply the permissions to override the umask.
+   */
+  private boolean mkdir(Path path, FsPermission permission) throws IOException {
+    try {
+      if (!fs.mkdirs(path) && !fs.isDirectory(path)) {
+        return false;
+      }
+    } catch (FileAlreadyExistsException e) {
+      return false;
+    }
+    // explicitly set permissions to get around the umask
+    fs.setPermission(path, permission);
+    return true;
   }
 
   /**
