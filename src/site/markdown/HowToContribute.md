@@ -71,6 +71,6 @@ Committer can merge code changes that are already reviewed into the `master` bra
 
         git checkout master
         git pull origin master
-        git am --signoff < ${PR_NUMBER}
+        git am --signoff < ${PR_NUMBER}.patch
         git push origin master
 5. Close the JIRA issue associated with the patch.
