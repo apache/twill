@@ -130,6 +130,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private final YarnAMClient amClient;
   private final JvmOptions jvmOpts;
   private final int reservedMemory;
+  private final double minHeapRatio;
   private final EventHandler eventHandler;
   private final Location applicationLocation;
   private final PlacementPolicyManager placementPolicyManager;
@@ -152,6 +153,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     this.credentials = createCredentials();
     this.jvmOpts = loadJvmOptions();
     this.reservedMemory = twillRuntimeSpec.getReservedMemory();
+    this.minHeapRatio = twillRuntimeSpec.getMinHeapRatio();
     this.twillSpec = twillRuntimeSpec.getTwillSpecification();
     this.placementPolicyManager = new PlacementPolicyManager(twillSpec.getPlacementPolicies());
     this.environments = getEnvironments();
@@ -689,7 +691,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       TwillContainerLauncher launcher = new TwillContainerLauncher(
         twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
-        containerCount, jvmOpts, reservedMemory, getSecureStoreLocation());
+        containerCount, jvmOpts, reservedMemory, getSecureStoreLocation(), minHeapRatio);
 
       runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher);
 

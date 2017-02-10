@@ -25,6 +25,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillRuntimeSpecification;
@@ -45,6 +46,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   private static final String TWILL_RUNID = "twillRunId";
   private static final String TWILL_APP_NAME = "twillAppName";
   private static final String RESERVED_MEMORY = "reservedMemory";
+  private static final String HEAP_RESERVED_MIN_RATIO = "minHeapRatio";
   private static final String RM_SCHEDULER_ADDR = "rmSchedulerAddr";
   private static final String TWILL_SPEC = "twillSpecification";
   private static final String LOG_LEVELS = "logLevels";
@@ -59,6 +61,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     json.addProperty(TWILL_RUNID, src.getTwillAppRunId().getId());
     json.addProperty(TWILL_APP_NAME, src.getTwillAppName());
     json.addProperty(RESERVED_MEMORY, src.getReservedMemory());
+    json.addProperty(HEAP_RESERVED_MIN_RATIO, src.getMinHeapRatio());
     if (src.getRmSchedulerAddr() != null) {
       json.addProperty(RM_SCHEDULER_ADDR, src.getRmSchedulerAddr());
     }
@@ -94,6 +97,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                          jsonObj.has(RM_SCHEDULER_ADDR) ?
                                          jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
                                          logLevels,
-                                         maxRetries);
+                                         maxRetries,
+                                         jsonObj.has(HEAP_RESERVED_MIN_RATIO) ?
+                                         jsonObj.get(HEAP_RESERVED_MIN_RATIO).getAsDouble()
+                                         : Configs.Defaults.HEAP_RESERVED_MIN_RATIO);
   }
 }
