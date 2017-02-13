@@ -20,7 +20,6 @@ package org.apache.twill.yarn;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
@@ -40,6 +39,7 @@ import com.google.common.io.OutputSupplier;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -112,6 +112,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
+
+import joptsimple.OptionSpec;
 
 /**
  * Implementation for {@link TwillPreparer} to prepare and launch distributed application on Hadoop YARN.
@@ -482,7 +484,7 @@ final class YarnTwillPreparer implements TwillPreparer {
       public void load(String name, Location targetLocation) throws IOException {
         // Stuck in the yarnAppClient class to make bundler being able to pickup the right yarn-client version
         bundler.createBundle(targetLocation, ApplicationMasterMain.class,
-                             yarnAppClient.getClass(), TwillContainerMain.class);
+          yarnAppClient.getClass(), TwillContainerMain.class, OptionSpec.class);
       }
     });
 
