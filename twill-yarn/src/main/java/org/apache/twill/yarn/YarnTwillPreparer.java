@@ -170,8 +170,10 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.credentials = createCredentials();
     this.reservedMemory = yarnConfig.getInt(Configs.Keys.JAVA_RESERVED_MEMORY_MB,
                                             Configs.Defaults.JAVA_RESERVED_MEMORY_MB);
-    this.minHeapRatio = yarnConfig.getDouble(Configs.Keys.HEAP_RESERVED_MIN_RATIO,
-                                                    Configs.Defaults.HEAP_RESERVED_MIN_RATIO);
+    // doing this way to support hadoop-2.0 profile
+    String minHeapRatioStr = yarnConfig.get(Configs.Keys.HEAP_RESERVED_MIN_RATIO);
+    this.minHeapRatio = (minHeapRatioStr == null) ?
+            Configs.Defaults.HEAP_RESERVED_MIN_RATIO : Double.parseDouble(minHeapRatioStr);
     this.localStagingDir = new File(yarnConfig.get(Configs.Keys.LOCAL_STAGING_DIRECTORY,
                                                    Configs.Defaults.LOCAL_STAGING_DIRECTORY));
     this.extraOptions = extraOptions;
