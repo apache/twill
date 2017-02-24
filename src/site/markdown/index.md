@@ -44,8 +44,8 @@ applications on a Hadoop® cluster.
 
 ### Latest Release
 
-The latest release of Apache Twill is [0.9.0](releases/0.9.0.html). 
-Please go to the [release](releases/0.9.0.html) page for additional information.
+The latest release of Apache Twill is [0.10.0](releases/0.10.0.html). 
+Please go to the [release](releases/0.10.0.html) page for additional information.
 
 ### Is it Building?
 
