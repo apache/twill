@@ -59,12 +59,13 @@ public final class TwillContainerLauncher {
   private final int instanceCount;
   private final JvmOptions jvmOpts;
   private final int reservedMemory;
+  private final double minHeapRatio;
   private final Location secureStoreLocation;
 
   public TwillContainerLauncher(RuntimeSpecification runtimeSpec, ContainerInfo containerInfo,
                                 ProcessLauncher.PrepareLaunchContext launchContext,
                                 ZKClient zkClient, int instanceCount, JvmOptions jvmOpts, int reservedMemory,
-                                Location secureStoreLocation) {
+                                Location secureStoreLocation, double minHeapRatio) {
     this.runtimeSpec = runtimeSpec;
     this.containerInfo = containerInfo;
     this.launchContext = launchContext;
@@ -72,6 +73,7 @@ public final class TwillContainerLauncher {
     this.instanceCount = instanceCount;
     this.jvmOpts = jvmOpts;
     this.reservedMemory = reservedMemory;
+    this.minHeapRatio = minHeapRatio;
     this.secureStoreLocation = secureStoreLocation;
   }
 
@@ -142,7 +144,8 @@ public final class TwillContainerLauncher {
       firstCommand = "$JAVA_HOME/bin/java";
     }
 
-    int memory = Resources.computeMaxHeapSize(containerInfo.getMemoryMB(), reservedMemory, Constants.HEAP_MIN_RATIO);
+    int memory = Resources.computeMaxHeapSize(containerInfo.getMemoryMB(), reservedMemory,
+            minHeapRatio);
     commandBuilder.add("-Djava.io.tmpdir=tmp",
                        "-Dyarn.container=$" + EnvKeys.YARN_CONTAINER_ID,
                        "-Dtwill.runnable=$" + Constants.TWILL_APP_NAME + ".$" + EnvKeys.TWILL_RUNNABLE_NAME,

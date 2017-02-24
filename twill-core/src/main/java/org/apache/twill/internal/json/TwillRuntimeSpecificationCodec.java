@@ -25,6 +25,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillRuntimeSpecification;
@@ -45,9 +46,11 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   private static final String TWILL_RUNID = "twillRunId";
   private static final String TWILL_APP_NAME = "twillAppName";
   private static final String RESERVED_MEMORY = "reservedMemory";
+  private static final String HEAP_RESERVED_MIN_RATIO = "minHeapRatio";
   private static final String RM_SCHEDULER_ADDR = "rmSchedulerAddr";
   private static final String TWILL_SPEC = "twillSpecification";
   private static final String LOG_LEVELS = "logLevels";
+  private static final String MAX_RETRIES = "maxRetries";
 
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
@@ -58,6 +61,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     json.addProperty(TWILL_RUNID, src.getTwillAppRunId().getId());
     json.addProperty(TWILL_APP_NAME, src.getTwillAppName());
     json.addProperty(RESERVED_MEMORY, src.getReservedMemory());
+    json.addProperty(HEAP_RESERVED_MIN_RATIO, src.getMinHeapRatio());
     if (src.getRmSchedulerAddr() != null) {
       json.addProperty(RM_SCHEDULER_ADDR, src.getRmSchedulerAddr());
     }
@@ -65,6 +69,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
              context.serialize(src.getTwillSpecification(), new TypeToken<TwillSpecification>() { }.getType()));
     json.add(LOG_LEVELS,
              context.serialize(src.getLogLevels(), new TypeToken<Map<String, Map<String, String>>>() { }.getType()));
+    json.add(MAX_RETRIES,
+             context.serialize(src.getMaxRetries(), new TypeToken<Map<String, Integer>>() { }.getType()));
+
     return json;
   }
 
@@ -77,6 +84,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
       jsonObj.get(TWILL_SPEC), new TypeToken<TwillSpecification>() { }.getType());
     Map<String, Map<String, String>> logLevels =
       context.deserialize(jsonObj.get(LOG_LEVELS), new TypeToken<Map<String, Map<String, String>>>() { }.getType());
+    Map<String, Integer> maxRetries = 
+      context.deserialize(jsonObj.get(MAX_RETRIES), new TypeToken<Map<String, Integer>>() { }.getType());
+    
     return new TwillRuntimeSpecification(twillSpecification,
                                          jsonObj.get(FS_USER).getAsString(),
                                          URI.create(jsonObj.get(TWILL_APP_DIR).getAsString()),
@@ -85,7 +95,11 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                          jsonObj.get(TWILL_APP_NAME).getAsString(),
                                          jsonObj.get(RESERVED_MEMORY).getAsInt(),
                                          jsonObj.has(RM_SCHEDULER_ADDR) ?
-                                           jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
-                                         logLevels);
+                                         jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
+                                         logLevels,
+                                         maxRetries,
+                                         jsonObj.has(HEAP_RESERVED_MIN_RATIO) ?
+                                         jsonObj.get(HEAP_RESERVED_MIN_RATIO).getAsDouble()
+                                         : Configs.Defaults.HEAP_RESERVED_MIN_RATIO);
   }
 }

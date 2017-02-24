@@ -130,6 +130,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private final YarnAMClient amClient;
   private final JvmOptions jvmOpts;
   private final int reservedMemory;
+  private final double minHeapRatio;
   private final EventHandler eventHandler;
   private final Location applicationLocation;
   private final PlacementPolicyManager placementPolicyManager;
@@ -152,6 +153,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     this.credentials = createCredentials();
     this.jvmOpts = loadJvmOptions();
     this.reservedMemory = twillRuntimeSpec.getReservedMemory();
+    this.minHeapRatio = twillRuntimeSpec.getMinHeapRatio();
     this.twillSpec = twillRuntimeSpec.getTwillSpecification();
     this.placementPolicyManager = new PlacementPolicyManager(twillSpec.getPlacementPolicies());
     this.environments = getEnvironments();
@@ -207,8 +209,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       Integer.parseInt(System.getenv(EnvKeys.YARN_CONTAINER_MEMORY_MB)),
       appMasterHost, null);
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
-    return new RunningContainers(appId, appMasterResources, zkClient,
-                                 applicationLocation, twillSpec.getRunnables().keySet());
+    return new RunningContainers(appId, appMasterResources, zkClient, applicationLocation,
+      twillSpec.getRunnables(), twillRuntimeSpec.getMaxRetries());
   }
 
   private ExpectedContainers initExpectedContainers(TwillSpecification twillSpec) {
@@ -226,8 +228,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
   @Override
   protected void doStart() throws Exception {
-    LOG.info("Start application master with spec: " +
-               TwillRuntimeSpecificationAdapter.create().toJson(twillRuntimeSpec));
+    LOG.info("Start application master with spec: {}",
+      TwillRuntimeSpecificationAdapter.create().toJson(twillRuntimeSpec));
 
     // initialize the event handler, if it fails, it will fail the application.
     if (eventHandler != null) {
@@ -403,12 +405,14 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
       // If nothing is in provisioning, and no pending request, move to next one
       int count = runnableContainerRequests.size();
+      LOG.debug("Runnable container requests: {}", count);
       while (provisioning.isEmpty() && currentRequest == null && !runnableContainerRequests.isEmpty()) {
         RunnableContainerRequest runnableContainerRequest = runnableContainerRequests.peek();
         if (!runnableContainerRequest.isReadyToBeProvisioned()) {
           // take it out from queue and put it back at the end for second chance.
           runnableContainerRequest = runnableContainerRequests.poll();
           runnableContainerRequests.add(runnableContainerRequest);
+          LOG.debug("Request not ready: {}", runnableContainerRequest);
 
           // We checked all the requests that were pending when we started this loop
           // Any remaining requests are not ready to be provisioned
@@ -477,6 +481,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
             // Yarn Resource Manager may include port in the node name depending on the setting
             // YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME. It is safe to add both
             // the names (with and without port) to the blacklist.
+            LOG.debug("Adding {} to host blacklist", containerInfo.getHost().getHostName());
             amClient.addToBlacklist(containerInfo.getHost().getHostName());
             amClient.addToBlacklist(containerInfo.getHost().getHostName() + ":" + containerInfo.getPort());
           }
@@ -642,7 +647,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
           racks = placementPolicy.getRacks();
         }
         // TODO: Allow user to set priority?
-        LOG.info("Request {} container with capability {} for runnable {}", newContainers, capability, name);
+        LOG.info("Request {} containers with capability {} for runnable {}", newContainers, capability, name);
         String requestId = amClient.addContainerRequest(capability, newContainers)
           .addHosts(hosts)
           .addRacks(racks)
@@ -686,7 +691,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       TwillContainerLauncher launcher = new TwillContainerLauncher(
         twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
-        containerCount, jvmOpts, reservedMemory, getSecureStoreLocation());
+        containerCount, jvmOpts, reservedMemory, getSecureStoreLocation(), minHeapRatio);
 
       runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher);
 
@@ -705,7 +710,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         provisioning.poll();
       }
       if (expectedContainers.getExpected(runnableName) == runningContainers.count(runnableName)) {
-        LOG.info("Runnable " + runnableName + " fully provisioned with " + containerCount + " instances.");
+        LOG.info("Runnable {} fully provisioned with {} instances.", runnableName, containerCount);
       }
     }
   }

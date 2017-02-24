@@ -46,13 +46,17 @@ public interface TwillRunner {
 
   /**
    * Prepares to run the given {@link TwillRunnable} with {@link ResourceSpecification#BASIC} resource specification.
+   * The name for the runnable will be defaulted to {@code runnable.getClass().getSimpleName()}
+   * 
    * @param runnable The runnable to run through Twill when {@link TwillPreparer#start()} is called.
    * @return A {@link TwillPreparer} for setting up runtime options.
    */
   TwillPreparer prepare(TwillRunnable runnable);
 
   /**
-   * Prepares to run the given {@link TwillRunnable} with the given resource specification.
+   * Prepares to run the given {@link TwillRunnable} with the given resource specification. The name for the runnable
+   * will be defaulted to {@code runnable.getClass().getSimpleName()}
+   * 
    * @param runnable The runnable to run through Twill when {@link TwillPreparer#start()} is called.
    * @param resourceSpecification The resource specification for running the runnable.
    * @return A {@link TwillPreparer} for setting up runtime options.

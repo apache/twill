@@ -39,6 +39,7 @@ import com.google.common.io.OutputSupplier;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -112,6 +113,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
+import joptsimple.OptionSpec;
+
 /**
  * Implementation for {@link TwillPreparer} to prepare and launch distributed application on Hadoop YARN.
  */
@@ -139,18 +142,20 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final List<URI> resources = Lists.newArrayList();
   private final List<String> classPaths = Lists.newArrayList();
   private final ListMultimap<String, String> runnableArgs = ArrayListMultimap.create();
-  private final Map<String, Map<String, String>> environments = new HashMap<>();
+  private final Map<String, Map<String, String>> environments = Maps.newHashMap();
   private final List<String> applicationClassPaths = Lists.newArrayList();
   private final Credentials credentials;
   private final int reservedMemory;
+  private final double minHeapRatio;
   private final File localStagingDir;
-  private final Map<String, Map<String, String>> logLevels = new HashMap<>();
+  private final Map<String, Map<String, String>> logLevels = Maps.newHashMap();
   private final LocationCache locationCache;
   private final Set<URL> twillClassPaths;
   private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
   private ClassAcceptor classAcceptor;
+  private final Map<String, Integer> maxRetries = Maps.newHashMap();
 
   YarnTwillPreparer(YarnConfiguration yarnConfig, TwillSpecification twillSpec, RunId runId,
                     YarnAppClient yarnAppClient, String zkConnectString, Location appLocation, Set<URL> twillClassPaths,
@@ -165,6 +170,10 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.credentials = createCredentials();
     this.reservedMemory = yarnConfig.getInt(Configs.Keys.JAVA_RESERVED_MEMORY_MB,
                                             Configs.Defaults.JAVA_RESERVED_MEMORY_MB);
+    // doing this way to support hadoop-2.0 profile
+    String minHeapRatioStr = yarnConfig.get(Configs.Keys.HEAP_RESERVED_MIN_RATIO);
+    this.minHeapRatio = (minHeapRatioStr == null) ?
+            Configs.Defaults.HEAP_RESERVED_MIN_RATIO : Double.parseDouble(minHeapRatioStr);
     this.localStagingDir = new File(yarnConfig.get(Configs.Keys.LOCAL_STAGING_DIRECTORY,
                                                    Configs.Defaults.LOCAL_STAGING_DIRECTORY));
     this.extraOptions = extraOptions;
@@ -174,6 +183,12 @@ final class YarnTwillPreparer implements TwillPreparer {
 
     // By default, the root logger is having INFO log level
     setLogLevel(LogEntry.Level.INFO);
+  }
+
+  private void confirmRunnableName(String runnableName) {
+    Preconditions.checkNotNull(runnableName);
+    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
+      "Runnable %s is not defined in the application.", runnableName);
   }
 
   @Override
@@ -234,8 +249,7 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer withArguments(String runnableName, Iterable<String> args) {
-    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
-                                "Runnable %s is not defined in the application.", runnableName);
+    confirmRunnableName(runnableName);
     runnableArgs.putAll(runnableName, args);
     return this;
   }
@@ -284,8 +298,7 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer withEnv(String runnableName, Map<String, String> env) {
-    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
-                                "Runnable %s is not defined in the application.", runnableName);
+    confirmRunnableName(runnableName);
     setEnv(runnableName, env, true);
     return this;
   }
@@ -304,6 +317,13 @@ final class YarnTwillPreparer implements TwillPreparer {
   @Override
   public TwillPreparer withBundlerClassAcceptor(ClassAcceptor classAcceptor) {
     this.classAcceptor = classAcceptor;
+    return this;
+  }
+
+  @Override
+  public TwillPreparer withMaxRetries(String runnableName, int maxRetries) {
+    confirmRunnableName(runnableName);
+    this.maxRetries.put(runnableName, maxRetries);
     return this;
   }
 
@@ -331,9 +351,7 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   @Override
   public TwillPreparer setLogLevels(String runnableName, Map<String, LogEntry.Level> runnableLogLevels) {
-    Preconditions.checkNotNull(runnableName);
-    Preconditions.checkArgument(twillSpec.getRunnables().containsKey(runnableName),
-                                "Runnable %s is not defined in the application.", runnableName);
+    confirmRunnableName(runnableName);
     Preconditions.checkNotNull(runnableLogLevels);
     Preconditions.checkArgument(!(logLevels.containsKey(Logger.ROOT_LOGGER_NAME)
       && logLevels.get(Logger.ROOT_LOGGER_NAME) == null));
@@ -471,7 +489,7 @@ final class YarnTwillPreparer implements TwillPreparer {
       public void load(String name, Location targetLocation) throws IOException {
         // Stuck in the yarnAppClient class to make bundler being able to pickup the right yarn-client version
         bundler.createBundle(targetLocation, ApplicationMasterMain.class,
-                             yarnAppClient.getClass(), TwillContainerMain.class);
+          yarnAppClient.getClass(), TwillContainerMain.class, OptionSpec.class);
       }
     });
 
@@ -616,7 +634,7 @@ final class YarnTwillPreparer implements TwillPreparer {
         new TwillRuntimeSpecification(newTwillSpec, appLocation.getLocationFactory().getHomeLocation().getName(),
                                       appLocation.toURI(), zkConnectString, runId, twillSpec.getName(),
                                       reservedMemory, yarnConfig.get(YarnConfiguration.RM_SCHEDULER_ADDRESS),
-                                      logLevels), writer);
+                                      logLevels, maxRetries, minHeapRatio), writer);
     }
     LOG.debug("Done {}", targetFile);
   }
