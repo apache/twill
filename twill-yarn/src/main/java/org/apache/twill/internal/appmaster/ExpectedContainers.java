@@ -19,6 +19,8 @@ package org.apache.twill.internal.appmaster;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import org.apache.twill.api.RuntimeSpecification;
+import org.apache.twill.api.TwillSpecification;
 
 import java.util.Map;
 
@@ -30,13 +32,14 @@ final class ExpectedContainers {
 
   private final Map<String, ExpectedCount> expectedCounts;
 
-  ExpectedContainers(Map<String, Integer> expected) {
-    expectedCounts = Maps.newHashMap();
+  ExpectedContainers(TwillSpecification twillSpec) {
+    Map<String, ExpectedCount> expectedCounts = Maps.newHashMap();
     long now = System.currentTimeMillis();
-
-    for (Map.Entry<String, Integer> entry : expected.entrySet()) {
-      expectedCounts.put(entry.getKey(), new ExpectedCount(entry.getValue(), now));
+    for (RuntimeSpecification runtimeSpec : twillSpec.getRunnables().values()) {
+      expectedCounts.put(runtimeSpec.getName(),
+                         new ExpectedCount(runtimeSpec.getResourceSpecification().getInstances(), now));
     }
+    this.expectedCounts = expectedCounts;
   }
 
   synchronized void setExpected(String runnable, int expected) {

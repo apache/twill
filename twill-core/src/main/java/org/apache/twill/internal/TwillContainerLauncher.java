@@ -262,6 +262,11 @@ public final class TwillContainerLauncher {
       processController.cancel();
     }
 
+    @Override
+    public int getInstanceId() {
+      return instanceId;
+    }
+
     private void killAndWait(int maxWaitSecs) {
       Stopwatch watch = new Stopwatch();
       watch.start();

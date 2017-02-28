@@ -18,60 +18,42 @@
 
 package org.apache.twill.internal.appmaster;
 
-import com.google.common.collect.Sets;
 import org.apache.twill.api.TwillSpecification;
 
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 /**
  * This class provides helper functions for operating on a set of Placement Policies.
  */
-public class PlacementPolicyManager {
-  List<TwillSpecification.PlacementPolicy> placementPolicies;
+final class PlacementPolicyManager {
 
-  public PlacementPolicyManager(List<TwillSpecification.PlacementPolicy> placementPolicies) {
-    this.placementPolicies = placementPolicies;
-  }
+  private final Map<TwillSpecification.PlacementPolicy.Type, Set<String>> policyTypeToRunnables;
+  private final Map<String, TwillSpecification.PlacementPolicy> runnablePolicies;
 
-  /**
-   * Given a set of runnables, get all runnables which belong to DISTRIBUTED placement policies.
-   * @param givenRunnables Set of runnables.
-   * @return Subset of runnables, which belong to DISTRIBUTED placement policies.
-   */
-  public Set<String> getDistributedRunnables(Set<String> givenRunnables) {
-    Set<String> distributedRunnables = getAllDistributedRunnables();
-    distributedRunnables.retainAll(givenRunnables);
-    return distributedRunnables;
-  }
+  PlacementPolicyManager(List<TwillSpecification.PlacementPolicy> policies) {
+    this.policyTypeToRunnables = new EnumMap<>(TwillSpecification.PlacementPolicy.Type.class);
+    this.runnablePolicies = new HashMap<>();
 
-  /**
-   * Given a runnable, get the type of placement policy. Returns DEFAULT if no placement policy is specified.
-   * @param runnableName Name of runnable.
-   * @return Placement policy type of the runnable.
-   */
-  public TwillSpecification.PlacementPolicy.Type getPlacementPolicyType(String runnableName) {
-    for (TwillSpecification.PlacementPolicy placementPolicy : placementPolicies) {
-      if (placementPolicy.getNames().contains(runnableName)) {
-        return placementPolicy.getType();
+    for (TwillSpecification.PlacementPolicy policy : policies) {
+      policyTypeToRunnables.put(policy.getType(), policy.getNames());
+      for (String runnable : policy.getNames()) {
+        runnablePolicies.put(runnable, policy);
       }
     }
-    return TwillSpecification.PlacementPolicy.Type.DEFAULT;
   }
 
   /**
-   * Get all runnables which belong to the same Placement policy as the given runnable.
-   * @param runnableName Name of runnable.
-   * @return Set of runnables, with same placement policy.
+   * Returns all runnables which belong to DISTRIBUTED placement policies.
    */
-  public Set<String> getFellowRunnables(String runnableName) {
-    for (TwillSpecification.PlacementPolicy placementPolicy : placementPolicies) {
-      if (placementPolicy.getNames().contains(runnableName)) {
-        return placementPolicy.getNames();
-      }
-    }
-    return Collections.emptySet();
+  Set<String> getDistributedRunnables() {
+    Set<String> runnables = policyTypeToRunnables.get(TwillSpecification.PlacementPolicy.Type.DISTRIBUTED);
+    return runnables == null ? Collections.<String>emptySet() : runnables;
   }
 
   /**
@@ -80,25 +62,8 @@ public class PlacementPolicyManager {
    * @param runnableName Name of runnable.
    * @return Placement policy of the runnable.
    */
-  public TwillSpecification.PlacementPolicy getPlacementPolicy(String runnableName) {
-    for (TwillSpecification.PlacementPolicy placementPolicy : placementPolicies) {
-      if (placementPolicy.getNames().contains(runnableName)) {
-        return placementPolicy;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Gets all runnables which belong to DISTRIBUTED placement policies.
-   */
-  private Set<String> getAllDistributedRunnables() {
-    Set<String> distributedRunnables = Sets.newHashSet();
-    for (TwillSpecification.PlacementPolicy placementPolicy : placementPolicies) {
-      if (placementPolicy.getType().equals(TwillSpecification.PlacementPolicy.Type.DISTRIBUTED)) {
-        distributedRunnables.addAll(placementPolicy.getNames());
-      }
-    }
-    return  distributedRunnables;
+  @Nullable
+  TwillSpecification.PlacementPolicy getPlacementPolicy(String runnableName) {
+    return runnablePolicies.get(runnableName);
   }
 }

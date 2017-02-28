@@ -22,6 +22,8 @@ import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.ServiceController;
 import org.apache.twill.internal.state.Message;
 
+import javax.annotation.Nullable;
+
 /**
  * A {@link ServiceController} that allows sending a message directly. Internal use only.
  */
@@ -36,7 +38,13 @@ public interface TwillContainerController extends ServiceController, Service {
   void completed(int exitStatus);
 
   /**
-   * @returns the container's live node data.
+   * @return the container's live node data.
    */
+  @Nullable
   ContainerLiveNodeData getLiveNodeData();
+
+  /**
+   * @return the instance ID of the runnable that running in the container controlled by this controller.
+   */
+  int getInstanceId();
 }

@@ -37,7 +37,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
@@ -81,7 +80,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
 import javax.annotation.Nullable;
 
 /**
@@ -238,7 +236,7 @@ final class RunningContainers {
     try {
       // Find the controller with particular instance id.
       for (Map.Entry<String, TwillContainerController> entry : containers.row(runnableName).entrySet()) {
-        if (getInstanceId(entry.getValue().getRunId()) == instanceId) {
+        if (entry.getValue().getInstanceId() == instanceId) {
           containerId = entry.getKey();
           controller = entry.getValue();
           break;
@@ -451,7 +449,7 @@ final class RunningContainers {
 
       for (Map.Entry<String, TwillContainerController> completedEntry : lookup.entrySet()) {
         TwillContainerController controller = completedEntry.getValue();
-        instanceId = getInstanceId(controller.getRunId());
+        instanceId = controller.getInstanceId();
 
         // TODO: Can there be multiple controllers for a single container?
         // TODO: What is the best way to determine whether to restart container when there are multiple controllers?
@@ -468,7 +466,7 @@ final class RunningContainers {
         }
         // TODO: should we remove the completed instance from instanceId and resource report even on failures?
         // TODO: won't they get added back when the container is re-requested?
-        removeInstanceId(runnableName, getInstanceId(controller.getRunId()));
+        removeInstanceId(runnableName, controller.getInstanceId());
         resourceReport.removeRunnableResources(runnableName, containerId);
       }
       
@@ -651,11 +649,6 @@ final class RunningContainers {
     }
 
     return RunIds.fromString(baseId.getId() + '-' + instanceId);
-  }
-
-  private int getInstanceId(RunId runId) {
-    String id = runId.getId();
-    return Integer.parseInt(id.substring(id.lastIndexOf('-') + 1));
   }
 
   /**

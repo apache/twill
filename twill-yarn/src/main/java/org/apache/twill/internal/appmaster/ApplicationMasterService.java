@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
-import com.google.common.base.Throwables;
 import com.google.common.collect.DiscreteDomains;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableSet;
@@ -38,7 +37,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -104,7 +102,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nullable;
 
 /**
@@ -162,8 +159,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
                                                         Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
                                                         amClient.getContainerId().toString(), getLocalizeFiles());
 
-    this.expectedContainers = initExpectedContainers(twillSpec);
-    this.runningContainers = initRunningContainers(amClient.getContainerId(), amClient.getHost());
+    this.expectedContainers = new ExpectedContainers(twillSpec);
+    this.runningContainers = createRunningContainers(amClient.getContainerId(), amClient.getHost());
     this.eventHandler = createEventHandler(twillSpec);
   }
 
@@ -182,26 +179,22 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
   @SuppressWarnings("unchecked")
   @Nullable
-  private EventHandler createEventHandler(TwillSpecification twillSpec) {
-    try {
-      // Should be able to load by this class ClassLoader, as they packaged in the same jar.
-      EventHandlerSpecification handlerSpec = twillSpec.getEventHandler();
-      if (handlerSpec == null) {
-        return null;
-      }
-
-      Class<?> handlerClass = getClass().getClassLoader().loadClass(handlerSpec.getClassName());
-      Preconditions.checkArgument(EventHandler.class.isAssignableFrom(handlerClass),
-                                  "Class {} does not implements {}",
-                                  handlerClass, EventHandler.class.getName());
-      return Instances.newInstance((Class<? extends EventHandler>) handlerClass);
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
+  private EventHandler createEventHandler(TwillSpecification twillSpec) throws ClassNotFoundException {
+    // Should be able to load by this class ClassLoader, as they packaged in the same jar.
+    EventHandlerSpecification handlerSpec = twillSpec.getEventHandler();
+    if (handlerSpec == null) {
+      return null;
     }
+
+    Class<?> handlerClass = getClass().getClassLoader().loadClass(handlerSpec.getClassName());
+    Preconditions.checkArgument(EventHandler.class.isAssignableFrom(handlerClass),
+                                "Class {} does not implements {}",
+                                handlerClass, EventHandler.class.getName());
+    return Instances.newInstance((Class<? extends EventHandler>) handlerClass);
   }
 
-  private RunningContainers initRunningContainers(ContainerId appMasterContainerId,
-                                                  String appMasterHost) throws Exception {
+  private RunningContainers createRunningContainers(ContainerId appMasterContainerId,
+                                                    String appMasterHost) throws Exception {
     TwillRunResources appMasterResources = new DefaultTwillRunResources(
       0,
       appMasterContainerId.toString(),
@@ -211,14 +204,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     String appId = appMasterContainerId.getApplicationAttemptId().getApplicationId().toString();
     return new RunningContainers(appId, appMasterResources, zkClient, applicationLocation,
       twillSpec.getRunnables(), twillRuntimeSpec.getMaxRetries());
-  }
-
-  private ExpectedContainers initExpectedContainers(TwillSpecification twillSpec) {
-    Map<String, Integer> expectedCounts = Maps.newHashMap();
-    for (RuntimeSpecification runtimeSpec : twillSpec.getRunnables().values()) {
-      expectedCounts.put(runtimeSpec.getName(), runtimeSpec.getResourceSpecification().getInstances());
-    }
-    return new ExpectedContainers(expectedCounts);
   }
 
   @Override
@@ -394,8 +379,14 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     boolean isRequestRelaxed = false;
     long nextTimeoutCheck = System.currentTimeMillis() + Constants.PROVISION_TIMEOUT;
     while (!stopped) {
-      // Call allocate. It has to be made at first in order to be able to get cluster resource availability.
-      amClient.allocate(0.0f, allocateHandler);
+      TimeUnit.SECONDS.sleep(1);
+
+      try {
+        // Call allocate. It has to be made at first in order to be able to get cluster resource availability.
+        amClient.allocate(0.0f, allocateHandler);
+      } catch (Exception e) {
+        LOG.warn("Exception raised when making heartbeat to RM. Will be retried in next heartbeat.", e);
+      }
 
       // Looks for containers requests.
       if (provisioning.isEmpty() && runnableContainerRequests.isEmpty() && runningContainers.isEmpty()) {
@@ -404,28 +395,22 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       }
 
       // If nothing is in provisioning, and no pending request, move to next one
-      int count = runnableContainerRequests.size();
-      LOG.debug("Runnable container requests: {}", count);
-      while (provisioning.isEmpty() && currentRequest == null && !runnableContainerRequests.isEmpty()) {
-        RunnableContainerRequest runnableContainerRequest = runnableContainerRequests.peek();
-        if (!runnableContainerRequest.isReadyToBeProvisioned()) {
-          // take it out from queue and put it back at the end for second chance.
-          runnableContainerRequest = runnableContainerRequests.poll();
-          runnableContainerRequests.add(runnableContainerRequest);
-          LOG.debug("Request not ready: {}", runnableContainerRequest);
-
-          // We checked all the requests that were pending when we started this loop
-          // Any remaining requests are not ready to be provisioned
-          if (--count <= 0) {
-            break;
-          }
+      if (provisioning.isEmpty() && currentRequest == null && !runnableContainerRequests.isEmpty()) {
+        RunnableContainerRequest containerRequest = runnableContainerRequests.peek();
+        // If the request at the head of the request queue is not yet ready, move it to the end of the queue
+        // so that it won't block requests that are already ready
+        if (!containerRequest.isReadyToBeProvisioned()) {
+          LOG.debug("Request not ready: {}", containerRequest);
+          runnableContainerRequests.add(runnableContainerRequests.poll());
           continue;
         }
-        currentRequest = runnableContainerRequest.takeRequest();
+
+        currentRequest = containerRequest.takeRequest();
         if (currentRequest == null) {
           // All different types of resource request from current order is done, move to next one
           // TODO: Need to handle order type as well
           runnableContainerRequests.poll();
+          continue;
         }
       }
 
@@ -450,10 +435,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       }
 
       nextTimeoutCheck = checkProvisionTimeout(nextTimeoutCheck);
-
-      if (isRunning()) {
-        TimeUnit.SECONDS.sleep(1);
-      }
     }
   }
 
@@ -464,28 +445,27 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     amClient.clearBlacklist();
 
     //Check the allocation strategy
-    AllocationSpecification currentAllocationSpecification = request.getKey();
-    if (currentAllocationSpecification.getType().equals(AllocationSpecification.Type.ALLOCATE_ONE_INSTANCE_AT_A_TIME)) {
+    AllocationSpecification allocationSpec = request.getKey();
+    if (!allocationSpec.getType().equals(AllocationSpecification.Type.ALLOCATE_ONE_INSTANCE_AT_A_TIME)) {
+      return;
+    }
 
-      //Check the placement policy
-      TwillSpecification.PlacementPolicy placementPolicy =
-        placementPolicyManager.getPlacementPolicy(currentAllocationSpecification.getRunnableName());
-      if (placementPolicy != null
-        && placementPolicy.getType().equals(TwillSpecification.PlacementPolicy.Type.DISTRIBUTED)) {
+    //Check the placement policy
+    String runnableName = allocationSpec.getRunnableName();
+    TwillSpecification.PlacementPolicy placementPolicy = placementPolicyManager.getPlacementPolicy(runnableName);
+    if (placementPolicy == null || placementPolicy.getType() != TwillSpecification.PlacementPolicy.Type.DISTRIBUTED) {
+      return;
+    }
 
-        //Update blacklist with hosts which are running DISTRIBUTED runnables
-        for (String runnable : placementPolicyManager.getFellowRunnables(request.getKey().getRunnableName())) {
-          Collection<ContainerInfo> containerStats =
-            runningContainers.getContainerInfo(runnable);
-          for (ContainerInfo containerInfo : containerStats) {
-            // Yarn Resource Manager may include port in the node name depending on the setting
-            // YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME. It is safe to add both
-            // the names (with and without port) to the blacklist.
-            LOG.debug("Adding {} to host blacklist", containerInfo.getHost().getHostName());
-            amClient.addToBlacklist(containerInfo.getHost().getHostName());
-            amClient.addToBlacklist(containerInfo.getHost().getHostName() + ":" + containerInfo.getPort());
-          }
-        }
+    //Update blacklist with hosts which are running DISTRIBUTED runnables
+    for (String runnable : placementPolicy.getNames()) {
+      for (ContainerInfo containerInfo : runningContainers.getContainerInfo(runnable)) {
+        // Yarn Resource Manager may include port in the node name depending on the setting
+        // YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME. It is safe to add both
+        // the names (with and without port) to the blacklist.
+        LOG.debug("Adding {} to host blacklist", containerInfo.getHost().getHostName());
+        amClient.addToBlacklist(containerInfo.getHost().getHostName());
+        amClient.addToBlacklist(containerInfo.getHost().getHostName() + ":" + containerInfo.getPort());
       }
     }
   }
@@ -503,9 +483,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     for (Multiset.Entry<String> entry : restartRunnables.entrySet()) {
       LOG.info("Re-request container for {} with {} instances.", entry.getElement(), entry.getCount());
-      for (int i = 0; i < entry.getCount(); i++) {
-        runnableContainerRequests.add(createRunnableContainerRequest(entry.getElement()));
-      }
+      runnableContainerRequests.add(createRunnableContainerRequest(entry.getElement(),  entry.getCount()));
     }
 
     // For all runnables that needs to re-request for containers, update the expected count timestamp
@@ -586,10 +564,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     Queue<RunnableContainerRequest> requests = new ConcurrentLinkedQueue<>();
     // For each order in the twillSpec, create container request for runnables, depending on Placement policy.
     for (TwillSpecification.Order order : twillSpec.getOrders()) {
-      Set<String> distributedRunnables = placementPolicyManager.getDistributedRunnables(order.getNames());
-      Set<String> defaultRunnables = Sets.newHashSet();
-      defaultRunnables.addAll(order.getNames());
-      defaultRunnables.removeAll(distributedRunnables);
+      Set<String> distributedRunnables = Sets.intersection(placementPolicyManager.getDistributedRunnables(),
+                                                           order.getNames());
+      Set<String> defaultRunnables = Sets.difference(order.getNames(), distributedRunnables);
+
       Map<AllocationSpecification, Collection<RuntimeSpecification>> requestsMap = Maps.newHashMap();
       for (String runnableName : distributedRunnables) {
         RuntimeSpecification runtimeSpec = twillSpec.getRunnables().get(runnableName);
@@ -639,19 +617,19 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
           //Spawning 1 instance at a time
           newContainers = 1;
         }
-        TwillSpecification.PlacementPolicy placementPolicy = placementPolicyManager.getPlacementPolicy(name);
-        Set<String> hosts = Sets.newHashSet();
-        Set<String> racks = Sets.newHashSet();
-        if (placementPolicy != null) {
-          hosts = placementPolicy.getHosts();
-          racks = placementPolicy.getRacks();
-        }
+
         // TODO: Allow user to set priority?
         LOG.info("Request {} containers with capability {} for runnable {}", newContainers, capability, name);
-        String requestId = amClient.addContainerRequest(capability, newContainers)
-          .addHosts(hosts)
-          .addRacks(racks)
-          .setPriority(0).apply();
+        YarnAMClient.ContainerRequestBuilder builder = amClient.addContainerRequest(capability, newContainers);
+        builder.setPriority(0);
+
+        TwillSpecification.PlacementPolicy placementPolicy = placementPolicyManager.getPlacementPolicy(name);
+        if (placementPolicy != null) {
+          builder.addHosts(placementPolicy.getHosts())
+                 .addRacks(placementPolicy.getRacks());
+        }
+
+        String requestId = builder.apply();
         provisioning.add(new ProvisionRequest(runtimeSpec, requestId, newContainers, allocationType));
       }
     }
@@ -663,14 +641,14 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private void launchRunnable(List<? extends ProcessLauncher<YarnContainerInfo>> launchers,
                               Queue<ProvisionRequest> provisioning) {
     for (ProcessLauncher<YarnContainerInfo> processLauncher : launchers) {
-      LOG.info("Got container {}", processLauncher.getContainerInfo().getId());
+      LOG.info("Container allocated: {}", processLauncher.getContainerInfo().getContainer());
       ProvisionRequest provisionRequest = provisioning.peek();
       if (provisionRequest == null) {
         continue;
       }
 
       String runnableName = provisionRequest.getRuntimeSpec().getName();
-      LOG.info("Starting runnable {} with {}", runnableName, processLauncher);
+      LOG.info("Starting runnable {} in {}", runnableName, processLauncher.getContainerInfo().getContainer());
 
       LOG.debug("Log level for Twill runnable {} is {}", runnableName,
                 twillRuntimeSpec.getLogLevels().get(runnableName).get(Logger.ROOT_LOGGER_NAME));
@@ -715,17 +693,15 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     }
   }
 
-  private List<LocalFile> getLocalizeFiles() {
+  private List<LocalFile> getLocalizeFiles() throws IOException {
     try (Reader reader = Files.newBufferedReader(Paths.get(Constants.Files.LOCALIZE_FILES), StandardCharsets.UTF_8)) {
       return new GsonBuilder().registerTypeAdapter(LocalFile.class, new LocalFileCodec())
         .create().fromJson(reader, new TypeToken<List<LocalFile>>() {
         }.getType());
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
     }
   }
 
-  private Map<String, Map<String, String>> getEnvironments() {
+  private Map<String, Map<String, String>> getEnvironments() throws IOException {
     Path envFile = Paths.get(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.ENVIRONMENTS);
     if (!Files.exists(envFile)) {
       return new HashMap<>();
@@ -734,8 +710,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     try (Reader reader = Files.newBufferedReader(envFile, StandardCharsets.UTF_8)) {
       return new Gson().fromJson(reader, new TypeToken<Map<String, Map<String, String>>>() {
       }.getType());
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
     }
   }
 
@@ -825,10 +799,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     };
   }
 
-  private RunnableContainerRequest createRunnableContainerRequest(final String runnableName) {
-    return createRunnableContainerRequest(runnableName, 1);
-  }
-
   private RunnableContainerRequest createRunnableContainerRequest(final String runnableName,
                                                                   final int numberOfInstances) {
     return createRunnableContainerRequest(runnableName, numberOfInstances, true);
@@ -848,8 +818,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     RuntimeSpecification runtimeSpec = twillSpec.getRunnables().get(runnableName);
     Resource capability = createCapability(runtimeSpec.getResourceSpecification());
     Map<AllocationSpecification, Collection<RuntimeSpecification>> requestsMap = Maps.newHashMap();
-    if (placementPolicyManager.getPlacementPolicyType(runnableName).equals(
-      TwillSpecification.PlacementPolicy.Type.DISTRIBUTED)) {
+
+    if (placementPolicyManager.getDistributedRunnables().contains(runnableName)) {
       for (int instanceId = 0; instanceId < numberOfInstances; instanceId++) {
         AllocationSpecification allocationSpecification =
           new AllocationSpecification(capability, AllocationSpecification.Type.ALLOCATE_ONE_INSTANCE_AT_A_TIME,
@@ -940,18 +910,9 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   /**
    * Helper method to restart instances of runnables.
    */
-  private void restartRunnableInstances(String runnableName, @Nullable Set<Integer> instanceIds,
+  private void restartRunnableInstances(final String runnableName, @Nullable final Set<Integer> instanceIds,
                                         final Runnable completion) {
-    Runnable restartInstancesRunnable = createRestartInstancesRunnable(runnableName, instanceIds, completion);
-    instanceChangeExecutor.execute(restartInstancesRunnable);
-  }
-
-  /**
-   * Creates a Runnable for execution of restart instances request.
-   */
-  private Runnable createRestartInstancesRunnable(final String runnableName, @Nullable final Set<Integer> instanceIds,
-                                                  final Runnable completion) {
-    return new Runnable() {
+    instanceChangeExecutor.execute(new Runnable() {
       @Override
       public void run() {
         LOG.debug("Begin restart runnable {} instances.", runnableName);
@@ -976,8 +937,11 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
           }
         }
 
+        LOG.info("All instances in {} for runnable {} are stopped. Ready to provision",
+                 instancesToRemove, runnableName);
+
         // set the container request to be ready
-        containerRequest.setReadyToBeProvisioned(true);
+        containerRequest.setReadyToBeProvisioned();
 
         // For all runnables that needs to re-request for containers, update the expected count timestamp
         // so that the EventHandler would be triggered with the right expiration timestamp.
@@ -985,7 +949,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
         completion.run();
       }
-    };
+    });
   }
 
   /**
