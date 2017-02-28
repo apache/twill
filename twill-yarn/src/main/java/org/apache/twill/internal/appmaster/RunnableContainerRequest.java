@@ -53,12 +53,12 @@ final class RunnableContainerRequest {
     return orderType;
   }
 
-  public boolean isReadyToBeProvisioned() {
+  boolean isReadyToBeProvisioned() {
     return isReadyToBeProvisioned;
   }
 
-  public void setReadyToBeProvisioned(boolean isProvisioned) {
-    this.isReadyToBeProvisioned = isProvisioned;
+  void setReadyToBeProvisioned() {
+    this.isReadyToBeProvisioned = true;
   }
 
   /**

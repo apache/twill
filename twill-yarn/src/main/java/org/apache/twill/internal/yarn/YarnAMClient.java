@@ -86,10 +86,19 @@ public interface YarnAMClient extends Service {
     }
   }
 
+  /**
+   * Returns the container ID of the application.
+   */
   ContainerId getContainerId();
 
+  /**
+   * Returns the hostname of the node manager that the AM is running on
+   */
   String getHost();
 
+  /**
+   * Returns the port of the node manager that the AM is running on
+   */
   int getNMPort();
 
   /**
@@ -98,18 +107,9 @@ public interface YarnAMClient extends Service {
   void setTracker(InetSocketAddress trackerAddr, URL trackerUrl);
 
   /**
-   * Callback for allocate call.
+   * The heartbeat call to RM.
    */
-  // TODO: Move AM heartbeat logic into this interface so AM only needs to handle callback.
-  interface AllocateHandler {
-    void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers);
-
-    void completed(List<YarnContainerStatus> completed);
-  }
-
   void allocate(float progress, AllocateHandler handler) throws Exception;
-
-  ContainerRequestBuilder addContainerRequest(Resource capability);
 
   ContainerRequestBuilder addContainerRequest(Resource capability, int count);
 
@@ -129,4 +129,24 @@ public interface YarnAMClient extends Service {
    * @param id The ID returned by {@link YarnAMClient.ContainerRequestBuilder#apply()}.
    */
   void completeContainerRequest(String id);
+
+  /**
+   * Callback for allocate call.
+   */
+  interface AllocateHandler {
+
+    /**
+     * Invokes when a list of containers has been acquired from YARN
+     *
+     * @param launchers list of launchers for launching runnables
+     */
+    void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers);
+
+    /**
+     * Invokes when containers completed
+     *
+     * @param completed list of completed container status
+     */
+    void completed(List<YarnContainerStatus> completed);
+  }
 }
