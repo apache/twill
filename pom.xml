@@ -105,6 +105,14 @@
                 <role>Committer</role>
             </roles>
         </developer>
+        <developer>
+            <id>serrano</id>
+            <name>Martin Serrano</name>
+            <email>serrano@apache.org</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+        </developer>
     </developers>
 
     <modules>
