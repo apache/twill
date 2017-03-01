@@ -34,7 +34,7 @@ public final class Configs {
     public static final String JAVA_RESERVED_MEMORY_MB = "twill.java.reserved.memory.mb";
 
     /**
-     * Configurable ratio between Heap and Reserved Memory
+     * Configurable ratio between Heap and Reserved Memory.
      */
     public static final String HEAP_RESERVED_MIN_RATIO = "twill.java.heap.memory.ratio";
 
