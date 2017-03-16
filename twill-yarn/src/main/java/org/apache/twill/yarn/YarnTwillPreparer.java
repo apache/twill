@@ -178,9 +178,6 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.classAcceptor = new ClassAcceptor();
     this.locationCache = locationCache;
     this.twillClassPaths = twillClassPaths;
-
-    // By default, the root logger is having INFO log level
-    setLogLevel(LogEntry.Level.INFO);
   }
 
   private void confirmRunnableName(String runnableName) {

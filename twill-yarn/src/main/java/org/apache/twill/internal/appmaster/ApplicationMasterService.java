@@ -650,9 +650,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       String runnableName = provisionRequest.getRuntimeSpec().getName();
       LOG.info("Starting runnable {} in {}", runnableName, processLauncher.getContainerInfo().getContainer());
 
-      LOG.debug("Log level for Twill runnable {} is {}", runnableName,
-                twillRuntimeSpec.getLogLevels().get(runnableName).get(Logger.ROOT_LOGGER_NAME));
-
       int containerCount = expectedContainers.getExpected(runnableName);
 
       // Setup container environment variables

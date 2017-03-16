@@ -18,6 +18,7 @@
 package org.apache.twill.internal.container;
 
 import com.google.common.base.Charsets;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
 import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.AbstractIdleService;
@@ -88,7 +89,11 @@ public final class TwillContainerMain extends ServiceMain {
     Map<String, String> dynamicLogLevels = loadLogLevels().get(runnableName);
 
     Map<String, String> logLevels = new HashMap<>();
-    logLevels.putAll(defaultLogLevels);
+    if (defaultLogLevels != null) {
+      logLevels.putAll(defaultLogLevels);
+    } else {
+      defaultLogLevels = ImmutableMap.of();
+    }
     if (dynamicLogLevels != null) {
       logLevels.putAll(dynamicLogLevels);
     }

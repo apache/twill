@@ -39,6 +39,7 @@ import java.io.PrintWriter;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /**
  * Test class whether enable certain log level for application container works.
@@ -111,11 +112,17 @@ public class LogLevelTestRun extends BaseYarnTest {
     testLogLevel("ALL");
   }
 
+  @Test
+  public void testNoSetLogLevel() throws Exception {
+    testLogLevel("NONE");
+  }
+
   private void testLogLevel(String method) throws Exception {
     YarnTwillRunnerService runner = getTwillRunner();
     runner.start();
 
     TwillPreparer preparer = runner.prepare(new LogLevelTestApplication());
+    // Set log level to DEBUG
     if (method.equals("ROOT")) {
       preparer.setLogLevel(LogEntry.Level.DEBUG);
     }
@@ -125,7 +132,6 @@ public class LogLevelTestRun extends BaseYarnTest {
     if (method.equals("RUNNABLE")) {
       preparer.setLogLevels(LogLevelTestRunnable.class.getSimpleName(), defaultLogArguments);
     }
-    // Set log level to DEBUG
     TwillController controller = preparer
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out)))
       .start();
@@ -140,11 +146,9 @@ public class LogLevelTestRun extends BaseYarnTest {
     }, Threads.SAME_THREAD_EXECUTOR);
     Assert.assertTrue(running.await(200, TimeUnit.SECONDS));
 
-    LogEntry.Level logLevel = waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(), 30L,
-                                              TimeUnit.SECONDS);
-
-    // Verify we got DEBUG log level.
-    Assert.assertEquals(LogEntry.Level.DEBUG, logLevel);
+    // If we do not set the root log level, it should be null from resource report.
+    Assert.assertTrue(waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(), 30L,
+                                      TimeUnit.SECONDS, !method.equals("NONE") ? LogEntry.Level.DEBUG : null));
 
     controller.terminate().get(120, TimeUnit.SECONDS);
 
@@ -154,8 +158,8 @@ public class LogLevelTestRun extends BaseYarnTest {
 
   // Need helper method here to wait for getting resource report because {@link TwillController#getResourceReport()}
   // could return null if the application has not fully started.
-  private LogEntry.Level waitForLogLevel(TwillController controller, String runnable, long timeout,
-                                         TimeUnit timeoutUnit) throws InterruptedException {
+  private boolean waitForLogLevel(TwillController controller, String runnable, long timeout,
+                                  TimeUnit timeoutUnit, @Nullable LogEntry.Level expected) throws InterruptedException {
 
     Stopwatch stopwatch = new Stopwatch();
     stopwatch.start();
@@ -166,13 +170,13 @@ public class LogLevelTestRun extends BaseYarnTest {
       }
       for (TwillRunResources resources : report.getRunnableResources(runnable)) {
         LogEntry.Level level = resources.getLogLevels().get(Logger.ROOT_LOGGER_NAME);
-        if (level != null) {
-           return level;
+        if (expected == level) {
+           return true;
         }
       }
       TimeUnit.MILLISECONDS.sleep(100);
     } while (stopwatch.elapsedTime(timeoutUnit) < timeout);
 
-    return null;
+    return false;
   }
 }
