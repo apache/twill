@@ -18,7 +18,6 @@
 package org.apache.twill.internal.yarn;
 
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.AbstractIdleService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -34,8 +33,8 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.client.api.YarnClientApplication;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.appmaster.ApplicationMasterInfo;
@@ -55,6 +54,7 @@ import javax.annotation.Nullable;
  * Apache Hadoop 2.1 and beyond.
  * </p>
  */
+@SuppressWarnings("unused")
 public final class Hadoop21YarnAppClient implements YarnAppClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(Hadoop21YarnAppClient.class);
@@ -90,9 +90,9 @@ public final class Hadoop21YarnAppClient implements YarnAppClient {
       appSubmissionContext.setQueue(schedulerQueue);
     }
 
-    // TODO: Make it adjustable through TwillSpec (TWILL-90)
     // Set the resource requirement for AM
-    final Resource capability = adjustMemory(response, Resource.newInstance(Constants.APP_MASTER_MEMORY_MB, 1));
+    int memoryMB = configuration.getInt(Configs.Keys.YARN_AM_MEMORY_MB, Configs.Defaults.YARN_AM_MEMORY_MB);
+    final Resource capability = adjustMemory(response, Resource.newInstance(memoryMB, 1));
     ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(),
                                                                     capability.getVirtualCores());
 
@@ -181,7 +181,7 @@ public final class Hadoop21YarnAppClient implements YarnAppClient {
     private final YarnClient yarnClient;
     private final ApplicationId appId;
 
-    public ProcessControllerImpl(YarnClient yarnClient, ApplicationId appId) {
+    ProcessControllerImpl(YarnClient yarnClient, ApplicationId appId) {
       this.yarnClient = yarnClient;
       this.appId = appId;
     }

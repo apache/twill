@@ -18,7 +18,6 @@
 package org.apache.twill.internal.yarn;
 
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.AbstractIdleService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -37,8 +36,8 @@ import org.apache.hadoop.yarn.client.YarnClient;
 import org.apache.hadoop.yarn.client.YarnClientImpl;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
 import org.apache.hadoop.yarn.util.Records;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.appmaster.ApplicationMasterInfo;
@@ -96,10 +95,11 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
       appSubmissionContext.setQueue(schedulerQueue);
     }
 
-    // TODO: Make it adjustable through TwillSpec (TWILL-90)
+
+    int memoryMB = configuration.getInt(Configs.Keys.YARN_AM_MEMORY_MB, Configs.Defaults.YARN_AM_MEMORY_MB);
     // Set the resource requirement for AM
     Resource amResource = Records.newRecord(Resource.class);
-    amResource.setMemory(Constants.APP_MASTER_MEMORY_MB);
+    amResource.setMemory(memoryMB);
     final Resource capability = adjustMemory(response, amResource);
     ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(), 1);
 

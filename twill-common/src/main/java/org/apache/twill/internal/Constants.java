@@ -37,13 +37,6 @@ public final class Constants {
    */
   public static final int CONSTRAINED_PROVISION_REQUEST_TIMEOUT = 5000;
 
-  public static final double HEAP_MIN_RATIO = 0.7d;
-
-  /** Memory size of AM. */
-  public static final int APP_MASTER_MEMORY_MB = 512;
-
-  public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;
-
   /** Command names for the restart runnable instances. */
   public static final String RESTART_ALL_RUNNABLE_INSTANCES = "restartAllRunnableInstances";
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";

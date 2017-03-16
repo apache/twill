@@ -404,9 +404,11 @@ final class YarnTwillPreparer implements TwillPreparer {
             //     org.apache.twill.internal.appmaster.ApplicationMasterMain
             //     false
 
+            int reservedMemoryMB = yarnConfig.getInt(Configs.Keys.YARN_AM_RESERVED_MEMORY_MB,
+                                                     Configs.Defaults.YARN_AM_RESERVED_MEMORY_MB);
             int memory = Resources.computeMaxHeapSize(appMasterInfo.getMemoryMB(),
-                                                      Constants.APP_MASTER_RESERVED_MEMORY_MB,
-                                                      Constants.HEAP_MIN_RATIO);
+                                                      reservedMemoryMB,
+                                                      minHeapRatio);
             return launcher.prepareLaunch(ImmutableMap.<String, String>of(), localFiles.values(), credentials)
               .addCommand(
                 "$JAVA_HOME/bin/java",
