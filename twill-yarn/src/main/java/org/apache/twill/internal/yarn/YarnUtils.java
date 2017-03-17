@@ -63,7 +63,8 @@ public class YarnUtils {
   public enum HadoopVersions {
     HADOOP_20,
     HADOOP_21,
-    HADOOP_22
+    HADOOP_22,
+    HADOOP_23
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
@@ -236,7 +237,12 @@ public class YarnUtils {
       Class.forName("org.apache.hadoop.yarn.client.api.NMClient");
       try {
         Class.forName("org.apache.hadoop.yarn.client.cli.LogsCLI");
-        HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
+        try {
+          Class.forName("org.apache.hadoop.yarn.conf.HAUtil");
+          HADOOP_VERSION.set(HadoopVersions.HADOOP_23);
+        } catch (ClassNotFoundException e) {
+          HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
+        }
       } catch (ClassNotFoundException e) {
         HADOOP_VERSION.set(HadoopVersions.HADOOP_21);
       }
