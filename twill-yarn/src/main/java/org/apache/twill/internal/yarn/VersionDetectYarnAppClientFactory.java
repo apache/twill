@@ -29,18 +29,21 @@ public final class VersionDetectYarnAppClientFactory implements YarnAppClientFac
   @SuppressWarnings("unchecked")
   public YarnAppClient create(Configuration configuration) {
     try {
-      Class<YarnAppClient> clz;
-
-      if (YarnUtils.getHadoopVersion().equals(YarnUtils.HadoopVersions.HADOOP_20)) {
-        // Uses hadoop-2.0 class.
-        String clzName = getClass().getPackage().getName() + ".Hadoop20YarnAppClient";
-        clz = (Class<YarnAppClient>) Class.forName(clzName);
-      } else {
-        // Uses hadoop-2.1 class
-        String clzName = getClass().getPackage().getName() + ".Hadoop21YarnAppClient";
-        clz = (Class<YarnAppClient>) Class.forName(clzName);
+      String clzName;
+      switch (YarnUtils.getHadoopVersion()) {
+        case HADOOP_20:
+          clzName = getClass().getPackage().getName() + ".Hadoop20YarnAppClient";
+          break;
+        case HADOOP_21:
+        case HADOOP_22:
+          // 2.1 and 2.2 uses the same YarnAppClient
+          clzName = getClass().getPackage().getName() + ".Hadoop21YarnAppClient";
+          break;
+        default:
+          // 2.3 and above uses the 2.3 YarnAppClient to support RM HA
+          clzName = getClass().getPackage().getName() + ".Hadoop23YarnAppClient";
       }
-
+      Class<YarnAppClient> clz = (Class<YarnAppClient>) Class.forName(clzName);
       return clz.getConstructor(Configuration.class).newInstance(configuration);
 
     } catch (Exception e) {
