@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal.yarn;
 
-import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -46,6 +45,7 @@ import org.apache.twill.internal.appmaster.ApplicationSubmitter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -120,7 +120,7 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
             yarnClient.submitApplication(appSubmissionContext);
             return new ProcessControllerImpl(yarnClient, appId);
           } catch (YarnRemoteException e) {
-            throw Throwables.propagate(e);
+            throw new RuntimeException("Failed to submit application " + appId, e);
           } finally {
             yarnClient.stop();
           }
@@ -163,9 +163,8 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
       credentials.addToken(token.getService(), token);
 
       context.setContainerTokens(YarnUtils.encodeCredentials(credentials));
-
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to acquire RM delegation token", e);
     }
   }
 
@@ -218,7 +217,7 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
       try {
         return new Hadoop20YarnApplicationReport(yarnClient.getApplicationReport(appId));
       } catch (YarnRemoteException e) {
-        throw Throwables.propagate(e);
+        throw new RuntimeException("Failed to get application report for " + appId, e);
       }
     }
 
@@ -227,7 +226,7 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
       try {
         yarnClient.killApplication(appId);
       } catch (YarnRemoteException e) {
-        throw Throwables.propagate(e);
+        throw new RuntimeException("Failed to kill application " + appId, e);
       }
     }
 

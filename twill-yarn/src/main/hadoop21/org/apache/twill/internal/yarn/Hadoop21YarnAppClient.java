@@ -17,7 +17,6 @@
  */
 package org.apache.twill.internal.yarn;
 
-import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -32,6 +31,7 @@ import org.apache.hadoop.yarn.api.records.NodeReport;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.client.api.YarnClientApplication;
+import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillSpecification;
@@ -43,6 +43,7 @@ import org.apache.twill.internal.appmaster.ApplicationSubmitter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nullable;
 
@@ -111,8 +112,8 @@ public class Hadoop21YarnAppClient implements YarnAppClient {
 
             yarnClient.submitApplication(appSubmissionContext);
             return new ProcessControllerImpl(appId);
-          } catch (Exception e) {
-            throw Throwables.propagate(e);
+          } catch (YarnException | IOException e) {
+            throw new RuntimeException("Failed to submit application " + appId, e);
           } finally {
             yarnClient.stop();
           }
@@ -157,9 +158,8 @@ public class Hadoop21YarnAppClient implements YarnAppClient {
       credentials.addToken(token.getService(), token);
 
       context.setTokens(YarnUtils.encodeCredentials(credentials));
-
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
+    } catch (YarnException | IOException e) {
+      throw new RuntimeException("Failed to acquire RM delegation token", e);
     }
   }
 
@@ -198,8 +198,8 @@ public class Hadoop21YarnAppClient implements YarnAppClient {
       YarnClient yarnClient = createYarnClient();
       try {
         return new Hadoop21YarnApplicationReport(yarnClient.getApplicationReport(appId));
-      } catch (Exception e) {
-        throw Throwables.propagate(e);
+      } catch (YarnException | IOException e) {
+        throw new RuntimeException("Failed to get application report for " + appId, e);
       } finally {
         yarnClient.stop();
       }
@@ -210,8 +210,8 @@ public class Hadoop21YarnAppClient implements YarnAppClient {
       YarnClient yarnClient = createYarnClient();
       try {
         yarnClient.killApplication(appId);
-      } catch (Exception e) {
-        throw Throwables.propagate(e);
+      } catch (YarnException | IOException e) {
+        throw new RuntimeException("Failed to kill application " + appId, e);
       } finally {
         yarnClient.stop();
       }

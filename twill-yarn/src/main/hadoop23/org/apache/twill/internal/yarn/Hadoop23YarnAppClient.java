@@ -41,10 +41,10 @@ import java.util.List;
 
 /**
  * <p>
- * The service implementation of {@link YarnAppClient} for Apache Hadoop 2.1 and beyond.
+ * The service implementation of {@link YarnAppClient} for Apache Hadoop 2.3 and beyond.
  *
  * The {@link VersionDetectYarnAppClientFactory} class will decide to return instance of this class for
- * Apache Hadoop 2.1 and beyond.
+ * Apache Hadoop 2.3 and beyond.
  * </p>
  */
 @SuppressWarnings("unused")
