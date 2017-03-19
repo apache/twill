@@ -20,6 +20,8 @@ package org.apache.twill.yarn;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.twill.api.AbstractTwillRunnable;
+import org.apache.twill.api.Configs;
+import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
@@ -33,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
+import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -65,12 +68,19 @@ public class ContainerSizeTestRun extends BaseYarnTest {
   public void testMaxHeapSize() throws InterruptedException, TimeoutException, ExecutionException {
     TwillRunner runner = getTwillRunner();
     TwillController controller = runner.prepare(new MaxHeapApp())
+      // Alter the AM container size
+      .withConfiguration(Collections.singletonMap(Configs.Keys.YARN_AM_MEMORY_MB, "256"))
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
 
     try {
       ServiceDiscovered discovered = controller.discoverService("sleep");
       Assert.assertTrue(waitForSize(discovered, 1, 120));
+
+      // Verify the AM container size
+      ResourceReport resourceReport = controller.getResourceReport();
+      Assert.assertNotNull(resourceReport);
+      Assert.assertEquals(256, resourceReport.getAppMasterResources().getMemoryMB());
     } finally {
       controller.terminate().get(120, TimeUnit.SECONDS);
     }

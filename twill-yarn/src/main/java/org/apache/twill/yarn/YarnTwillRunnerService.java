@@ -126,7 +126,6 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
   };
 
   private final YarnConfiguration yarnConfig;
-  private final YarnAppClient yarnAppClient;
   private final ZKClientService zkClientService;
   private final LocationFactory locationFactory;
   private final Table<String, RunId, YarnTwillController> controllers;
@@ -162,7 +161,6 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
    */
   public YarnTwillRunnerService(YarnConfiguration config, String zkConnect, LocationFactory locationFactory) {
     this.yarnConfig = config;
-    this.yarnAppClient = new VersionDetectYarnAppClientFactory().create(config);
     this.locationFactory = locationFactory;
     this.zkClientService = getZKClientService(zkConnect);
     this.controllers = HashBasedTable.create();
@@ -288,8 +286,9 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
       locationCache = new NoCachingLocationCache(appLocation);
     }
 
-    return new YarnTwillPreparer(yarnConfig, twillSpec, runId, yarnAppClient,
-                                 zkClientService.getConnectString(), appLocation, twillClassPaths, jvmOptions,
+    Configuration config = new Configuration(yarnConfig);
+    return new YarnTwillPreparer(config, twillSpec, runId, zkClientService.getConnectString(),
+                                 appLocation, twillClassPaths, jvmOptions,
                                  locationCache, new YarnTwillControllerFactory() {
       @Override
       public YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
@@ -596,6 +595,8 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
         synchronized (YarnTwillRunnerService.this) {
           if (!controllers.contains(appName, runId)) {
             ZKClient zkClient = ZKClients.namespace(zkClientService, "/" + appName);
+            YarnAppClient yarnAppClient = new VersionDetectYarnAppClientFactory().create(new Configuration(yarnConfig));
+
             YarnTwillController controller = listenController(
               new YarnTwillController(appName, runId, zkClient, amLiveNodeData, yarnAppClient));
             controllers.put(appName, runId, controller);
