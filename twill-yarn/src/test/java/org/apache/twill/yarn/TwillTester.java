@@ -138,7 +138,7 @@ public class TwillTester extends ExternalResource {
                "org.apache.hadoop.yarn.util.resource.DominantResourceCalculator");
       conf.setBoolean("yarn.scheduler.include-port-in-node-name", true);
     }
-    conf.set("yarn.nodemanager.vmem-pmem-ratio", "20.1");
+    conf.set("yarn.nodemanager.vmem-pmem-ratio", "100.1");
     conf.set("yarn.nodemanager.vmem-check-enabled", "false");
     conf.set("yarn.scheduler.minimum-allocation-mb", "128");
     conf.set("yarn.nodemanager.delete.debug-delay-sec", "3600");

@@ -30,6 +30,14 @@ import java.util.concurrent.TimeUnit;
 public interface TwillPreparer {
 
   /**
+   * Overrides the default configuration with the given set of configurations.
+   *
+   * @param config set of configurations to override
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withConfiguration(Map<String, String> config);
+
+  /**
    * Adds a {@link LogHandler} for receiving an application log.
    * @param handler The {@link LogHandler}.
    * @return This {@link TwillPreparer}.
