@@ -291,11 +291,12 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
                                  appLocation, twillClassPaths, jvmOptions,
                                  locationCache, new YarnTwillControllerFactory() {
       @Override
-      public YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
+      public YarnTwillController create(RunId runId, boolean logCollectionEnabled, Iterable<LogHandler> logHandlers,
                                         Callable<ProcessController<YarnApplicationReport>> startUp,
                                         long startTimeout, TimeUnit startTimeoutUnit) {
         ZKClient zkClient = ZKClients.namespace(zkClientService, "/" + appName);
         YarnTwillController controller = listenController(new YarnTwillController(appName, runId, zkClient,
+                                                                                  logCollectionEnabled,
                                                                                   logHandlers, startUp,
                                                                                   startTimeout, startTimeoutUnit));
         synchronized (YarnTwillRunnerService.this) {

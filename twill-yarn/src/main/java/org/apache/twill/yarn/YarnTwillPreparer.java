@@ -419,7 +419,10 @@ final class YarnTwillPreparer implements TwillPreparer {
           }
         };
 
-      YarnTwillController controller = controllerFactory.create(runId, logHandlers, submitTask, timeout, timeoutUnit);
+      boolean logCollectionEnabled = config.getBoolean(Configs.Keys.LOG_COLLECTION_ENABLED,
+                                                       Configs.Defaults.LOG_COLLECTION_ENABLED);
+      YarnTwillController controller = controllerFactory.create(runId, logCollectionEnabled,
+                                                                logHandlers, submitTask, timeout, timeoutUnit);
       controller.start();
       return controller;
     } catch (Exception e) {
@@ -671,11 +674,13 @@ final class YarnTwillPreparer implements TwillPreparer {
       }
       TwillSpecification newTwillSpec = new DefaultTwillSpecification(spec.getName(), runtimeSpec, spec.getOrders(),
                                                                       spec.getPlacementPolicies(), eventHandler);
+      boolean logCollectionEnabled = config.getBoolean(Configs.Keys.LOG_COLLECTION_ENABLED,
+                                                       Configs.Defaults.LOG_COLLECTION_ENABLED);
       TwillRuntimeSpecificationAdapter.create().toJson(
         new TwillRuntimeSpecification(newTwillSpec, appLocation.getLocationFactory().getHomeLocation().getName(),
                                       appLocation.toURI(), zkConnectString, runId, twillSpec.getName(),
                                       getReservedMemory(), config.get(YarnConfiguration.RM_SCHEDULER_ADDRESS),
-                                      logLevels, maxRetries, getMinHeapRatio()), writer);
+                                      logLevels, maxRetries, getMinHeapRatio(), logCollectionEnabled), writer);
     }
     LOG.debug("Done {}", targetFile);
   }

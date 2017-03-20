@@ -20,6 +20,7 @@ package org.apache.twill.internal.appmaster;
 import org.apache.twill.api.LocalFile;
 
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Represents data being stored in the live node of the application master.
@@ -30,13 +31,16 @@ public final class ApplicationMasterLiveNodeData {
   private final long appIdClusterTime;
   private final String containerId;
   private final List<LocalFile> localFiles;
+  private final String kafkaZKConnect;
 
   public ApplicationMasterLiveNodeData(int appId, long appIdClusterTime,
-                                       String containerId, List<LocalFile> localFiles) {
+                                       String containerId, List<LocalFile> localFiles,
+                                       @Nullable String kafkaZKConnect) {
     this.appId = appId;
     this.appIdClusterTime = appIdClusterTime;
     this.containerId = containerId;
     this.localFiles = localFiles;
+    this.kafkaZKConnect = kafkaZKConnect;
   }
 
   public int getAppId() {
@@ -53,6 +57,15 @@ public final class ApplicationMasterLiveNodeData {
 
   public List<LocalFile> getLocalFiles() {
     return localFiles;
+  }
+
+  /**
+   * @return the Kafka ZK connection string for the Kafka used for log collection;
+   *         if log collection is turned off, a {@code null} value will be returned.
+   */
+  @Nullable
+  public String getKafkaZKConnect() {
+    return kafkaZKConnect;
   }
 
   @Override

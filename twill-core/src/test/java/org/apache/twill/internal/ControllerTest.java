@@ -62,7 +62,7 @@ public class ControllerTest {
       Service service = createService(zkClientService, runId);
       service.startAndWait();
 
-      TwillController controller = getController(zkClientService, runId);
+      TwillController controller = getController(zkClientService, "testController", runId);
       controller.sendCommand(Command.Builder.of("test").build()).get(2, TimeUnit.SECONDS);
       controller.terminate().get(2, TimeUnit.SECONDS);
 
@@ -96,7 +96,7 @@ public class ControllerTest {
       zkClientService.startAndWait();
 
       final CountDownLatch runLatch = new CountDownLatch(1);
-      TwillController controller = getController(zkClientService, runId);
+      TwillController controller = getController(zkClientService, "testControllerBefore", runId);
       controller.onRunning(new Runnable() {
         @Override
         public void run() {
@@ -140,7 +140,7 @@ public class ControllerTest {
       service.startAndWait();
 
       final CountDownLatch runLatch = new CountDownLatch(1);
-      TwillController controller = getController(zkClientService, runId);
+      TwillController controller = getController(zkClientService, "testControllerListener", runId);
       controller.onRunning(new Runnable() {
         @Override
         public void run() {
@@ -185,8 +185,9 @@ public class ControllerTest {
     };
   }
 
-  private TwillController getController(ZKClient zkClient, RunId runId) {
-    AbstractTwillController controller = new AbstractTwillController(runId, zkClient, ImmutableList.<LogHandler>of()) {
+  private TwillController getController(ZKClient zkClient, String appName, RunId runId) {
+    AbstractTwillController controller = new AbstractTwillController(appName, runId,
+                                                                     zkClient, false, ImmutableList.<LogHandler>of()) {
 
       @Override
       public void kill() {

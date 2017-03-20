@@ -66,20 +66,26 @@ public final class TwillContainerMain extends ServiceMain {
 
   private static final Logger LOG = LoggerFactory.getLogger(TwillContainerMain.class);
 
+  private final TwillRuntimeSpecification twillRuntimeSpec;
+
   /**
    * Main method for launching a {@link TwillContainerService} which runs
    * a {@link org.apache.twill.api.TwillRunnable}.
    */
   public static void main(String[] args) throws Exception {
-    new TwillContainerMain().doMain();
+    File twillSpecFile = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.TWILL_SPEC);
+    TwillRuntimeSpecification twillRuntimeSpec = TwillRuntimeSpecificationAdapter.create().fromJson(twillSpecFile);
+
+    new TwillContainerMain(twillRuntimeSpec).doMain();
+  }
+
+  private TwillContainerMain(TwillRuntimeSpecification twillRuntimeSpec) {
+    this.twillRuntimeSpec = twillRuntimeSpec;
   }
 
   private void doMain() throws Exception {
     // Try to load the secure store from localized file, which AM requested RM to localize it for this container.
     loadSecureStore();
-    File twillSpecFile = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.TWILL_SPEC);
-    TwillRuntimeSpecification twillRuntimeSpec = loadTwillSpec(twillSpecFile);
-    String zkConnectStr = twillRuntimeSpec.getZkConnectStr();
     RunId appRunId = twillRuntimeSpec.getTwillAppRunId();
     RunId runId = RunIds.fromString(System.getenv(EnvKeys.TWILL_RUN_ID));
     String runnableName = System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
@@ -98,7 +104,7 @@ public final class TwillContainerMain extends ServiceMain {
       logLevels.putAll(dynamicLogLevels);
     }
 
-    ZKClientService zkClientService = createZKClient(zkConnectStr, twillRuntimeSpec.getTwillAppName());
+    ZKClientService zkClientService = createZKClient();
     ZKDiscoveryService discoveryService = new ZKDiscoveryService(zkClientService);
 
     ZKClient appRunZkClient = getAppRunZKClient(zkClientService, appRunId);
@@ -170,12 +176,6 @@ public final class TwillContainerMain extends ServiceMain {
     return classLoader;
   }
 
-  private static TwillRuntimeSpecification loadTwillSpec(File specFile) throws IOException {
-    try (Reader reader = Files.newReader(specFile, Charsets.UTF_8)) {
-      return TwillRuntimeSpecificationAdapter.create().fromJson(reader);
-    }
-  }
-
   private static Map<String, Map<String, String>> loadLogLevels() throws IOException {
     File file = new File(Constants.Files.LOG_LEVELS);
     if (file.exists()) {
@@ -198,15 +198,14 @@ public final class TwillContainerMain extends ServiceMain {
   }
 
   @Override
-  protected String getKafkaZKConnect() {
-    return System.getenv(EnvKeys.TWILL_LOG_KAFKA_ZK);
+  protected TwillRuntimeSpecification getTwillRuntimeSpecification() {
+    return twillRuntimeSpec;
   }
 
   @Override
   protected String getRunnableName() {
     return System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
   }
-
 
   /**
    * Simple service that force flushing logs on stop.

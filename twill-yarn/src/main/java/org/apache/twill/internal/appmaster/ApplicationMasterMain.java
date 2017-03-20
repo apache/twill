@@ -17,14 +17,15 @@
  */
 package org.apache.twill.internal.appmaster;
 
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.twill.api.RunId;
 import org.apache.twill.internal.Constants;
-import org.apache.twill.internal.EnvKeys;
 import org.apache.twill.internal.ServiceMain;
 import org.apache.twill.internal.TwillRuntimeSpecification;
 import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
@@ -45,21 +46,20 @@ import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /**
  * Main class for launching {@link ApplicationMasterService}.
  */
 public final class ApplicationMasterMain extends ServiceMain {
 
-  private final String kafkaZKConnect;
-
-  private ApplicationMasterMain(String kafkaZKConnect) {
-    this.kafkaZKConnect = kafkaZKConnect;
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(ApplicationMasterMain.class);
+  private final TwillRuntimeSpecification twillRuntimeSpec;
 
   /**
    * Starts the application master.
@@ -67,10 +67,18 @@ public final class ApplicationMasterMain extends ServiceMain {
   public static void main(String[] args) throws Exception {
     File twillSpec = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.TWILL_SPEC);
     TwillRuntimeSpecification twillRuntimeSpec = TwillRuntimeSpecificationAdapter.create().fromJson(twillSpec);
-    String zkConnect = twillRuntimeSpec.getZkConnectStr();
+
+    new ApplicationMasterMain(twillRuntimeSpec).doMain();
+  }
+
+  private ApplicationMasterMain(TwillRuntimeSpecification twillRuntimeSpec) {
+    this.twillRuntimeSpec = twillRuntimeSpec;
+  }
+
+  private void doMain() throws Exception {
     RunId runId = twillRuntimeSpec.getTwillAppRunId();
 
-    ZKClientService zkClientService = createZKClient(zkConnect, twillRuntimeSpec.getTwillAppName());
+    ZKClientService zkClientService = createZKClient();
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
     setRMSchedulerAddress(conf, twillRuntimeSpec.getRmSchedulerAddr());
 
@@ -81,13 +89,22 @@ public final class ApplicationMasterMain extends ServiceMain {
                                                      twillRuntimeSpec.getTwillAppDir()));
     TrackerService trackerService = new TrackerService(service);
 
-    new ApplicationMasterMain(service.getKafkaZKConnect())
+    List<Service> prerequisites = Lists.newArrayList(
+      new YarnAMClientService(amClient, trackerService),
+      zkClientService,
+      new AppMasterTwillZKPathService(zkClientService, runId)
+    );
+
+    if (twillRuntimeSpec.isLogCollectionEnabled()) {
+      prerequisites.add(new ApplicationKafkaService(zkClientService, twillRuntimeSpec.getKafkaZKConnect()));
+    } else {
+      LOG.info("Log collection through kafka disabled");
+    }
+
+    new ApplicationMasterMain(twillRuntimeSpec)
       .doMain(
         service,
-        new YarnAMClientService(amClient, trackerService),
-        zkClientService,
-        new AppMasterTwillZKPathService(zkClientService, runId),
-        new ApplicationKafkaService(zkClientService, runId)
+        prerequisites.toArray(new Service[prerequisites.size()])
       );
   }
 
@@ -117,13 +134,15 @@ public final class ApplicationMasterMain extends ServiceMain {
   }
 
   @Override
-  protected String getKafkaZKConnect() {
-    return kafkaZKConnect;
+  protected TwillRuntimeSpecification getTwillRuntimeSpecification() {
+    return twillRuntimeSpec;
   }
 
+  @Nullable
   @Override
   protected String getRunnableName() {
-    return System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
+    // No runnable name for the AM
+    return null;
   }
 
   /**
@@ -135,13 +154,13 @@ public final class ApplicationMasterMain extends ServiceMain {
     private static final Logger LOG = LoggerFactory.getLogger(ApplicationKafkaService.class);
 
     private final ZKClient zkClient;
-    private final String kafkaZKPath;
     private final EmbeddedKafkaServer kafkaServer;
+    private final String kafkaZKPath;
 
-    private ApplicationKafkaService(ZKClient zkClient, RunId runId) {
+    private ApplicationKafkaService(ZKClient zkClient, String kafkaZKConnect) {
       this.zkClient = zkClient;
-      this.kafkaZKPath = "/" + runId.getId() + "/kafka";
-      this.kafkaServer = new EmbeddedKafkaServer(generateKafkaConfig(zkClient.getConnectString() + kafkaZKPath));
+      this.kafkaServer = new EmbeddedKafkaServer(generateKafkaConfig(kafkaZKConnect));
+      this.kafkaZKPath = kafkaZKConnect.substring(zkClient.getConnectString().length());
     }
 
     @Override
@@ -236,7 +255,7 @@ public final class ApplicationMasterMain extends ServiceMain {
     private static final Logger LOG = LoggerFactory.getLogger(AppMasterTwillZKPathService.class);
     private final ZKClient zkClient;
 
-    public AppMasterTwillZKPathService(ZKClient zkClient, RunId runId) {
+    AppMasterTwillZKPathService(ZKClient zkClient, RunId runId) {
       super(zkClient, runId);
       this.zkClient = zkClient;
     }
@@ -258,8 +277,7 @@ public final class ApplicationMasterMain extends ServiceMain {
 
       // Try to delete children under /discovery. It may fail with NotEmptyException if there are other instances
       // of the same app running that has discovery services running.
-      List<String> children = zkClient.getChildren(Constants.DISCOVERY_PATH_PREFIX)
-                                      .get(TIMEOUT_SECONDS, TimeUnit.SECONDS).getChildren();
+      List<String> children = getChildren(Constants.DISCOVERY_PATH_PREFIX);
       List<OperationFuture<?>> deleteFutures = new ArrayList<>();
       for (String child : children) {
         String path = Constants.DISCOVERY_PATH_PREFIX + "/" + child;
@@ -272,7 +290,14 @@ public final class ApplicationMasterMain extends ServiceMain {
           future.get();
         } catch (ExecutionException e) {
           if (e.getCause() instanceof KeeperException.NotEmptyException) {
+            // If any deletion of the service failed with not empty, if means there are other apps running,
+            // hence just return
             return;
+          }
+          if (e.getCause() instanceof KeeperException.NoNodeException) {
+            // If the service node is gone, it maybe deleted by another app instance that is also shutting down,
+            // hence just keep going
+            continue;
           }
           throw e;
         }
@@ -303,6 +328,29 @@ public final class ApplicationMasterMain extends ServiceMain {
       } catch (ExecutionException e) {
         if (e.getCause() instanceof KeeperException.NotEmptyException) {
           return false;
+        }
+        if (e.getCause() instanceof KeeperException.NoNodeException) {
+          // If the node to be deleted was not created or is already gone, it is the same as delete successfully.
+          return true;
+        }
+        throw e;
+      }
+    }
+
+    /**
+     * Returns the list of children node under the given path.
+     *
+     * @param path path to get children
+     * @return the list of children or empty list if the path doesn't exist.
+     * @throws Exception if failed to get children
+     */
+    private List<String> getChildren(String path) throws Exception {
+      try {
+        return zkClient.getChildren(path).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).getChildren();
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof KeeperException.NoNodeException) {
+          // If the node doesn't exists, return an empty list
+          return Collections.emptyList();
         }
         throw e;
       }

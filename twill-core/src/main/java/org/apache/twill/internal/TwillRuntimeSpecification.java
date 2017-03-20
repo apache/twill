@@ -41,13 +41,14 @@ public class TwillRuntimeSpecification {
   private final String rmSchedulerAddr;
   private final Map<String, Map<String, String>> logLevels;
   private final Map<String, Integer> maxRetries;
-  private double minHeapRatio;
+  private final double minHeapRatio;
+  private final boolean logCollectionEnabled;
 
   public TwillRuntimeSpecification(TwillSpecification twillSpecification, String fsUser, URI twillAppDir,
                                    String zkConnectStr, RunId twillRunId, String twillAppName,
                                    int reservedMemory, @Nullable String rmSchedulerAddr,
                                    Map<String, Map<String, String>> logLevels, Map<String, Integer> maxRetries,
-                                   double minHeapRatio) {
+                                   double minHeapRatio, boolean logCollectionEnabled) {
     this.twillSpecification = twillSpecification;
     this.fsUser = fsUser;
     this.twillAppDir = twillAppDir;
@@ -59,6 +60,7 @@ public class TwillRuntimeSpecification {
     this.logLevels = logLevels;
     this.maxRetries = maxRetries;
     this.minHeapRatio = minHeapRatio;
+    this.logCollectionEnabled = logCollectionEnabled;
   }
 
   public TwillSpecification getTwillSpecification() {
@@ -93,6 +95,13 @@ public class TwillRuntimeSpecification {
     return minHeapRatio;
   }
 
+  /**
+   * Returns whether log collection is enabled.
+   */
+  public boolean isLogCollectionEnabled() {
+    return logCollectionEnabled;
+  }
+
   @Nullable
   public String getRmSchedulerAddr() {
     return rmSchedulerAddr;
@@ -104,5 +113,18 @@ public class TwillRuntimeSpecification {
 
   public Map<String, Integer> getMaxRetries() {
     return maxRetries;
+  }
+
+  /**
+   * Returns the ZK connection string for the Kafka used for log collections,
+   * or {@code null} if log collection is disabled.
+   */
+  @Nullable
+  public String getKafkaZKConnect() {
+    if (!isLogCollectionEnabled()) {
+      return null;
+    }
+    // When addressing TWILL-147, a field can be introduced to carry this value.
+    return String.format("%s/%s/%s/kafka", getZkConnectStr(), getTwillAppName(), getTwillAppRunId());
   }
 }
