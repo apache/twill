@@ -17,26 +17,32 @@
  */
 package org.apache.twill.yarn;
 
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.twill.api.AbstractTwillRunnable;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.api.logging.PrinterLogHandler;
+import org.apache.twill.common.Threads;
+import org.apache.twill.discovery.ServiceDiscovered;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
+import java.util.Collections;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Test for LogHandler able to receive logs from AM and runnable.
@@ -100,6 +106,42 @@ public class LogHandlerTestRun extends BaseYarnTest {
     Assert.assertEquals("Exception", t.getMessage());
   }
 
+  @Test
+  public void testDisableLogCollection() throws Exception {
+    final AtomicBoolean logReceived = new AtomicBoolean();
+
+    // Start the LogRunnable by turning off log collection
+    TwillRunner runner = getTwillRunner();
+    TwillController controller = runner.prepare(new LogRunnable())
+      .withConfiguration(Collections.singletonMap(Configs.Keys.LOG_COLLECTION_ENABLED, "false"))
+      .addLogHandler(new LogHandler() {
+        @Override
+        public void onLog(LogEntry logEntry) {
+          logReceived.set(true);
+        }
+      })
+      .start();
+
+    // Make sure the runnable gets executed
+    try {
+      final CountDownLatch latch = new CountDownLatch(1);
+      controller.discoverService("log").watchChanges(new ServiceDiscovered.ChangeListener() {
+        @Override
+        public void onChange(ServiceDiscovered serviceDiscovered) {
+          if (Iterables.size(serviceDiscovered) == 1) {
+            latch.countDown();
+          }
+        }
+      }, Threads.SAME_THREAD_EXECUTOR);
+      Assert.assertTrue(latch.await(120, TimeUnit.SECONDS));
+    } finally {
+      controller.terminate().get(120, TimeUnit.SECONDS);
+    }
+
+    // Should receive no log
+    Assert.assertFalse("Not expecting logs collected", logReceived.get());
+  }
+
   /**
    * TwillRunnable for the test case to simply emit one log line.
    */
@@ -121,6 +163,8 @@ public class LogHandlerTestRun extends BaseYarnTest {
       } catch (Throwable t) {
         LOG.error("Got exception", t);
       }
+      // Announce so that test case knows the code reaches here.
+      getContext().announce("log", 12345);
 
       Uninterruptibles.awaitUninterruptibly(stopLatch);
     }

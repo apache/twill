@@ -18,7 +18,8 @@
 package org.apache.twill.internal.logging;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.AppenderBase;
+import ch.qos.logback.core.Appender;
+import ch.qos.logback.core.UnsynchronizedAppenderBase;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -44,8 +45,6 @@ import org.apache.twill.zookeeper.RetryStrategies;
 import org.apache.twill.zookeeper.ZKClientService;
 import org.apache.twill.zookeeper.ZKClientServices;
 import org.apache.twill.zookeeper.ZKClients;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -61,11 +60,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- *
+ * A logback {@link Appender} for writing log events to Kafka.
  */
-public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
+public final class KafkaAppender extends UnsynchronizedAppenderBase<ILoggingEvent> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(KafkaAppender.class);
+  private static final String PUBLISH_THREAD_NAME = "kafka-logger";
 
   private final AtomicReference<KafkaPublisher.Preparer> publisher;
   private final Runnable flushTask;
@@ -146,7 +145,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
     Preconditions.checkNotNull(zkConnectStr);
 
     eventConverter = new LogEventConverter(hostname, runnableName);
-    scheduler = Executors.newSingleThreadScheduledExecutor(Threads.createDaemonThreadFactory("kafka-logger"));
+    scheduler = Executors.newSingleThreadScheduledExecutor(Threads.createDaemonThreadFactory(PUBLISH_THREAD_NAME));
 
     zkClientService = ZKClientServices.delegate(
       ZKClients.reWatchOnExpire(
@@ -162,14 +161,14 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
           Preconditions.checkState(Futures.getUnchecked(future) == Service.State.RUNNING,
                                    "Service is not running.");
         }
-        LOG.info("Kafka client started: " + zkConnectStr);
+        addInfo("Kafka client started: " + zkConnectStr);
         scheduler.scheduleWithFixedDelay(flushTask, 0, flushPeriod, TimeUnit.MILLISECONDS);
       }
 
       @Override
       public void onFailure(Throwable t) {
         // Fail to talk to kafka. Other than logging, what can be done?
-        LOG.error("Failed to start kafka appender.", t);
+        addError("Failed to start kafka appender.", t);
       }
     }, Threads.SAME_THREAD_EXECUTOR);
 
@@ -187,7 +186,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
     try {
       scheduler.submit(flushTask).get(2, TimeUnit.SECONDS);
     } catch (Exception e) {
-      LOG.error("Failed to force log flush in 2 seconds.", e);
+      addError("Failed to force log flush in 2 seconds.", e);
     }
   }
 
@@ -229,7 +228,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
           bufferedSize.addAndGet(-published);
           return published;
         } catch (ExecutionException e) {
-          LOG.error("Failed to publish logs to Kafka.", e);
+          addError("Failed to publish logs to Kafka.", e);
           TimeUnit.NANOSECONDS.sleep(backOffTime);
           publishTimeout -= stopwatch.elapsedTime(timeoutUnit);
           stopwatch.reset();
@@ -237,7 +236,7 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
         }
       } while (publishTimeout > 0);
     } catch (InterruptedException e) {
-      LOG.warn("Logs publish to Kafka interrupted.", e);
+      addWarn("Logs publish to Kafka interrupted.", e);
     }
     return 0;
   }
@@ -277,12 +276,9 @@ public final class KafkaAppender extends AppenderBase<ILoggingEvent> {
       @Override
       public void run() {
         try {
-          int published = publishLogs(2L, TimeUnit.SECONDS);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Published {} log messages to Kafka.", published);
-          }
+          publishLogs(2L, TimeUnit.SECONDS);
         } catch (Exception e) {
-          LOG.error("Failed to push logs to Kafka. Log entries dropped.", e);
+          addError("Failed to push logs to Kafka. Log entries dropped.", e);
         }
       }
     };

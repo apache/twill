@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
  */
 interface YarnTwillControllerFactory {
 
-  YarnTwillController create(RunId runId, Iterable<LogHandler> logHandlers,
+  YarnTwillController create(RunId runId, boolean logCollectionEnabled, Iterable<LogHandler> logHandlers,
                              Callable<ProcessController<YarnApplicationReport>> startUp,
                              long startTimeout, TimeUnit startTimeoutUnit);
 }

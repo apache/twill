@@ -78,6 +78,11 @@ public final class Configs {
      */
     public static final String YARN_AM_RESERVED_MEMORY_MB = "twill.yarn.am.reserved.memory.mb";
 
+    /**
+     * Setting for enabling log collection.
+     */
+    public static final String LOG_COLLECTION_ENABLED = "twill.log.collection.enabled";
+
     private Keys() {
     }
   }
@@ -116,6 +121,11 @@ public final class Configs {
      * Default AM JVM reserved memory.
      */
     public static final int YARN_AM_RESERVED_MEMORY_MB = 150;
+
+    /**
+     * Default to enable log collection.
+     */
+    public static final boolean LOG_COLLECTION_ENABLED = true;
 
 
     private Defaults() {

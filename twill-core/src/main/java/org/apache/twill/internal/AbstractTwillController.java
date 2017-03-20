@@ -71,21 +71,37 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   private static final Logger LOG = LoggerFactory.getLogger(AbstractTwillController.class);
   private static final Gson GSON = new Gson();
 
+  private final String appName;
+  private final RunId runId;
   private final Queue<LogHandler> logHandlers;
   private final KafkaClientService kafkaClient;
   private ZKDiscoveryService discoveryServiceClient;
   private Cancellable logCancellable;
 
-  public AbstractTwillController(RunId runId, ZKClient zkClient, Iterable<LogHandler> logHandlers) {
+  public AbstractTwillController(String appName, RunId runId, ZKClient zkClient, boolean logCollectionEnabled,
+                                 Iterable<LogHandler> logHandlers) {
     super(runId, zkClient);
+    this.appName = appName;
+    this.runId = runId;
     this.logHandlers = new ConcurrentLinkedQueue<>();
-    this.kafkaClient = new ZKKafkaClientService(ZKClients.namespace(zkClient, "/" + runId.getId() + "/kafka"));
-    Iterables.addAll(this.logHandlers, logHandlers);
+
+    // When addressing TWILL-147, need to check if the given ZKClient is
+    // actually used by the Kafka used for log collection
+    if (logCollectionEnabled) {
+      this.kafkaClient = new ZKKafkaClientService(ZKClients.namespace(zkClient, "/" + runId.getId() + "/kafka"));
+      Iterables.addAll(this.logHandlers, logHandlers);
+    } else {
+      this.kafkaClient = null;
+      if (!Iterables.isEmpty(logHandlers)) {
+        LOG.warn("Log collection is disabled for application {} with runId {}. " +
+                   "Adding log handler won't get any logs.", appName, runId);
+      }
+    }
   }
 
   @Override
   protected synchronized void doStartUp() {
-    if (!logHandlers.isEmpty()) {
+    if (kafkaClient != null && !logHandlers.isEmpty()) {
       kafkaClient.startAndWait();
       logCancellable = kafkaClient.getConsumer().prepare()
                                   .addFromBeginning(Constants.LOG_TOPIC, 0)
@@ -101,12 +117,20 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
     if (discoveryServiceClient != null) {
       discoveryServiceClient.close();
     }
-    // Safe to call stop no matter when state the KafkaClientService is in.
-    kafkaClient.stopAndWait();
+    if (kafkaClient != null) {
+      // Safe to call stop no matter what state the KafkaClientService is in.
+      kafkaClient.stopAndWait();
+    }
   }
 
   @Override
   public final synchronized void addLogHandler(LogHandler handler) {
+    if (kafkaClient == null) {
+      LOG.warn("Log collection is disabled for application {} with runId {}. " +
+                 "Adding log handler won't get any logs.", appName, runId);
+      return;
+    }
+
     logHandlers.add(handler);
     if (logHandlers.size() == 1) {
       kafkaClient.startAndWait();

@@ -157,7 +157,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     this.amLiveNode = new ApplicationMasterLiveNodeData(Integer.parseInt(System.getenv(EnvKeys.YARN_APP_ID)),
                                                         Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
-                                                        amClient.getContainerId().toString(), getLocalizeFiles());
+                                                        amClient.getContainerId().toString(), getLocalizeFiles(),
+                                                        twillRuntimeSpec.getKafkaZKConnect());
 
     this.expectedContainers = new ExpectedContainers(twillSpec);
     this.runningContainers = createRunningContainers(amClient.getContainerId(), amClient.getHost());
@@ -657,8 +658,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       if (environments.containsKey(runnableName)) {
         env.putAll(environments.get(runnableName));
       }
-      // Override with system env
-      env.put(EnvKeys.TWILL_LOG_KAFKA_ZK, getKafkaZKConnect());
 
       ProcessLauncher.PrepareLaunchContext launchContext = processLauncher.prepareLaunch(env,
                                                                                          amLiveNode.getLocalFiles(),
@@ -712,10 +711,6 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
   private String getZKNamespace(String runnableName) {
     return String.format("/%s/runnables/%s", runId.getId(), runnableName);
-  }
-
-  String getKafkaZKConnect() {
-    return String.format("%s/%s/kafka", zkClient.getConnectString(), runId.getId());
   }
 
   /**
