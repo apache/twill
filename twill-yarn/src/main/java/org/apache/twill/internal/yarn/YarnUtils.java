@@ -41,7 +41,6 @@ import org.apache.hadoop.yarn.util.Records;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.ForwardingLocationFactory;
-import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.LocationFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,7 +162,7 @@ public class YarnUtils {
     FileSystem fileSystem = getFileSystem(locationFactory, config);
 
     if (fileSystem == null) {
-      LOG.warn("Unexpected: LocationFactory is neither FileContextLocationFactory nor HDFSLocationFactory.");
+      LOG.warn("Unexpected: LocationFactory is not backed by FileContextLocationFactory");
       return ImmutableList.of();
     }
 
@@ -320,9 +319,6 @@ public class YarnUtils {
    */
   @Nullable
   private static FileSystem getFileSystem(LocationFactory locationFactory, Configuration config) throws IOException {
-    if (locationFactory instanceof HDFSLocationFactory) {
-      return ((HDFSLocationFactory) locationFactory).getFileSystem();
-    }
     if (locationFactory instanceof ForwardingLocationFactory) {
       return getFileSystem(((ForwardingLocationFactory) locationFactory).getDelegate(), config);
     }
