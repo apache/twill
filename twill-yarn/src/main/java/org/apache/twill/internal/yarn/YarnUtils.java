@@ -159,19 +159,19 @@ public class YarnUtils {
       return ImmutableList.of();
     }
 
-    FileSystem fileSystem = getFileSystem(locationFactory, config);
+    try (FileSystem fileSystem = getFileSystem(locationFactory)) {
+      if (fileSystem == null) {
+        LOG.warn("Unexpected: LocationFactory is not backed by FileContextLocationFactory");
+        return ImmutableList.of();
+      }
 
-    if (fileSystem == null) {
-      LOG.warn("Unexpected: LocationFactory is not backed by FileContextLocationFactory");
-      return ImmutableList.of();
+      String renewer = YarnUtils.getYarnTokenRenewer(config);
+
+      Token<?>[] tokens = fileSystem.addDelegationTokens(renewer, credentials);
+      LOG.debug("Added HDFS DelegationTokens: {}", Arrays.toString(tokens));
+
+      return tokens == null ? ImmutableList.<Token<?>>of() : ImmutableList.copyOf(tokens);
     }
-
-    String renewer = YarnUtils.getYarnTokenRenewer(config);
-
-    Token<?>[] tokens = fileSystem.addDelegationTokens(renewer, credentials);
-    LOG.debug("Added HDFS DelegationTokens: {}", Arrays.toString(tokens));
-
-    return tokens == null ? ImmutableList.<Token<?>>of() : ImmutableList.copyOf(tokens);
   }
 
   /**
@@ -318,13 +318,18 @@ public class YarnUtils {
    *         {@code null} will be returned if unable to determine the {@link FileSystem}.
    */
   @Nullable
-  private static FileSystem getFileSystem(LocationFactory locationFactory, Configuration config) throws IOException {
+  private static FileSystem getFileSystem(LocationFactory locationFactory) throws IOException {
     if (locationFactory instanceof ForwardingLocationFactory) {
-      return getFileSystem(((ForwardingLocationFactory) locationFactory).getDelegate(), config);
+      return getFileSystem(((ForwardingLocationFactory) locationFactory).getDelegate());
     }
     // Due to HDFS-10296, for encrypted file systems, FileContext does not acquire the KMS delegation token
     // Since we know we are in Yarn, it is safe to get the FileSystem directly, bypassing LocationFactory.
     if (locationFactory instanceof FileContextLocationFactory) {
+      // Disable caching of FileSystem object, as the FileSystem object is only used to get delegation token for the
+      // current user. Caching it may causes leaking of FileSystem object if the method is called with different users.
+      Configuration config = new Configuration(((FileContextLocationFactory) locationFactory).getConfiguration());
+      String scheme = FileSystem.getDefaultUri(config).getScheme();
+      config.set(String.format("fs.%s.impl.disable.cache", scheme), "true");
       return FileSystem.get(config);
     }
     return null;
