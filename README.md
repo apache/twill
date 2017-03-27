@@ -18,7 +18,7 @@
 
 What is Apache Twill?
 ---------------------
-Twill is an abstraction over Apache Hadoop® YARN that reduces the complexity 
+[Twill] is an abstraction over Apache Hadoop® YARN that reduces the complexity 
 of developing distributed applications, allowing developers to focus more on 
 their business logic. Twill allows you to use YARN’s distributed capabilities 
 with a programming model that is similar to running threads.
@@ -62,3 +62,5 @@ Apache Twill uses the built-in java cryptography libraries for unique ID
 generation. See 
 <http://www.oracle.com/us/products/export/export-regulations-345813.html>
 for more details on Java's cryptography features.
+
+[Twill]: http://twill.apache.org/
