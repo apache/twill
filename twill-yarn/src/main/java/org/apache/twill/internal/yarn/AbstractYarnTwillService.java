@@ -17,6 +17,7 @@
  */
 package org.apache.twill.internal.yarn;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.twill.api.RunId;
@@ -40,11 +41,15 @@ import java.io.IOException;
 public abstract class AbstractYarnTwillService extends AbstractTwillService {
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractYarnTwillService.class);
-  protected final Location applicationLocation;
+
+  private final Configuration config;
+  private final Location applicationLocation;
   protected volatile Credentials credentials;
 
-  protected AbstractYarnTwillService(ZKClient zkClient, RunId runId, Location applicationLocation) {
+  protected AbstractYarnTwillService(ZKClient zkClient, RunId runId,
+                                     Configuration config, Location applicationLocation) {
     super(zkClient, runId);
+    this.config = config;
     this.applicationLocation = applicationLocation;
   }
 
@@ -83,11 +88,20 @@ public abstract class AbstractYarnTwillService extends AbstractTwillService {
     try {
       Credentials credentials = new Credentials();
       Location location = getSecureStoreLocation();
+
+      // If failed to determine the secure store location, simply ignore the message.
+      if (location == null) {
+        return true;
+      }
+
       try (DataInputStream input = new DataInputStream(new BufferedInputStream(location.getInputStream()))) {
         credentials.readTokenStorageStream(input);
       }
 
       UserGroupInformation.getCurrentUser().addCredentials(credentials);
+
+      // Clone the HDFS tokens for HA NameNode. This is to workaround bug HDFS-9276.
+      YarnUtils.cloneHaNnCredentials(config);
       this.credentials = credentials;
 
       LOG.info("Secure store updated from {}.", location);

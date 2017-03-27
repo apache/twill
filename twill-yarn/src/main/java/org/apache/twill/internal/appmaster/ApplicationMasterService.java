@@ -37,6 +37,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -138,9 +139,10 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private Queue<RunnableContainerRequest> runnableContainerRequests;
   private ExecutorService instanceChangeExecutor;
 
-  public ApplicationMasterService(RunId runId, ZKClient zkClient, TwillRuntimeSpecification twillRuntimeSpec,
-                                  YarnAMClient amClient, Location applicationLocation) throws Exception {
-    super(zkClient, runId, applicationLocation);
+  public ApplicationMasterService(RunId runId, ZKClient zkClient,
+                                  TwillRuntimeSpecification twillRuntimeSpec, YarnAMClient amClient,
+                                  Configuration config, Location applicationLocation) throws Exception {
+    super(zkClient, runId, config, applicationLocation);
 
     this.runId = runId;
     this.twillRuntimeSpec = twillRuntimeSpec;

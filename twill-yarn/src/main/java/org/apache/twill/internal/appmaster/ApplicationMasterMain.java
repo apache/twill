@@ -84,7 +84,7 @@ public final class ApplicationMasterMain extends ServiceMain {
 
     final YarnAMClient amClient = new VersionDetectYarnAMClientFactory(conf).create();
     ApplicationMasterService service =
-      new ApplicationMasterService(runId, zkClientService, twillRuntimeSpec, amClient,
+      new ApplicationMasterService(runId, zkClientService, twillRuntimeSpec, amClient, conf,
                                    createAppLocation(conf, twillRuntimeSpec.getFsUser(),
                                                      twillRuntimeSpec.getTwillAppDir()));
     TrackerService trackerService = new TrackerService(service);
