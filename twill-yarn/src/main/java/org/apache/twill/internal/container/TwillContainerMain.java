@@ -124,7 +124,7 @@ public final class TwillContainerMain extends ServiceMain {
     ZKClient containerZKClient = getContainerZKClient(zkClientService, appRunId, runnableName);
     Configuration conf = new YarnConfiguration(new HdfsConfiguration(new Configuration()));
     TwillContainerService service = new TwillContainerService(context, containerInfo, containerZKClient,
-                                                              runId, runnableSpec, getClassLoader(),
+                                                              runId, runnableSpec, getClassLoader(), conf,
                                                               createAppLocation(conf, twillRuntimeSpec.getFsUser(),
                                                                                 twillRuntimeSpec.getTwillAppDir()),
                                                               defaultLogLevels, logLevels);

@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillRunnable;
@@ -70,9 +71,9 @@ public final class TwillContainerService extends AbstractYarnTwillService {
 
   TwillContainerService(BasicTwillContext context, ContainerInfo containerInfo, ZKClient zkClient,
                         RunId runId, TwillRunnableSpecification specification, ClassLoader classLoader,
-                        Location applicationLocation, Map<String, String> defaultLogLevels,
-                        Map<String, String> logLevels) {
-    super(zkClient, runId, applicationLocation);
+                        Configuration config, Location applicationLocation,
+                        Map<String, String> defaultLogLevels, Map<String, String> logLevels) {
+    super(zkClient, runId, config, applicationLocation);
 
     this.specification = specification;
     this.classLoader = classLoader;
