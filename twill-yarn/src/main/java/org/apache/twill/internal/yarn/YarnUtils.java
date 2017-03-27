@@ -21,9 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.Credentials;
@@ -49,8 +47,10 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 
 /**
  * Collection of helper methods to simplify YARN calls.
@@ -155,26 +155,19 @@ public class YarnUtils {
       return ImmutableList.of();
     }
 
-    LocationFactory factory = unwrap(locationFactory);
-    String renewer = getYarnTokenRenewer(config);
-    List<Token<?>> tokens = ImmutableList.of();
+    FileSystem fileSystem = getFileSystem(locationFactory, config);
 
-    if (factory instanceof HDFSLocationFactory) {
-      FileSystem fs = ((HDFSLocationFactory) factory).getFileSystem();
-      Token<?>[] fsTokens = fs.addDelegationTokens(renewer, credentials);
-      if (fsTokens != null) {
-        tokens = ImmutableList.copyOf(fsTokens);
-      }
-    } else if (factory instanceof FileContextLocationFactory) {
-      FileContext fc = ((FileContextLocationFactory) factory).getFileContext();
-      tokens = fc.getDelegationTokens(new Path(locationFactory.create("/").toURI()), renewer);
+    if (fileSystem == null) {
+      LOG.warn("Unexpected: LocationFactory is neither FileContextLocationFactory nor HDFSLocationFactory.");
+      return ImmutableList.of();
     }
 
-    for (Token<?> token : tokens) {
-      credentials.addToken(token.getService(), token);
-    }
+    String renewer = YarnUtils.getYarnTokenRenewer(config);
 
-    return ImmutableList.copyOf(tokens);
+    Token<?>[] tokens = fileSystem.addDelegationTokens(renewer, credentials);
+    LOG.debug("Added HDFS DelegationTokens: {}", Arrays.toString(tokens));
+
+    return tokens == null ? ImmutableList.<Token<?>>of() : ImmutableList.copyOf(tokens);
   }
 
   /**
@@ -265,6 +258,7 @@ public class YarnUtils {
     }
 
     try {
+      //noinspection unchecked
       return (T) Class.forName(className).newInstance();
     } catch (Exception e) {
       throw Throwables.propagate(e);
@@ -286,14 +280,25 @@ public class YarnUtils {
   }
 
   /**
-   * Unwraps the given {@link LocationFactory} and returns the inner most {@link LocationFactory} which is not
-   * a {@link ForwardingLocationFactory}.
+   * Gets the Hadoop {@link FileSystem} from LocationFactory.
+   *
+   * @return the Hadoop {@link FileSystem} that represents the filesystem used by the given {@link LocationFactory};
+   *         {@code null} will be returned if unable to determine the {@link FileSystem}.
    */
-  private static LocationFactory unwrap(LocationFactory locationFactory) {
-    while (locationFactory instanceof ForwardingLocationFactory) {
-      locationFactory = ((ForwardingLocationFactory) locationFactory).getDelegate();
+  @Nullable
+  private static FileSystem getFileSystem(LocationFactory locationFactory, Configuration config) throws IOException {
+    if (locationFactory instanceof HDFSLocationFactory) {
+      return ((HDFSLocationFactory) locationFactory).getFileSystem();
     }
-    return locationFactory;
+    if (locationFactory instanceof ForwardingLocationFactory) {
+      return getFileSystem(((ForwardingLocationFactory) locationFactory).getDelegate(), config);
+    }
+    // Due to HDFS-10296, for encrypted file systems, FileContext does not acquire the KMS delegation token
+    // Since we know we are in Yarn, it is safe to get the FileSystem directly, bypassing LocationFactory.
+    if (locationFactory instanceof FileContextLocationFactory) {
+      return FileSystem.get(config);
+    }
+    return null;
   }
 
   private YarnUtils() {
