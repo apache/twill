@@ -17,6 +17,8 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.api.security.SecureStoreRenewer;
+import org.apache.twill.api.security.SecureStoreWriter;
 import org.apache.twill.common.Cancellable;
 
 import java.util.concurrent.TimeUnit;
@@ -105,7 +107,25 @@ public interface TwillRunner {
    * @param delay Delay between completion of one update call to the next one.
    * @param unit time unit for the initialDelay and delay.
    * @return A {@link Cancellable} for cancelling the scheduled update.
+   *
+   * @deprecated Use {@link #setSecureStoreRenewer(SecureStoreRenewer, long, long, long, TimeUnit)} instead.
    */
+  @Deprecated
   Cancellable scheduleSecureStoreUpdate(final SecureStoreUpdater updater,
                                         long initialDelay, long delay, TimeUnit unit);
+
+  /**
+   * Sets and schedules a periodic renewal of {@link SecureStore} using a given {@link SecureStoreRenewer}.
+   * There is always only one active {@link SecureStoreRenewer}. Setting a new renewer will replace the old one
+   * and setting up a new schedule.
+   *
+   * @param renewer a {@link SecureStoreRenewer} for renewing {@link SecureStore} for all applications.
+   * @param initialDelay delay before the first call to renew method.
+   * @param delay the delay between successful completion of one renew call to the next one.
+   * @param retryDelay the delay before the retrying the renewal if the call
+   *                   to {@link SecureStoreRenewer#renew(String, RunId, SecureStoreWriter)} raised exception.
+   * @param unit time unit for the initialDelay and period.
+   */
+  Cancellable setSecureStoreRenewer(SecureStoreRenewer renewer,
+                                    long initialDelay, long delay, long retryDelay, TimeUnit unit);
 }

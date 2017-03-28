@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,24 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.api;
+package org.apache.twill.api.security;
 
-import org.apache.twill.api.security.SecureStoreRenewer;
+import org.apache.twill.api.SecureStore;
+
+import java.io.IOException;
 
 /**
- * Represents class capable of creating update of {@link SecureStore} for live applications.
- *
- * @deprecated This class doesn't handle user correctly, use {@link SecureStoreRenewer} instead
+ * A writer provided to {@link SecureStoreRenewer} for writing out {@link SecureStore} during renewal process.
  */
-@Deprecated
-public interface SecureStoreUpdater {
+public interface SecureStoreWriter {
 
   /**
-   * Invoked when an update to SecureStore is needed.
+   * Writes the given {@link SecureStore}.
    *
-   * @param application The name of the application.
-   * @param runId The runId of the live application.
-   * @return A new {@link SecureStore}.
+   * @param secureStore the {@link SecureStore} to persist
+   * @throws IOException if failed to write out the {@link SecureStore}
    */
-  SecureStore update(String application, RunId runId);
+  void write(SecureStore secureStore) throws IOException;
 }
