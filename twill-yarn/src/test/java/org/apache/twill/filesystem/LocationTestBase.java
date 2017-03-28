@@ -35,6 +35,8 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.URI;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
 /**
@@ -98,16 +100,22 @@ public abstract class LocationTestBase {
 
   @Test
   public void testHomeLocation() throws Exception {
-    LocationFactory locationFactory = createLocationFactory("/");
+    final LocationFactory locationFactory = createLocationFactory("/");
 
-    // Without UGI, the home location should be the same as the user
-    Assert.assertEquals(getUserName(), locationFactory.getHomeLocation().getName());
+    // Without UGI, the home location should be the same as the current user
+    UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+    Assert.assertEquals(currentUser.getShortUserName(), locationFactory.getHomeLocation().getName());
 
     // With UGI, the home location should be based on the UGI current user
-    UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
-      getUserName() + "1", UserGroupInformation.getCurrentUser().getGroupNames());
-    locationFactory = createLocationFactory("/", ugi);
-    Assert.assertEquals(ugi.getUserName(), locationFactory.getHomeLocation().getName());
+    UserGroupInformation ugi = createTestUGI();
+
+    Location homeLocation = ugi.doAs(new PrivilegedAction<Location>() {
+      @Override
+      public Location run() {
+        return locationFactory.getHomeLocation();
+      }
+    });
+    Assert.assertEquals(ugi.getUserName(), homeLocation.getName());
   }
 
   @Test
@@ -184,163 +192,187 @@ public abstract class LocationTestBase {
 
   @Test
   public void testOwnerGroup() throws Exception {
-    LocationFactory factory = locationFactoryCache.getUnchecked("ownergroup");
-    Location location = factory.create("ogtest");
+    final LocationFactory factory = locationFactoryCache.getUnchecked("ownergroup");
+
+    UserGroupInformation testUGI = createTestUGI();
+    Location location = testUGI.doAs(new PrivilegedExceptionAction<Location>() {
+      @Override
+      public Location run() throws Exception {
+        return factory.create("ogtest");
+      }
+    });
+
     location.createNew();
-    Assert.assertEquals(getUserName(), location.getOwner());
-    String newGroup =  getUserGroup(location.getGroup());
-    location.setGroup(newGroup);
-    Assert.assertEquals(newGroup, location.getGroup());
+    Assert.assertEquals(testUGI.getUserName(), location.getOwner());
+
+    String group = testUGI.getGroupNames()[0];
+
+    location.setGroup(group);
+    Assert.assertEquals(group, location.getGroup());
   }
 
   @Test
-  public void testPermissions() throws IOException {
-    LocationFactory factory = locationFactoryCache.getUnchecked("permission1");
+  public void testPermissions() throws IOException, InterruptedException {
+    createTestUGI().doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        LocationFactory factory = locationFactoryCache.getUnchecked("permission1");
 
-    // Test permissions setting on createNew calls
-    Location location = factory.create("test400-1");
-    Assert.assertTrue(location.createNew("400"));
-    Assert.assertEquals("r--------", location.getPermissions());
-    location = factory.create("test400-2");
-    Assert.assertTrue(location.createNew("r--------"));
-    Assert.assertEquals("r--------", location.getPermissions());
-    Assert.assertFalse(location.createNew("600"));
+        // Test permissions setting on createNew calls
+        Location location = factory.create("test400-1");
+        Assert.assertTrue(location.createNew("400"));
+        Assert.assertEquals("r--------", location.getPermissions());
+        location = factory.create("test400-2");
+        Assert.assertTrue(location.createNew("r--------"));
+        Assert.assertEquals("r--------", location.getPermissions());
+        Assert.assertFalse(location.createNew("600"));
 
-    location = factory.create("test660-1");
-    Assert.assertTrue(location.createNew("660"));
-    Assert.assertEquals("rw-rw----", location.getPermissions());
-    location = factory.create("test660-2");
-    Assert.assertTrue(location.createNew("rw-rw----"));
-    Assert.assertEquals("rw-rw----", location.getPermissions());
-    Assert.assertFalse(location.createNew("600"));
+        location = factory.create("test660-1");
+        Assert.assertTrue(location.createNew("660"));
+        Assert.assertEquals("rw-rw----", location.getPermissions());
+        location = factory.create("test660-2");
+        Assert.assertTrue(location.createNew("rw-rw----"));
+        Assert.assertEquals("rw-rw----", location.getPermissions());
+        Assert.assertFalse(location.createNew("600"));
 
-    location = factory.create("test644-1");
-    Assert.assertTrue(location.createNew("644"));
-    Assert.assertEquals("rw-r--r--", location.getPermissions());
-    location = factory.create("test644-2");
-    Assert.assertTrue(location.createNew("rw-r--r--"));
-    Assert.assertEquals("rw-r--r--", location.getPermissions());
-    Assert.assertFalse(location.createNew("600"));
+        location = factory.create("test644-1");
+        Assert.assertTrue(location.createNew("644"));
+        Assert.assertEquals("rw-r--r--", location.getPermissions());
+        location = factory.create("test644-2");
+        Assert.assertTrue(location.createNew("rw-r--r--"));
+        Assert.assertEquals("rw-r--r--", location.getPermissions());
+        Assert.assertFalse(location.createNew("600"));
 
-    // Test permissions setting on getOutputStream calls
-    factory = locationFactoryCache.getUnchecked("permission2");
+        // Test permissions setting on getOutputStream calls
+        factory = locationFactoryCache.getUnchecked("permission2");
 
-    location = factory.create("test400-1");
-    location.getOutputStream("400").close();
-    Assert.assertEquals("r--------", location.getPermissions());
-    location = factory.create("test400-2");
-    location.getOutputStream("r--------").close();
-    Assert.assertEquals("r--------", location.getPermissions());
+        location = factory.create("test400-1");
+        location.getOutputStream("400").close();
+        Assert.assertEquals("r--------", location.getPermissions());
+        location = factory.create("test400-2");
+        location.getOutputStream("r--------").close();
+        Assert.assertEquals("r--------", location.getPermissions());
 
-    location = factory.create("test660-1");
-    location.getOutputStream("660").close();
-    Assert.assertEquals("rw-rw----", location.getPermissions());
-    location = factory.create("test660-2");
-    location.getOutputStream("rw-rw----").close();
-    Assert.assertEquals("rw-rw----", location.getPermissions());
+        location = factory.create("test660-1");
+        location.getOutputStream("660").close();
+        Assert.assertEquals("rw-rw----", location.getPermissions());
+        location = factory.create("test660-2");
+        location.getOutputStream("rw-rw----").close();
+        Assert.assertEquals("rw-rw----", location.getPermissions());
 
-    location = factory.create("test644-1");
-    location.getOutputStream("644").close();
-    Assert.assertEquals("rw-r--r--", location.getPermissions());
-    location = factory.create("test644-2");
-    location.getOutputStream("rw-r--r--").close();
-    Assert.assertEquals("rw-r--r--", location.getPermissions());
+        location = factory.create("test644-1");
+        location.getOutputStream("644").close();
+        Assert.assertEquals("rw-r--r--", location.getPermissions());
+        location = factory.create("test644-2");
+        location.getOutputStream("rw-r--r--").close();
+        Assert.assertEquals("rw-r--r--", location.getPermissions());
 
-    // Test permissions setting on setPermission method
-    factory = locationFactoryCache.getUnchecked("permission3");
+        // Test permissions setting on setPermission method
+        factory = locationFactoryCache.getUnchecked("permission3");
 
-    // Setting permission on non-existed file should have IOException thrown
-    location = factory.create("somefile");
-    try {
-      location.setPermissions("400");
-      Assert.fail("IOException expected on setting permission on non-existing Location.");
-    } catch (IOException e) {
-      // expected
-    }
+        // Setting permission on non-existed file should have IOException thrown
+        location = factory.create("somefile");
+        try {
+          location.setPermissions("400");
+          Assert.fail("IOException expected on setting permission on non-existing Location.");
+        } catch (IOException e) {
+          // expected
+        }
 
-    // Create file with read only permission
-    Assert.assertTrue(location.createNew("444"));
-    Assert.assertEquals("r--r--r--", location.getPermissions());
-    // Change the permission to write only
-    location.setPermissions("222");
-    Assert.assertEquals("-w--w--w-", location.getPermissions());
+        // Create file with read only permission
+        Assert.assertTrue(location.createNew("444"));
+        Assert.assertEquals("r--r--r--", location.getPermissions());
+        // Change the permission to write only
+        location.setPermissions("222");
+        Assert.assertEquals("-w--w--w-", location.getPermissions());
+
+        return null;
+      }
+    });
   }
 
   @Test
-  public void testDirPermissions() throws IOException {
-    LocationFactory factory = locationFactoryCache.getUnchecked("permissionD");
+  public void testDirPermissions() throws IOException, InterruptedException {
+    createTestUGI().doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
 
-    Location location = factory.create("nn");
-    String permissions = "rwxr-x---";
-    location.mkdirs(permissions);
-    Assert.assertTrue(location.exists());
-    Assert.assertTrue(location.isDirectory());
-    Assert.assertEquals(permissions, location.getPermissions());
+        LocationFactory factory = locationFactoryCache.getUnchecked("permissionD");
 
-    permissions = "rwx------";
-    location.setPermissions(permissions);
-    Assert.assertEquals(permissions, location.getPermissions());
+        Location location = factory.create("base");
+        String permissions = "rwxr-x---";
+        location.mkdirs(permissions);
+        Assert.assertTrue(location.exists());
+        Assert.assertTrue(location.isDirectory());
+        Assert.assertEquals(permissions, location.getPermissions());
 
-    Location child = location.append("p1");
-    Location grandchild = child.append("xx");
-    permissions = "rwx-w--w-";
-    grandchild.mkdirs(permissions);
-    Assert.assertTrue(child.isDirectory());
-    Assert.assertTrue(grandchild.isDirectory());
-    Assert.assertEquals(permissions, child.getPermissions());
-    Assert.assertEquals(permissions, grandchild.getPermissions());
+        permissions = "rwx------";
+        location.setPermissions(permissions);
+        Assert.assertEquals(permissions, location.getPermissions());
 
-    permissions = "rwx------";
-    child.delete(true);
-    Assert.assertFalse(child.exists());
-    Location textfile = grandchild.append("a.txt");
-    textfile.getOutputStream(permissions).close();
-    Assert.assertTrue(child.isDirectory());
-    Assert.assertTrue(grandchild.isDirectory());
-    Assert.assertFalse(textfile.isDirectory());
-    Assert.assertEquals(permissions, child.getPermissions());
-    Assert.assertEquals(permissions, grandchild.getPermissions());
-    Assert.assertEquals(correctFilePermissions(permissions), textfile.getPermissions());
+        Location child = location.append("child");
+        Location grandchild = child.append("grandchild");
+        permissions = "rwx-w--w-";
+        grandchild.mkdirs(permissions);
+        Assert.assertTrue(child.isDirectory());
+        Assert.assertTrue(grandchild.isDirectory());
+        Assert.assertEquals(permissions, child.getPermissions());
+        Assert.assertEquals(permissions, grandchild.getPermissions());
 
-    // mkdirs of existing file
-    Location file = factory.create("existingfile");
-    Assert.assertTrue(file.createNew("rwx------"));
-    Assert.assertFalse(file.mkdirs());
-    Assert.assertFalse(file.mkdirs("rwxrwx---"));
+        permissions = "rwx------";
+        child.delete(true);
+        Assert.assertFalse(child.exists());
+        Location textfile = grandchild.append("a.txt");
+        textfile.getOutputStream(permissions).close();
+        Assert.assertTrue(child.isDirectory());
+        Assert.assertTrue(grandchild.isDirectory());
+        Assert.assertFalse(textfile.isDirectory());
+        Assert.assertEquals(permissions, child.getPermissions());
+        Assert.assertEquals(permissions, grandchild.getPermissions());
+        Assert.assertEquals(correctFilePermissions(permissions), textfile.getPermissions());
 
-    // mkdirs where parent is existing file
-    file = file.append("newdir");
-    Assert.assertFalse(file.mkdirs());
-    Assert.assertFalse(file.mkdirs("rwxrwx---"));
+        // mkdirs of existing file
+        Location file = factory.create("existingfile");
+        Assert.assertTrue(file.createNew("rwx------"));
+        Assert.assertFalse(file.mkdirs());
+        Assert.assertFalse(file.mkdirs("rwxrwx---"));
 
-    // mkdirs of existing directory
-    Location dir = factory.create("existingdir");
-    Assert.assertTrue(dir.mkdirs());
-    Assert.assertFalse(dir.mkdirs());
-    Assert.assertFalse(dir.mkdirs("rwxrwx---"));
+        // mkdirs where parent is existing file
+        file = file.append("newdir");
+        Assert.assertFalse(file.mkdirs());
+        Assert.assertFalse(file.mkdirs("rwxrwx---"));
 
-    // mkdirs for existing parent with different permissions -> should not change
-    dir.setPermissions("rwx------");
-    Assert.assertEquals("rwx------", dir.getPermissions());
-    Location newdir = dir.append("newdir");
-    Assert.assertTrue(newdir.mkdirs("rwxrwx---"));
-    Assert.assertEquals("rwxrwx---", newdir.getPermissions());
-    Assert.assertEquals("rwx------", dir.getPermissions());
+        // mkdirs of existing directory
+        Location dir = factory.create("existingdir");
+        Assert.assertTrue(dir.mkdirs());
+        Assert.assertFalse(dir.mkdirs());
+        Assert.assertFalse(dir.mkdirs("rwxrwx---"));
 
-    // mkdirs whithout permission for parent
-    Assert.assertTrue(newdir.delete(true));
-    dir.setPermissions("r-x------");
-    Assert.assertEquals("r-x------", dir.getPermissions());
-    try {
-      Assert.assertFalse(newdir.mkdirs());
-    } catch (AccessControlException e) {
-      // expected
-    }
-    try {
-      Assert.assertFalse(newdir.mkdirs("rwxrwx---"));
-    } catch (AccessControlException e) {
-      // expected
-    }
+        // mkdirs for existing parent with different permissions -> should not change
+        dir.setPermissions("rwx------");
+        Assert.assertEquals("rwx------", dir.getPermissions());
+        Location newdir = dir.append("newdir");
+        Assert.assertTrue(newdir.mkdirs("rwxrwx---"));
+        Assert.assertEquals("rwxrwx---", newdir.getPermissions());
+        Assert.assertEquals("rwx------", dir.getPermissions());
+
+        // mkdirs whithout permission for parent
+        Assert.assertTrue(newdir.delete(true));
+        dir.setPermissions("r-x------");
+        Assert.assertEquals("r-x------", dir.getPermissions());
+        try {
+          Assert.assertFalse(newdir.mkdirs());
+        } catch (AccessControlException e) {
+          // expected
+        }
+        try {
+          Assert.assertFalse(newdir.mkdirs("rwxrwx---"));
+        } catch (AccessControlException e) {
+          // expected
+        }
+        return null;
+      }
+    });
   }
 
   /**
@@ -349,26 +381,15 @@ public abstract class LocationTestBase {
   protected abstract LocationFactory createLocationFactory(String pathBase) throws Exception;
 
   /**
-   * Create a location factory rooted at a given path, for the given UGI.
-   */
-  protected abstract LocationFactory createLocationFactory(String pathBase, UserGroupInformation ugi) throws Exception;
-
-  /**
-   * Get the user name used for {@link #createLocationFactory(String)}.
-   */
-  protected abstract String getUserName();
-
-  /**
-   * Given the group name of a location, return a valid group name to test changing the location's group.
-   * If no suitable group name is known, the passed-in group name can be returned.
-   */
-  protected abstract String getUserGroup(String groupName);
-
-  /**
    * Some older versions of Hadoop always strip the execute permission from files (but keep it for directories).
    * This allows subclasses to correct the expected file permissions, based on the Hadoop version (if any).
    */
   protected String correctFilePermissions(String expectedFilePermissions) {
     return expectedFilePermissions; // unchanged by default
+  }
+
+  protected UserGroupInformation createTestUGI() throws IOException {
+    String userName = System.getProperty("user.name").equals("tester") ? "twiller" : "tester";
+    return UserGroupInformation.createUserForTesting(userName, new String[] { "testgroup" });
   }
 }

@@ -18,13 +18,21 @@
 package org.apache.twill.filesystem;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.UnsupportedFileSystemException;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.twill.api.Configs;
 
+import java.io.IOException;
 import java.net.URI;
+import java.security.PrivilegedExceptionAction;
 import java.util.Objects;
 
 /**
@@ -33,8 +41,8 @@ import java.util.Objects;
 public class FileContextLocationFactory implements LocationFactory {
 
   private final Configuration configuration;
-  private final FileContext fc;
   private final Path pathBase;
+  private final LoadingCache<UserGroupInformation, FileContext> fileContextCache;
 
   /**
    * Same as {@link #FileContextLocationFactory(Configuration, String) FileContextLocationFactory(configuration, "/")}.
@@ -49,8 +57,28 @@ public class FileContextLocationFactory implements LocationFactory {
    * @param configuration the hadoop configuration
    * @param pathBase base path for all non-absolute location created through this {@link LocationFactory}.
    */
-  public FileContextLocationFactory(Configuration configuration, String pathBase) {
-    this(configuration, createFileContext(configuration), pathBase);
+  public FileContextLocationFactory(final Configuration configuration, String pathBase) {
+    this.configuration = configuration;
+    this.pathBase = new Path(pathBase.startsWith("/") ? pathBase : "/" + pathBase);
+
+    int maxCacheSize = configuration.getInt(Configs.Keys.FILE_CONTEXT_CACHE_MAX_SIZE,
+                                            Configs.Defaults.FILE_CONTEXT_CACHE_MAX_SIZE);
+    this.fileContextCache = CacheBuilder
+      .newBuilder()
+      .weakKeys()
+      .weakValues()
+      .maximumSize(maxCacheSize)
+      .build(new CacheLoader<UserGroupInformation, FileContext>() {
+        @Override
+        public FileContext load(UserGroupInformation ugi) throws Exception {
+          return ugi.doAs(new PrivilegedExceptionAction<FileContext>() {
+            @Override
+            public FileContext run() throws UnsupportedFileSystemException {
+              return FileContext.getFileContext(configuration);
+            }
+          });
+        }
+      });
   }
 
   /**
@@ -59,11 +87,16 @@ public class FileContextLocationFactory implements LocationFactory {
    * @param configuration the hadoop configuration
    * @param fc {@link FileContext} instance created from the given configuration
    * @param pathBase base path for all non-absolute location created through this (@link LocationFactory}.
+   *
+   * @deprecated Use {@link #FileContextLocationFactory(Configuration)}
+   *             or {@link #FileContextLocationFactory(Configuration, String)} instead. The {@link FileContext}
+   *             provided to this method will only be used if the current user calling any methods of this class
+   *             matches with the {@link UserGroupInformation} of the {@link FileContext} instance.
    */
+  @Deprecated
   public FileContextLocationFactory(Configuration configuration, FileContext fc, String pathBase) {
-    this.configuration = configuration;
-    this.fc = fc;
-    this.pathBase = new Path(pathBase.startsWith("/") ? pathBase : "/" + pathBase);
+    this(configuration, pathBase);
+    this.fileContextCache.put(fc.getUgi(), fc);
   }
 
   @Override
@@ -77,12 +110,14 @@ public class FileContextLocationFactory implements LocationFactory {
     } else {
       locationPath = new Path(path);
     }
+    FileContext fc = getFileContext();
     locationPath = locationPath.makeQualified(fc.getDefaultFileSystem().getUri(), pathBase);
     return new FileContextLocation(this, fc, locationPath);
   }
 
   @Override
   public Location create(URI uri) {
+    FileContext fc = getFileContext();
     URI contextURI = fc.getWorkingDirectory().toUri();
     if (Objects.equals(contextURI.getScheme(), uri.getScheme())
       && Objects.equals(contextURI.getAuthority(), uri.getAuthority())) {
@@ -103,16 +138,32 @@ public class FileContextLocationFactory implements LocationFactory {
 
   @Override
   public Location getHomeLocation() {
+    FileContext fc = getFileContext();
     // Fix for TWILL-163. FileContext.getHomeDirectory() uses System.getProperty("user.name") instead of UGI
     return new FileContextLocation(this, fc,
                                    new Path(fc.getHomeDirectory().getParent(), fc.getUgi().getShortUserName()));
   }
 
   /**
-   * Returns the {@link FileContext} used by this {@link LocationFactory}.
+   * Returns the {@link FileContext} for the current user based on {@link UserGroupInformation#getCurrentUser()}.
+   *
+   * @throws IllegalStateException if failed to determine the current user or fail to create the FileContext.
+   * @throws RuntimeException if failed to get the {@link FileContext} object for the current user due to exception
    */
   public FileContext getFileContext() {
-    return fc;
+    try {
+      return fileContextCache.getUnchecked(UserGroupInformation.getCurrentUser());
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to get current user information", e);
+    } catch (UncheckedExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof UnsupportedFileSystemException) {
+        String defaultURI = configuration.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
+                                              CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT);
+        throw new IllegalStateException("File system with URI '" + defaultURI + "' is not supported", cause);
+      }
+      throw (cause instanceof RuntimeException) ? (RuntimeException) cause : new RuntimeException(cause);
+    }
   }
 
   /**
@@ -120,13 +171,5 @@ public class FileContextLocationFactory implements LocationFactory {
    */
   public Configuration getConfiguration() {
     return configuration;
-  }
-
-  private static FileContext createFileContext(Configuration configuration) {
-    try {
-      return FileContext.getFileContext(configuration);
-    } catch (UnsupportedFileSystemException e) {
-      throw Throwables.propagate(e);
-    }
   }
 }
