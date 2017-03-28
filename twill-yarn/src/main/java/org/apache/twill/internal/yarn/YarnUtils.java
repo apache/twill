@@ -161,7 +161,6 @@ public class YarnUtils {
 
     try (FileSystem fileSystem = getFileSystem(locationFactory)) {
       if (fileSystem == null) {
-        LOG.warn("Unexpected: LocationFactory is not backed by FileContextLocationFactory");
         return ImmutableList.of();
       }
 
@@ -332,6 +331,8 @@ public class YarnUtils {
       config.set(String.format("fs.%s.impl.disable.cache", scheme), "true");
       return FileSystem.get(config);
     }
+
+    LOG.warn("Unexpected: LocationFactory is not backed by FileContextLocationFactory");
     return null;
   }
 
