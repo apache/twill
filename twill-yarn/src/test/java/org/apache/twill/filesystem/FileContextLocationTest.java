@@ -17,18 +17,20 @@
  */
 package org.apache.twill.filesystem;
 
-import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.twill.internal.yarn.YarnUtils;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.io.IOException;
-import java.security.PrivilegedAction;
+import java.security.PrivilegedExceptionAction;
 
 /**
  *
@@ -36,7 +38,6 @@ import java.security.PrivilegedAction;
 public class FileContextLocationTest extends LocationTestBase {
 
   public static MiniDFSCluster dfsCluster;
-  private static UserGroupInformation testUGI;
 
   @BeforeClass
   public static void init() throws IOException {
@@ -45,9 +46,6 @@ public class FileContextLocationTest extends LocationTestBase {
     dfsCluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     // make root world-writable so that we can create all location factories as unprivileged user
     dfsCluster.getFileSystem().setPermission(new Path("/"), FsPermission.valueOf("-rwxrwxrwx"));
-    // to run these tests not as superuser, make sure to use a user name other than the JVM user
-    String userName = System.getProperty("user.name").equals("tester") ? "twiller" : "tester";
-    testUGI = UserGroupInformation.createUserForTesting(userName, new String[] { "testgroup" });
   }
 
   @AfterClass
@@ -56,39 +54,7 @@ public class FileContextLocationTest extends LocationTestBase {
   }
 
   @Override
-  protected String getUserName() {
-    return testUGI.getUserName();
-  }
-
-  @Override
-  protected String getUserGroup(String ignoredGroupName) {
-    return testUGI.getGroupNames()[testUGI.getGroupNames().length - 1];
-  }
-
-  @Override
   protected LocationFactory createLocationFactory(String pathBase) throws Exception {
-    return createLocationFactory(pathBase, testUGI);
-  }
-
-  @Override
-  protected LocationFactory createLocationFactory(final String pathBase, UserGroupInformation ugi) throws Exception {
-    LocationFactory factory = ugi.doAs(new PrivilegedAction<LocationFactory>() {
-      @Override
-      public LocationFactory run() {
-        try {
-          return doCreateLocationFactory(pathBase);
-        } catch (IOException e) {
-          throw Throwables.propagate(e);
-        }
-      }
-    });
-    // make sure the root of the location factory exists and only permits the test user
-    Location root = factory.create("/");
-    root.mkdirs("rwx------");
-    return factory;
-  }
-
-  protected LocationFactory doCreateLocationFactory(String pathBase) throws IOException {
     return new FileContextLocationFactory(dfsCluster.getFileSystem().getConf(), pathBase);
   }
 
@@ -100,5 +66,21 @@ public class FileContextLocationTest extends LocationTestBase {
         original.substring(6, 8) + '-'; // strip the x for world;
     }
     return original;
+  }
+
+  @Test
+  public void testGetFileContext() throws Exception {
+    final FileContextLocationFactory locationFactory = (FileContextLocationFactory) createLocationFactory("/testGetFC");
+
+    Assert.assertEquals(UserGroupInformation.getCurrentUser(), locationFactory.getFileContext().getUgi());
+
+    UserGroupInformation testUGI = createTestUGI();
+    FileContext fileContext = testUGI.doAs(new PrivilegedExceptionAction<FileContext>() {
+      @Override
+      public FileContext run() throws Exception {
+        return locationFactory.getFileContext();
+      }
+    });
+    Assert.assertEquals(testUGI, fileContext.getUgi());
   }
 }

@@ -674,7 +674,8 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
   private static LocationFactory createDefaultLocationFactory(Configuration configuration) {
     try {
       FileContext fc = FileContext.getFileContext(configuration);
-      return new FileContextLocationFactory(configuration, fc, fc.getHomeDirectory().toUri().getPath());
+      String basePath = fc.getHomeDirectory().toUri().getPath();
+      return new FileContextLocationFactory(configuration, basePath);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

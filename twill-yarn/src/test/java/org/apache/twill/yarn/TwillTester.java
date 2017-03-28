@@ -207,7 +207,8 @@ public class TwillTester extends ExternalResource {
   public LocationFactory createLocationFactory() {
     try {
       FileContext fc = FileContext.getFileContext(config);
-      return new FileContextLocationFactory(config, fc, fc.getHomeDirectory().toUri().getPath());
+      String basePath = fc.getHomeDirectory().toUri().getPath();
+      return new FileContextLocationFactory(config, basePath);
     } catch (IOException e) {
       throw Throwables.propagate(e);
     }

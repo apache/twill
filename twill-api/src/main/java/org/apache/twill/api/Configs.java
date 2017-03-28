@@ -83,6 +83,11 @@ public final class Configs {
      */
     public static final String LOG_COLLECTION_ENABLED = "twill.log.collection.enabled";
 
+    /**
+     * The maximum number of FileContext object cached by the FileContextLocationFactory.
+     */
+    public static final String FILE_CONTEXT_CACHE_MAX_SIZE = "twill.file.context.cache.max.size";
+
     private Keys() {
     }
   }
@@ -126,6 +131,11 @@ public final class Configs {
      * Default to enable log collection.
      */
     public static final boolean LOG_COLLECTION_ENABLED = true;
+
+    /**
+     * Default size of the file context cache.
+     */
+    public static final int FILE_CONTEXT_CACHE_MAX_SIZE = 100;
 
 
     private Defaults() {
