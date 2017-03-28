@@ -25,6 +25,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableTable;
 import com.google.common.collect.Iterables;
@@ -57,6 +58,8 @@ import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.LogHandler;
+import org.apache.twill.api.security.SecureStoreRenewer;
+import org.apache.twill.api.security.SecureStoreWriter;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.filesystem.FileContextLocationFactory;
@@ -91,6 +94,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashSet;
@@ -99,6 +103,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -214,45 +219,29 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
   @Override
   public Cancellable scheduleSecureStoreUpdate(final SecureStoreUpdater updater,
                                                long initialDelay, long delay, TimeUnit unit) {
-    if (!UserGroupInformation.isSecurityEnabled()) {
-      return new Cancellable() {
-        @Override
-        public void cancel() {
-          // No-op
-        }
-      };
-    }
-
     synchronized (this) {
       if (secureStoreScheduler == null) {
         secureStoreScheduler = Executors.newSingleThreadScheduledExecutor(
-          Threads.createDaemonThreadFactory("secure-store-updater"));
+          Threads.createDaemonThreadFactory("secure-store-renewer"));
       }
     }
 
     final ScheduledFuture<?> future = secureStoreScheduler.scheduleWithFixedDelay(new Runnable() {
       @Override
       public void run() {
-        // Collects all <application, runId> pairs first
-        Multimap<String, RunId> liveApps = HashMultimap.create();
-        synchronized (YarnTwillRunnerService.this) {
-          for (Table.Cell<String, RunId, YarnTwillController> cell : controllers.cellSet()) {
-            liveApps.put(cell.getRowKey(), cell.getColumnKey());
-          }
+        // Collects all live applications
+        Table<String, RunId, YarnTwillController> liveApps;
+        synchronized (this) {
+          liveApps = HashBasedTable.create(controllers);
         }
 
-        // Collect all secure stores that needs to be updated.
-        Table<String, RunId, SecureStore> secureStores = HashBasedTable.create();
-        for (Map.Entry<String, RunId> entry : liveApps.entries()) {
-          try {
-            secureStores.put(entry.getKey(), entry.getValue(), updater.update(entry.getKey(), entry.getValue()));
-          } catch (Throwable t) {
-            LOG.warn("Exception thrown by SecureStoreUpdater {}", updater, t);
+        // Update the secure store with merging = true
+        renewSecureStore(liveApps, new SecureStoreRenewer() {
+          @Override
+          public void renew(String application, RunId runId, SecureStoreWriter secureStoreWriter) throws IOException {
+            secureStoreWriter.write(updater.update(application, runId));
           }
-        }
-
-        // Update secure stores.
-        updateSecureStores(secureStores);
+        }, true);
       }
     }, initialDelay, delay, unit);
 
@@ -260,6 +249,37 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
       @Override
       public void cancel() {
         future.cancel(false);
+      }
+    };
+  }
+
+  @Override
+  public Cancellable setSecureStoreRenewer(SecureStoreRenewer renewer, long initialDelay,
+                                           long delay, long retryDelay, TimeUnit unit) {
+    synchronized (this) {
+      if (secureStoreScheduler != null) {
+        // Shutdown and block until the schedule is stopped
+        stopScheduler(secureStoreScheduler);
+      }
+      secureStoreScheduler = Executors.newSingleThreadScheduledExecutor(
+        Threads.createDaemonThreadFactory("secure-store-renewer"));
+    }
+
+    final ScheduledExecutorService currentScheduler = secureStoreScheduler;
+    secureStoreScheduler.scheduleWithFixedDelay(
+      createSecureStoreUpdateRunnable(currentScheduler, renewer,
+                                      ImmutableMultimap.<String, RunId>of(), retryDelay, unit),
+      initialDelay, delay, unit);
+    return new Cancellable() {
+      @Override
+      public void cancel() {
+        synchronized (YarnTwillRunnerService.this) {
+          // Only cancel if the active scheduler is the same as the schedule bind to this cancellable
+          if (currentScheduler == secureStoreScheduler) {
+            secureStoreScheduler.shutdown();
+            secureStoreScheduler = null;
+          }
+        }
       }
     };
   }
@@ -367,8 +387,9 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
       if (delay <= 0) {
         delay = (renewalInterval <= 2) ? 1 : renewalInterval / 2;
       }
-      scheduleSecureStoreUpdate(new LocationSecureStoreUpdater(yarnConfig, locationFactory),
-                                delay, delay, TimeUnit.MILLISECONDS);
+
+      setSecureStoreRenewer(new LocationSecureStoreRenewer(yarnConfig, locationFactory),
+                            delay, delay, 10000L, TimeUnit.MILLISECONDS);
     }
 
     // Optionally create a LocationCache
@@ -613,62 +634,109 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     }, Threads.SAME_THREAD_EXECUTOR);
   }
 
-
-  private void updateSecureStores(Table<String, RunId, SecureStore> secureStores) {
-    for (Table.Cell<String, RunId, SecureStore> cell : secureStores.cellSet()) {
-      Object store = cell.getValue().getStore();
-      if (!(store instanceof Credentials)) {
-        LOG.warn("Only Hadoop Credentials is supported. Ignore update for {}.", cell);
-        continue;
-      }
-
-      Credentials credentials = (Credentials) store;
-      if (credentials.getAllTokens().isEmpty()) {
-        // Nothing to update.
-        continue;
-      }
-
-      try {
-        updateCredentials(cell.getRowKey(), cell.getColumnKey(), credentials);
-        synchronized (YarnTwillRunnerService.this) {
-          // Notify the application for secure store updates if it is still running.
-          YarnTwillController controller = controllers.get(cell.getRowKey(), cell.getColumnKey());
-          if (controller != null) {
-            controller.secureStoreUpdated();
-          }
+  /**
+   * Stops the given scheduler and block until is it stopped.
+   */
+  private void stopScheduler(final ScheduledExecutorService scheduler) {
+    scheduler.shutdown();
+    boolean interrupted = false;
+    try {
+      while (true) {
+        try {
+          scheduler.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+          return;
+        } catch (InterruptedException e) {
+          interrupted = true;
         }
-      } catch (Throwable t) {
-        LOG.warn("Failed to update secure store for {}.", cell, t);
+      }
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
       }
     }
   }
 
-  private void updateCredentials(String application, RunId runId, Credentials updates) throws IOException {
-    Location credentialsLocation = locationFactory.create(String.format("/%s/%s/%s", application, runId.getId(),
-                                                                        Constants.Files.CREDENTIALS));
-    // Try to read the old credentials.
-    Credentials credentials = new Credentials();
-    if (credentialsLocation.exists()) {
-      try (DataInputStream is = new DataInputStream(new BufferedInputStream(credentialsLocation.getInputStream()))) {
-        credentials.readTokenStorageStream(is);
+  /**
+   * Creates a {@link Runnable} for renewing {@link SecureStore} for running applications.
+   *
+   * @param scheduler the schedule to schedule next renewal execution
+   * @param renewer the {@link SecureStoreRenewer} to use for renewal
+   * @param retryRuns if non-empty, only the given set of application name and run id that need to have
+   *                  secure store renewed; if empty, renew all running applications
+   * @param retryDelay the delay before retrying applications that are failed to have secure store renewed
+   * @param timeUnit the unit for the {@code delay} and {@code failureDelay}.
+   * @return a {@link Runnable}
+   */
+  private Runnable createSecureStoreUpdateRunnable(final ScheduledExecutorService scheduler,
+                                                   final SecureStoreRenewer renewer,
+                                                   final Multimap<String, RunId> retryRuns,
+                                                   final long retryDelay, final TimeUnit timeUnit) {
+    return new Runnable() {
+      @Override
+      public void run() {
+        // Collects the set of running application runs
+        Table<String, RunId, YarnTwillController> liveApps;
+
+        synchronized (YarnTwillRunnerService.this) {
+          if (retryRuns.isEmpty()) {
+            liveApps = HashBasedTable.create(controllers);
+          } else {
+            // If this is a renew retry, only renew the one in the retryRuns set
+            liveApps = HashBasedTable.create();
+            for (Table.Cell<String, RunId, YarnTwillController> cell : controllers.cellSet()) {
+              if (retryRuns.containsEntry(cell.getRowKey(), cell.getColumnKey())) {
+                liveApps.put(cell.getRowKey(), cell.getColumnKey(), cell.getValue());
+              }
+            }
+          }
+        }
+
+        Multimap<String, RunId> failureRenews = renewSecureStore(liveApps, renewer, false);
+
+        if (!failureRenews.isEmpty()) {
+          // If there are failure during the renewal, schedule a retry with a new Runnable.
+          LOG.info("Schedule to retry on secure store renewal for applications {} in {} {}",
+                   failureRenews.keySet(), retryDelay, timeUnit.name().toLowerCase());
+          try {
+            scheduler.schedule(
+              createSecureStoreUpdateRunnable(scheduler, renewer, failureRenews, retryDelay, timeUnit),
+              retryDelay, timeUnit);
+          } catch (RejectedExecutionException e) {
+            // If the renewal is stopped, the scheduler will be stopped,
+            // hence this exception will be thrown and can be safely ignore.
+          }
+        }
+      }
+    };
+  }
+
+  /**
+   * Renews the {@link SecureStore} for all the running applications.
+   *
+   * @param liveApps set of running applications that need to have secure store renewal
+   * @param renewer the {@link SecureStoreRenewer} for renewal
+   * @param mergeCredentials {@code true} to merge with existing credentials
+   * @return a {@link Multimap} containing the application runs that were failed to have secure store renewed
+   */
+  private Multimap<String, RunId> renewSecureStore(Table<String, RunId, YarnTwillController> liveApps,
+                                                   SecureStoreRenewer renewer, boolean mergeCredentials) {
+    Multimap<String, RunId> failureRenews = HashMultimap.create();
+
+    // Renew the secure store for each running application
+    for (Table.Cell<String, RunId, YarnTwillController> liveApp : liveApps.cellSet()) {
+      String application = liveApp.getRowKey();
+      RunId runId = liveApp.getColumnKey();
+      YarnTwillController controller = liveApp.getValue();
+
+      try {
+        renewer.renew(application, runId, new YarnSecureStoreWriter(application, runId, controller, mergeCredentials));
+      } catch (Exception e) {
+        LOG.warn("Failed to renew secure store for {}:{}", application, runId, e);
+        failureRenews.put(application, runId);
       }
     }
 
-    // Overwrite with the updates.
-    credentials.addAll(updates);
-
-    // Overwrite the credentials.
-    Location tmpLocation = credentialsLocation.getTempFile(Constants.Files.CREDENTIALS);
-
-    // Save the credentials store with user-only permission.
-    try (DataOutputStream os = new DataOutputStream(new BufferedOutputStream(tmpLocation.getOutputStream("600")))) {
-      credentials.writeTokenStorageToStream(os);
-    }
-
-    // Rename the tmp file into the credentials location
-    tmpLocation.renameTo(credentialsLocation);
-
-    LOG.debug("Secure store for {} {} saved to {}.", application, runId, credentialsLocation);
+    return failureRenews;
   }
 
   private static LocationFactory createDefaultLocationFactory(Configuration configuration) {
@@ -678,6 +746,72 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
       return new FileContextLocationFactory(configuration, basePath);
     } catch (IOException e) {
       throw Throwables.propagate(e);
+    }
+  }
+
+  /**
+   * A {@link SecureStoreWriter} for updating secure store for YARN application via a shared location with the
+   * running application.
+   */
+  private final class YarnSecureStoreWriter implements SecureStoreWriter {
+
+    private final String application;
+    private final RunId runId;
+    private final YarnTwillController controller;
+    private final boolean mergeCredentials;
+
+    private YarnSecureStoreWriter(String application, RunId runId,
+                                  YarnTwillController controller, boolean mergeCredentials) {
+      this.application = application;
+      this.runId = runId;
+      this.controller = controller;
+      this.mergeCredentials = mergeCredentials;
+    }
+
+    @Override
+    public void write(SecureStore secureStore) throws IOException {
+      Object store = secureStore.getStore();
+      if (!(store instanceof Credentials)) {
+        LOG.warn("Only Hadoop Credentials is supported. Ignore update for {}:{} with secure store {}",
+                 application, runId, secureStore);
+        return;
+      }
+
+      Location credentialsLocation = locationFactory.create(String.format("/%s/%s/%s", application, runId.getId(),
+                                                                          Constants.Files.CREDENTIALS));
+
+      LOG.debug("Writing new secure store for {}:{} to {}", application, runId, credentialsLocation);
+
+      Credentials credentials = new Credentials();
+      if (mergeCredentials) {
+        // Try to read the old credentials.
+        try (DataInputStream is = new DataInputStream(new BufferedInputStream(credentialsLocation.getInputStream()))) {
+          credentials.readTokenStorageStream(is);
+        } catch (FileNotFoundException e) {
+          // This is safe to ignore as the file may not be there
+        } catch (Exception e) {
+          // Just log and proceed.
+          LOG.warn("Failed to read existing credentials from {} for merging due to {}.",
+                   credentialsLocation, e.toString());
+        }
+      }
+
+      // Overwrite with credentials from the secure store
+      credentials.addAll((Credentials) store);
+      Location tmpLocation = credentialsLocation.getTempFile(Constants.Files.CREDENTIALS);
+
+      // Save the credentials store with user-only permission.
+      try (DataOutputStream os = new DataOutputStream(new BufferedOutputStream(tmpLocation.getOutputStream("600")))) {
+        credentials.writeTokenStorageToStream(os);
+      }
+
+      // Rename the tmp file into the credentials location
+      tmpLocation.renameTo(credentialsLocation);
+
+      // Notify the application that the credentials has been updated
+      controller.secureStoreUpdated();
+
+      LOG.debug("Secure store for {} {} saved to {}.", application, runId, credentialsLocation);
     }
   }
 }
