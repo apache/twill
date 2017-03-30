@@ -18,6 +18,8 @@
 package org.apache.twill.internal;
 
 import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.util.ContextInitializer;
+import ch.qos.logback.core.joran.spi.JoranException;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
@@ -44,9 +46,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import java.security.PrivilegedExceptionAction;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
@@ -65,7 +68,7 @@ public abstract class ServiceMain {
   }
 
   protected final void doMain(final Service mainService,
-                              Service...prerequisites) throws ExecutionException, InterruptedException {
+                              Service...prerequisites) throws Exception {
     // Only configure the log collection if it is enabled.
     if (getTwillRuntimeSpecification().isLogCollectionEnabled()) {
       configureLogger();
@@ -189,7 +192,7 @@ public abstract class ServiceMain {
     );
   }
 
-  private void configureLogger() {
+  private void configureLogger() throws MalformedURLException, JoranException {
     // Check if SLF4J is bound to logback in the current environment
     ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
     if (!(loggerFactory instanceof LoggerContext)) {
@@ -197,6 +200,16 @@ public abstract class ServiceMain {
     }
 
     LoggerContext context = (LoggerContext) loggerFactory;
+
+    ContextInitializer contextInitializer = new ContextInitializer(context);
+    URL url = contextInitializer.findURLOfDefaultConfigurationFile(false);
+    if (url == null) {
+      // The logger context was not initialized using configuration file, initialize it with the logback template.
+      File twillLogback = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.LOGBACK_TEMPLATE);
+      if (twillLogback.exists()) {
+        contextInitializer.configureByResource(twillLogback.toURI().toURL());
+      }
+    }
 
     // Attach the KafkaAppender to the root logger
     KafkaAppender kafkaAppender = new KafkaAppender();
