@@ -44,7 +44,6 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.twill.api.ClassAcceptor;
 import org.apache.twill.api.Configs;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.api.ResourceSpecification;
@@ -73,7 +72,6 @@ import org.apache.twill.internal.appmaster.ApplicationMasterLiveNodeData;
 import org.apache.twill.internal.io.BasicLocationCache;
 import org.apache.twill.internal.io.LocationCache;
 import org.apache.twill.internal.io.NoCachingLocationCache;
-import org.apache.twill.internal.utils.Dependencies;
 import org.apache.twill.internal.yarn.VersionDetectYarnAppClientFactory;
 import org.apache.twill.internal.yarn.YarnAppClient;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
@@ -96,7 +94,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URL;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -134,7 +131,6 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
   private final ZKClientService zkClientService;
   private final LocationFactory locationFactory;
   private final Table<String, RunId, YarnTwillController> controllers;
-  private final Set<URL> twillClassPaths;
   // A Guava service to help the state transition.
   private final Service serviceDelegate;
   private LocationCache locationCache;
@@ -169,7 +165,6 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     this.locationFactory = locationFactory;
     this.zkClientService = getZKClientService(zkConnect);
     this.controllers = HashBasedTable.create();
-    this.twillClassPaths = new HashSet<>();
     this.serviceDelegate = new AbstractIdleService() {
       @Override
       protected void startUp() throws Exception {
@@ -308,8 +303,7 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
 
     Configuration config = new Configuration(yarnConfig);
     return new YarnTwillPreparer(config, twillSpec, runId, zkClientService.getConnectString(),
-                                 appLocation, twillClassPaths, jvmOptions,
-                                 locationCache, new YarnTwillControllerFactory() {
+                                 appLocation, jvmOptions, locationCache, new YarnTwillControllerFactory() {
       @Override
       public YarnTwillController create(RunId runId, boolean logCollectionEnabled, Iterable<LogHandler> logHandlers,
                                         Callable<ProcessController<YarnApplicationReport>> startUp,
@@ -354,19 +348,6 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
 
   private void startUp() throws Exception {
     zkClientService.startAndWait();
-
-    // Find all the classpaths for Twill classes. It is used for class filtering when building application jar
-    // in the YarnTwillPreparer
-    Dependencies.findClassDependencies(getClass().getClassLoader(), new ClassAcceptor() {
-      @Override
-      public boolean accept(String className, URL classUrl, URL classPathUrl) {
-        if (!className.startsWith("org.apache.twill.")) {
-          return false;
-        }
-        twillClassPaths.add(classPathUrl);
-        return true;
-      }
-    }, getClass().getName());
 
     // Create the root node, so that the namespace root would get created if it is missing
     // If the exception is caused by node exists, then it's ok. Otherwise propagate the exception.
