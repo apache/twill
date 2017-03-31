@@ -146,7 +146,6 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final Credentials credentials;
   private final Map<String, Map<String, String>> logLevels = Maps.newHashMap();
   private final LocationCache locationCache;
-  private final Set<URL> twillClassPaths;
   private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
@@ -154,8 +153,8 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final Map<String, Integer> maxRetries = Maps.newHashMap();
 
   YarnTwillPreparer(Configuration config, TwillSpecification twillSpec, RunId runId,
-                    String zkConnectString, Location appLocation, Set<URL> twillClassPaths,
-                    String extraOptions, LocationCache locationCache, YarnTwillControllerFactory controllerFactory) {
+                    String zkConnectString, Location appLocation, String extraOptions,
+                    LocationCache locationCache, YarnTwillControllerFactory controllerFactory) {
     this.config = config;
     this.twillSpec = twillSpec;
     this.runId = runId;
@@ -166,7 +165,6 @@ final class YarnTwillPreparer implements TwillPreparer {
     this.extraOptions = extraOptions;
     this.classAcceptor = new ClassAcceptor();
     this.locationCache = locationCache;
-    this.twillClassPaths = twillClassPaths;
   }
 
   private void confirmRunnableName(String runnableName) {
@@ -372,7 +370,7 @@ final class YarnTwillPreparer implements TwillPreparer {
 
             createLauncherJar(localFiles);
             createTwillJar(createBundler(classAcceptor), yarnAppClient, localFiles);
-            createApplicationJar(createApplicationJarBundler(classAcceptor), localFiles);
+            createApplicationJar(createBundler(classAcceptor), localFiles);
             createResourcesJar(createBundler(classAcceptor), localFiles);
 
             Path runtimeConfigDir = Files.createTempDirectory(getLocalStagingDir().toPath(),
@@ -834,20 +832,5 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   private ApplicationBundler createBundler(ClassAcceptor classAcceptor) {
     return new ApplicationBundler(classAcceptor).setTempDir(getLocalStagingDir());
-  }
-
-  /**
-   * Creates a {@link ApplicationBundler} for building application jar. The bundler will include classes
-   * accepted by the given {@link ClassAcceptor}, as long as it is not a twill class.
-   */
-  private ApplicationBundler createApplicationJarBundler(final ClassAcceptor classAcceptor) {
-    // Accept classes based on the classAcceptor and also excluding all twill classes as they are already
-    // in the twill.jar
-    return createBundler(new ClassAcceptor() {
-      @Override
-      public boolean accept(String className, URL classUrl, URL classPathUrl) {
-        return !twillClassPaths.contains(classPathUrl) && classAcceptor.accept(className, classUrl, classPathUrl);
-      }
-    });
   }
 }
