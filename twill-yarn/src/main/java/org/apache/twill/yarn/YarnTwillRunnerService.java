@@ -260,13 +260,6 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
       if (secureStoreScheduler != null) {
         // Shutdown and block until the schedule is stopped
         stopScheduler(secureStoreScheduler);
-
-        Futures.getUnchecked(secureStoreScheduler.submit(new Runnable() {
-          @Override
-          public void run() {
-            secureStoreScheduler.shutdown();
-          }
-        }));
       }
       secureStoreScheduler = Executors.newSingleThreadScheduledExecutor(
         Threads.createDaemonThreadFactory("secure-store-renewer"));

@@ -29,7 +29,8 @@ import java.io.IOException;
 public abstract class SecureStoreRenewer {
 
   /**
-   * Renew the secure store for an application run. It must use the {@link Location} provided by the
+   * Renew the secure store for an application run. It must uses the {@link SecureStoreWriter} to update the
+   * {@link SecureStore}.
    *
    * @param application The name of the application.
    * @param runId The runId of the live application.
