@@ -61,6 +61,7 @@ import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -178,33 +179,33 @@ public final class TrackerService extends AbstractIdleService {
   final class ReportHandler extends SimpleChannelUpstreamHandler {
     private final ResourceReportAdapter reportAdapter;
 
-    public ReportHandler() {
+    ReportHandler() {
       this.reportAdapter = ResourceReportAdapter.create();
     }
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
       HttpRequest request = (HttpRequest) e.getMessage();
-      if (!isValid(request)) {
-        write404(e);
+      if (request.getMethod() != HttpMethod.GET) {
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED);
+        response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "text/plain; charset=UTF-8");
+        response.setContent(ChannelBuffers.wrappedBuffer("Only GET is supported".getBytes(StandardCharsets.UTF_8)));
+        writeResponse(e.getChannel(), response);
         return;
       }
 
-      writeResponse(e);
+      if (!PATH.equals(request.getUri())) {
+        // Redirect all GET call to the /resources path.
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.TEMPORARY_REDIRECT);
+        response.setHeader(HttpHeaders.Names.LOCATION, PATH);
+        writeResponse(e.getChannel(), response);
+        return;
+      }
+
+      writeResourceReport(e.getChannel());
     }
 
-    // only accepts GET on /resources for now
-    private boolean isValid(HttpRequest request) {
-      return (request.getMethod() == HttpMethod.GET) && PATH.equals(request.getUri());
-    }
-
-    private void write404(MessageEvent e) {
-      HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
-      ChannelFuture future = e.getChannel().write(response);
-      future.addListener(ChannelFutureListener.CLOSE);
-    }
-
-    private void writeResponse(MessageEvent e) {
+    private void writeResourceReport(Channel channel) {
       HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
       response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "application/json; charset=UTF-8");
 
@@ -217,7 +218,11 @@ public final class TrackerService extends AbstractIdleService {
         LOG.error("error writing resource report", e1);
       }
       response.setContent(content);
-      ChannelFuture future = e.getChannel().write(response);
+      writeResponse(channel, response);
+    }
+
+    private void writeResponse(Channel channel, HttpResponse response) {
+      ChannelFuture future = channel.write(response);
       future.addListener(ChannelFutureListener.CLOSE);
     }
 
