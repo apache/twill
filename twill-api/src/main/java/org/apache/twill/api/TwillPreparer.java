@@ -21,6 +21,7 @@ import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 
 import java.net.URI;
+import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -274,6 +275,18 @@ public interface TwillPreparer {
    * @return This {@link TwillPreparer}.
    */
   TwillPreparer setLogLevels(String runnableName, Map<String, LogEntry.Level> logLevelsForRunnable);
+
+  /**
+   * Sets the class name of the {@link ClassLoader} to be used for loading twill and application classes for
+   * all containers. The {@link ClassLoader} class should have a public constructor that takes two parameters in the
+   * form of {@code (URL[] urls, ClassLoader parentClassLoader)}.
+   * The first parameter is an array of {@link URL} that contains the list of {@link URL} for loading classes and
+   * resources; the second parameter is the parent {@link ClassLoader}.
+   *
+   * @param classLoaderClassName name of the {@link ClassLoader} class.
+   * @return This {@link TwillPreparer}.
+   */
+  TwillPreparer setClassLoader(String classLoaderClassName);
 
   /**
    * Starts the application. It's the same as calling {@link #start(long, TimeUnit)} with timeout of 60 seconds.

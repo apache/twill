@@ -146,11 +146,12 @@ final class YarnTwillPreparer implements TwillPreparer {
   private final Credentials credentials;
   private final Map<String, Map<String, String>> logLevels = Maps.newHashMap();
   private final LocationCache locationCache;
+  private final Map<String, Integer> maxRetries = Maps.newHashMap();
   private String schedulerQueue;
   private String extraOptions;
   private JvmOptions.DebugOptions debugOptions = JvmOptions.DebugOptions.NO_DEBUG;
   private ClassAcceptor classAcceptor;
-  private final Map<String, Integer> maxRetries = Maps.newHashMap();
+  private String classLoaderClassName;
 
   YarnTwillPreparer(Configuration config, TwillSpecification twillSpec, RunId runId,
                     String zkConnectString, Location appLocation, String extraOptions,
@@ -350,6 +351,12 @@ final class YarnTwillPreparer implements TwillPreparer {
   }
 
   @Override
+  public TwillPreparer setClassLoader(String classLoaderClassName) {
+    this.classLoaderClassName = classLoaderClassName;
+    return this;
+  }
+
+  @Override
   public TwillController start() {
     return start(Constants.APPLICATION_MAX_START_SECONDS, TimeUnit.SECONDS);
   }
@@ -365,6 +372,8 @@ final class YarnTwillPreparer implements TwillPreparer {
           @Override
           public ProcessController<YarnApplicationReport> call() throws Exception {
 
+            String extraOptions = getExtraOptions();
+
             // Local files needed by AM
             Map<String, LocalFile> localFiles = Maps.newHashMap();
 
@@ -379,7 +388,7 @@ final class YarnTwillPreparer implements TwillPreparer {
               saveSpecification(twillSpec, runtimeConfigDir.resolve(Constants.Files.TWILL_SPEC));
               saveLogback(runtimeConfigDir.resolve(Constants.Files.LOGBACK_TEMPLATE));
               saveClassPaths(runtimeConfigDir);
-              saveJvmOptions(runtimeConfigDir.resolve(Constants.Files.JVM_OPTIONS));
+              saveJvmOptions(extraOptions, debugOptions, runtimeConfigDir.resolve(Constants.Files.JVM_OPTIONS));
               saveArguments(new Arguments(arguments, runnableArgs),
                             runtimeConfigDir.resolve(Constants.Files.ARGUMENTS));
               saveEnvironments(runtimeConfigDir.resolve(Constants.Files.ENVIRONMENTS));
@@ -409,7 +418,7 @@ final class YarnTwillPreparer implements TwillPreparer {
                 "-Dtwill.app=$" + Constants.TWILL_APP_NAME,
                 "-cp", Constants.Files.LAUNCHER_JAR + ":$HADOOP_CONF_DIR",
                 "-Xmx" + memory + "m",
-                extraOptions == null ? "" : extraOptions,
+                extraOptions,
                 TwillLauncher.class.getName(),
                 ApplicationMasterMain.class.getName(),
                 Boolean.FALSE.toString())
@@ -450,6 +459,17 @@ final class YarnTwillPreparer implements TwillPreparer {
    */
   private File getLocalStagingDir() {
     return new File(config.get(Configs.Keys.LOCAL_STAGING_DIRECTORY, Configs.Defaults.LOCAL_STAGING_DIRECTORY));
+  }
+
+  /**
+   * Returns the extra options for the container JVM.
+   */
+  private String getExtraOptions() {
+    String extraOptions = this.extraOptions == null ? "" : this.extraOptions;
+    if (classLoaderClassName != null) {
+      extraOptions += " -D" + Constants.TWILL_CONTAINER_CLASSLOADER + "=" + classLoaderClassName;
+    }
+    return extraOptions;
   }
 
   private void setEnv(String runnableName, Map<String, String> env, boolean overwrite) {
@@ -742,9 +762,9 @@ final class YarnTwillPreparer implements TwillPreparer {
                 Joiner.on(':').join(classPaths).getBytes(StandardCharsets.UTF_8));
   }
 
-  private void saveJvmOptions(final Path targetPath) throws IOException {
-    if ((extraOptions == null || extraOptions.isEmpty()) &&
-      JvmOptions.DebugOptions.NO_DEBUG.equals(debugOptions)) {
+  private void saveJvmOptions(String extraOptions,
+                              JvmOptions.DebugOptions debugOptions, final Path targetPath) throws IOException {
+    if (extraOptions.isEmpty() && JvmOptions.DebugOptions.NO_DEBUG.equals(debugOptions)) {
       // If no vm options, no need to localize the file.
       return;
     }

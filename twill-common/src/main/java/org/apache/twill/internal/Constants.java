@@ -53,6 +53,11 @@ public final class Constants {
   public static final String TWILL_APP_NAME = "TWILL_APP_NAME";
 
   /**
+   * Constant for the system property name that carries the class name for the container ClassLoader as defined by user.
+   */
+  public static final String TWILL_CONTAINER_CLASSLOADER = "twill.container.class.loader";
+
+  /**
    * Constants for names of internal files that are shared between client, AM and containers.
    */
   public static final class Files {
