@@ -43,10 +43,12 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.net.URI;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -66,7 +68,6 @@ final class YarnTwillController extends AbstractTwillController implements Twill
   private final TimeUnit startTimeoutUnit;
   private volatile ApplicationMasterLiveNodeData amLiveNodeData;
   private ProcessController<YarnApplicationReport> processController;
-  private ResourceReportClient resourcesClient;
 
   // Thread for polling yarn for application status if application got ZK session expire.
   // Only used by the instanceUpdate/Delete method, which is from serialized call from ZK callback.
@@ -100,7 +101,6 @@ final class YarnTwillController extends AbstractTwillController implements Twill
     this.startTimeout = startTimeout;
     this.startTimeoutUnit = startTimeoutUnit;
   }
-
 
   /**
    * Sends a message to application to notify the secure store has be updated.
@@ -140,14 +140,6 @@ final class YarnTwillController extends AbstractTwillController implements Twill
       if (state != YarnApplicationState.RUNNING) {
         LOG.info("Yarn application {} {} is not in running state. Shutting down controller.", appName, appId);
         forceShutDown();
-      } else {
-        try {
-          URL resourceUrl = URI.create(String.format("http://%s:%d", report.getHost(), report.getRpcPort()))
-                               .resolve(TrackerService.PATH).toURL();
-          resourcesClient = new ResourceReportClient(resourceUrl);
-        } catch (IOException e) {
-          resourcesClient = null;
-        }
       }
     } catch (Exception e) {
       throw Throwables.propagate(e);
@@ -322,7 +314,45 @@ final class YarnTwillController extends AbstractTwillController implements Twill
 
   @Override
   public ResourceReport getResourceReport() {
-    // in case the user calls this before starting, return null
+    // Only has resource report if the app is running.
+    if (state() != State.RUNNING) {
+      return null;
+    }
+    ResourceReportClient resourcesClient = getResourcesClient();
     return (resourcesClient == null) ? null : resourcesClient.get();
+  }
+
+  /**
+   * Returns the {@link ResourceReportClient} for fetching resource report from the AM.
+   * It first consults the RM for the tracking URL and get the resource report from there.
+   */
+  @Nullable
+  private ResourceReportClient getResourcesClient() {
+    YarnApplicationReport report = processController.getReport();
+    List<URL> urls = new ArrayList<>(2);
+
+    // Try getting the report from the proxy tracking URL as well as the original tracking URL directly
+    // This is mainly to workaround for unit-test that the proxy tracking URL doesn't work well with local address.
+    for (String url : Arrays.asList(report.getTrackingUrl(), report.getOriginalTrackingUrl())) {
+      if (url != null && !url.equals("N/A")) {
+        try {
+          URL trackingUrl = new URL(url);
+          String path = trackingUrl.getPath();
+          if (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+          }
+          urls.add(new URL(trackingUrl.getProtocol(), trackingUrl.getHost(),
+                           trackingUrl.getPort(), path + TrackerService.PATH));
+        } catch (MalformedURLException e) {
+          LOG.debug("Invalid tracking URL {} from YARN application report for {}:{}", url, appName, getRunId());
+        }
+      }
+    }
+
+    if (urls.isEmpty()) {
+      return null;
+    }
+
+    return new ResourceReportClient(urls);
   }
 }
