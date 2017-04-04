@@ -166,13 +166,14 @@ final class YarnTwillController extends AbstractTwillController implements Twill
       kill();
     }
 
+    FinalApplicationStatus finalStatus;
     // Poll application status from yarn
     try (ProcessController<YarnApplicationReport> processController = this.processController) {
       Stopwatch stopWatch = new Stopwatch().start();
       long maxTime = TimeUnit.MILLISECONDS.convert(Constants.APPLICATION_MAX_STOP_SECONDS, TimeUnit.SECONDS);
 
       YarnApplicationReport report = processController.getReport();
-      FinalApplicationStatus finalStatus = report.getFinalApplicationStatus();
+      finalStatus = report.getFinalApplicationStatus();
       ApplicationId appId = report.getApplicationId();
       while (finalStatus == FinalApplicationStatus.UNDEFINED &&
           stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
@@ -180,18 +181,28 @@ final class YarnTwillController extends AbstractTwillController implements Twill
         TimeUnit.SECONDS.sleep(1);
         finalStatus = processController.getReport().getFinalApplicationStatus();
       }
-      LOG.debug("Yarn application {} {} completed with status {}", appName, appId, finalStatus);
 
       // Application not finished after max stop time, kill the application
       if (finalStatus == FinalApplicationStatus.UNDEFINED) {
         kill();
+        finalStatus = FinalApplicationStatus.KILLED;
       }
     } catch (Exception e) {
       LOG.warn("Exception while waiting for application report: {}", e.getMessage(), e);
       kill();
+      finalStatus = FinalApplicationStatus.KILLED;
     }
 
     super.doShutDown();
+
+    if (finalStatus == FinalApplicationStatus.FAILED) {
+      // If we know the app status is failed, throw an exception to make this controller goes into error state.
+      // All other final status are not treated as failure as we can't be sure.
+      setTerminationStatus(TerminationStatus.FAILED);
+      throw new RuntimeException(String.format("Yarn application completed with failure %s, %s.", appName, getRunId()));
+    }
+    setTerminationStatus(finalStatus == FinalApplicationStatus.SUCCEEDED
+                           ? TerminationStatus.SUCCEEDED : TerminationStatus.KILLED);
   }
 
   @Override

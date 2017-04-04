@@ -20,6 +20,7 @@ package org.apache.twill.yarn;
 import com.google.common.base.Throwables;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.ResourceSpecification;
+import org.apache.twill.api.ServiceController;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.logging.PrinterLogHandler;
@@ -82,7 +83,32 @@ public final class TaskCompletedTestRun extends BaseYarnTest {
 
     Assert.assertTrue(runLatch.await(1, TimeUnit.MINUTES));
     controller.awaitTerminated(1, TimeUnit.MINUTES);
+    Assert.assertEquals(ServiceController.TerminationStatus.SUCCEEDED, controller.getTerminationStatus());
+  }
 
-    TimeUnit.SECONDS.sleep(2);
+  @Test
+  public void testFailureComplete() throws TimeoutException, ExecutionException, InterruptedException {
+    TwillRunner twillRunner = getTwillRunner();
+
+    // Start the app with an invalid ClassLoader. This will cause the AM fails to start.
+    TwillController controller = twillRunner.prepare(new SleepTask(),
+                                                     ResourceSpecification.Builder.with()
+                                                       .setVirtualCores(1)
+                                                       .setMemory(512, ResourceSpecification.SizeUnit.MEGA)
+                                                       .setInstances(1).build())
+      .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
+      .setClassLoader("InvalidClassLoader")
+      .start();
+
+    final CountDownLatch terminateLatch = new CountDownLatch(1);
+    controller.onTerminated(new Runnable() {
+      @Override
+      public void run() {
+        terminateLatch.countDown();
+      }
+    }, Threads.SAME_THREAD_EXECUTOR);
+
+    Assert.assertTrue(terminateLatch.await(2, TimeUnit.MINUTES));
+    Assert.assertEquals(ServiceController.TerminationStatus.FAILED, controller.getTerminationStatus());
   }
 }

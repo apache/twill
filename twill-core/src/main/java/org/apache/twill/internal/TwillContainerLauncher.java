@@ -246,6 +246,13 @@ public final class TwillContainerLauncher {
     @Override
     public void completed(int exitStatus) {
       // count down the shutdownLatch to inform any waiting threads that this container is complete
+      if (exitStatus == 0) {
+        setTerminationStatus(TerminationStatus.SUCCEEDED);
+      } else if (exitStatus == 143) {
+        setTerminationStatus(TerminationStatus.KILLED);
+      } else {
+        setTerminationStatus(TerminationStatus.FAILED);
+      }
       shutdownLatch.countDown();
       synchronized (this) {
         forceShutDown();
