@@ -36,6 +36,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 
 /**
  * An abstract base class for implementing {@link ServiceController} that deal with Service state transition and
@@ -47,6 +48,7 @@ public abstract class AbstractExecutionServiceController implements ServiceContr
   private final ListenerExecutors listenerExecutors;
   private final Service serviceDelegate;
   private final SettableFuture<State> terminationFuture;
+  private volatile TerminationStatus terminationStatus;
 
   protected AbstractExecutionServiceController(RunId runId) {
     this.runId = runId;
@@ -85,6 +87,12 @@ public abstract class AbstractExecutionServiceController implements ServiceContr
         return AbstractExecutionServiceController.this;
       }
     });
+  }
+
+  @Nullable
+  @Override
+  public TerminationStatus getTerminationStatus() {
+    return terminationStatus;
   }
 
   @Override
@@ -166,6 +174,10 @@ public abstract class AbstractExecutionServiceController implements ServiceContr
         t.start();
       }
     };
+  }
+
+  protected final void setTerminationStatus(TerminationStatus status) {
+    this.terminationStatus = status;
   }
 
 
