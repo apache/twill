@@ -344,13 +344,12 @@ final class YarnTwillController extends AbstractTwillController implements Twill
           urls.add(new URL(trackingUrl.getProtocol(), trackingUrl.getHost(),
                            trackingUrl.getPort(), path + TrackerService.PATH));
         } catch (MalformedURLException e) {
-          LOG.info("Invalid tracking URL {} from YARN application report for {}:{}", url, appName, getRunId());
+          LOG.debug("Invalid tracking URL {} from YARN application report for {}:{}", url, appName, getRunId());
         }
       }
     }
 
     if (urls.isEmpty()) {
-      LOG.debug("No valid tracking URL for YARN application {}:{}", appName, getRunId());
       return null;
     }
 
