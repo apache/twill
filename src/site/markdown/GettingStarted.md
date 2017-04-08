@@ -28,7 +28,7 @@ For your application module
 <dependency>
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-api</artifactId>
-    <version>0.10.0</version>
+    <version>0.11.0</version>
 </dependency>
 ```
 
@@ -38,7 +38,7 @@ For the your Apache Twill YARN client module
 <dependency>
     <groupId>org.apache.twill</groupId>
     <artifactId>twill-yarn</artifactId>
-    <version>0.10.0</version>
+    <version>0.11.0</version>
 </dependency>
 ```
 

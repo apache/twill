@@ -51,7 +51,7 @@ add the following section to your Maven settings (`~/.m2/settings.xml`):
 ```
 git checkout -b branch-${RELEASE_VERSION}
 ```
-The `${RELEASE_VERSION}` is something such as `0.5.0`. 
+The `${RELEASE_VERSION}` is something such as `0.11.0`. 
 
 #### Update the version to the non-snapshot version
 ```
