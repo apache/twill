@@ -49,7 +49,7 @@ public final class VersionDetectYarnAMClientFactory implements YarnAMClientFacto
           clz = (Class<YarnAMClient>) Class.forName(clzName);
           break;
         default:
-          // Uses hadoop-2.2 class
+          // Uses hadoop-2.2 or above class
           clzName = getClass().getPackage().getName() + ".Hadoop22YarnAMClient";
           clz = (Class<YarnAMClient>) Class.forName(clzName);
           break;

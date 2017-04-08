@@ -26,6 +26,7 @@ import org.junit.runners.Suite;
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
   ContainerSizeTestRun.class,
+  CustomClassLoaderTestRun.class,
   DebugTestRun.class,
   DistributeShellTestRun.class,
   EchoServerTestRun.class,

@@ -15,17 +15,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.filesystem;
+package org.apache.twill.yarn;
 
-import java.io.IOException;
+import org.apache.twill.api.TwillController;
+import org.apache.twill.api.logging.PrinterLogHandler;
+import org.junit.Assert;
+import org.junit.Test;
+
+import java.io.PrintWriter;
 
 /**
- * Everything here is set up the same as for FileContextLocation; except that we use an HDFSLocationFactory.
+ * Unit test for testing custom classloader for containers.
  */
-public class HDFSLocationTest extends FileContextLocationTest {
+public class CustomClassLoaderTestRun extends BaseYarnTest {
 
-  @Override
-  protected LocationFactory doCreateLocationFactory(String pathBase) throws IOException {
-    return new HDFSLocationFactory(dfsCluster.getFileSystem(), pathBase);
+  @Test
+  public void testCustomClassLoader() throws Exception {
+    TwillController controller = getTwillRunner().prepare(new CustomClassLoaderRunnable())
+      .setClassLoader(CustomClassLoader.class.getName())
+      .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
+      .start();
+
+    Assert.assertTrue(waitForSize(controller.discoverService(CustomClassLoaderRunnable.SERVICE_NAME), 1, 120));
+    controller.terminate().get();
   }
 }

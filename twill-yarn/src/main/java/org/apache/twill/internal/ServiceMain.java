@@ -18,7 +18,6 @@
 package org.apache.twill.internal;
 
 import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.core.joran.spi.JoranException;
 import com.google.common.base.Throwables;
@@ -45,14 +44,14 @@ import org.apache.zookeeper.KeeperException;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xml.sax.InputSource;
 
 import java.io.File;
-import java.io.StringReader;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import java.security.PrivilegedExceptionAction;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /**
  * Class for main method that starts a service.
@@ -69,8 +68,11 @@ public abstract class ServiceMain {
   }
 
   protected final void doMain(final Service mainService,
-                              Service...prerequisites) throws ExecutionException, InterruptedException {
-    configureLogger();
+                              Service...prerequisites) throws Exception {
+    // Only configure the log collection if it is enabled.
+    if (getTwillRuntimeSpecification().isLogCollectionEnabled()) {
+      configureLogger();
+    }
 
     Service requiredServices = new CompositeService(prerequisites);
     Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -121,14 +123,21 @@ public abstract class ServiceMain {
 
   protected abstract String getHostname();
 
-  protected abstract String getKafkaZKConnect();
+  /**
+   * Returns the {@link TwillRuntimeSpecification} for this application.
+   */
+  protected abstract TwillRuntimeSpecification getTwillRuntimeSpecification();
 
+  /**
+   * Returns the name of the runnable that this running inside this process.
+   */
+  @Nullable
   protected abstract String getRunnableName();
 
   /**
    * Returns the {@link Location} for the application based on the app directory.
    */
-  protected static Location createAppLocation(final Configuration conf, String fsUser, final URI appDir) {
+  protected final Location createAppLocation(final Configuration conf, String fsUser, final URI appDir) {
     // Note: It's a little bit hacky based on the uri schema to create the LocationFactory, refactor it later.
 
     try {
@@ -168,19 +177,22 @@ public abstract class ServiceMain {
   /**
    * Creates a {@link ZKClientService}.
    */
-  protected static ZKClientService createZKClient(String zkConnectStr, String appName) {
+  protected final ZKClientService createZKClient() {
+    TwillRuntimeSpecification twillRuntimeSpec = getTwillRuntimeSpecification();
+
     return ZKClientServices.delegate(
       ZKClients.namespace(
         ZKClients.reWatchOnExpire(
           ZKClients.retryOnFailure(
-            ZKClientService.Builder.of(zkConnectStr).build(),
+            ZKClientService.Builder.of(twillRuntimeSpec.getZkConnectStr()).build(),
             RetryStrategies.fixDelay(1, TimeUnit.SECONDS)
           )
-        ), "/" + appName
-      ));
+        ), "/" + twillRuntimeSpec.getTwillAppName()
+      )
+    );
   }
 
-  private void configureLogger() {
+  private void configureLogger() throws MalformedURLException, JoranException {
     // Check if SLF4J is bound to logback in the current environment
     ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
     if (!(loggerFactory instanceof LoggerContext)) {
@@ -188,84 +200,33 @@ public abstract class ServiceMain {
     }
 
     LoggerContext context = (LoggerContext) loggerFactory;
-    context.reset();
-    JoranConfigurator configurator = new JoranConfigurator();
-    configurator.setContext(context);
 
-    try {
+    ContextInitializer contextInitializer = new ContextInitializer(context);
+    URL url = contextInitializer.findURLOfDefaultConfigurationFile(false);
+    if (url == null) {
+      // The logger context was not initialized using configuration file, initialize it with the logback template.
       File twillLogback = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.LOGBACK_TEMPLATE);
       if (twillLogback.exists()) {
-        configurator.doConfigure(twillLogback);
+        contextInitializer.configureByResource(twillLogback.toURI().toURL());
       }
-      new ContextInitializer(context).autoConfig();
-    } catch (JoranException e) {
-      throw Throwables.propagate(e);
-    }
-    doConfigure(configurator, getLogConfig(getLoggerLevel(context.getLogger(Logger.ROOT_LOGGER_NAME))));
-  }
-
-  private void doConfigure(JoranConfigurator configurator, String config) {
-    try {
-      configurator.doConfigure(new InputSource(new StringReader(config)));
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
-    }
-  }
-
-  private String getLogConfig(String rootLevel) {
-    return
-      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-      "<configuration>\n" +
-      "    <appender name=\"KAFKA\" class=\"" + KafkaAppender.class.getName() + "\">\n" +
-      "        <topic>" + Constants.LOG_TOPIC + "</topic>\n" +
-      "        <hostname>" + getHostname() + "</hostname>\n" +
-      "        <zookeeper>" + getKafkaZKConnect() + "</zookeeper>\n" +
-      appendRunnable() +
-      "    </appender>\n" +
-      "    <logger name=\"org.apache.twill.internal.logging\" additivity=\"false\" />\n" +
-      "    <root level=\"" + rootLevel + "\">\n" +
-      "        <appender-ref ref=\"KAFKA\"/>\n" +
-      "    </root>\n" +
-      "</configuration>";
-  }
-
-
-  private String appendRunnable() {
-    // RunnableName for AM is null, so append runnable name to log config only if the name is not null.
-    if (getRunnableName() == null) {
-     return "";
-    } else {
-      return "        <runnableName>" + getRunnableName() + "</runnableName>\n";
-    }
-  }
-
-  /**
-   * Return the right log level for the service.
-   *
-   * @param logger the {@link Logger} instance of the service context.
-   * @return String of log level based on {@code slf4j} log levels.
-   */
-  private String getLoggerLevel(Logger logger) {
-    if (logger instanceof ch.qos.logback.classic.Logger) {
-      return ((ch.qos.logback.classic.Logger) logger).getLevel().toString();
     }
 
-    if (logger.isTraceEnabled()) {
-      return "TRACE";
+    // Attach the KafkaAppender to the root logger
+    KafkaAppender kafkaAppender = new KafkaAppender();
+    kafkaAppender.setName("KAFKA");
+    kafkaAppender.setTopic(Constants.LOG_TOPIC);
+    kafkaAppender.setHostname(getHostname());
+    // The Kafka ZK Connection shouldn't be null as this method only get called if log collection is enabled
+    kafkaAppender.setZookeeper(getTwillRuntimeSpecification().getKafkaZKConnect());
+    String runnableName = getRunnableName();
+    if (runnableName != null) {
+      kafkaAppender.setRunnableName(runnableName);
     }
-    if (logger.isDebugEnabled()) {
-      return "DEBUG";
-    }
-    if (logger.isInfoEnabled()) {
-      return "INFO";
-    }
-    if (logger.isWarnEnabled()) {
-      return "WARN";
-    }
-    if (logger.isErrorEnabled()) {
-      return "ERROR";
-    }
-    return "OFF";
+
+    kafkaAppender.setContext(context);
+    kafkaAppender.start();
+
+    context.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME).addAppender(kafkaAppender);
   }
 
   /**

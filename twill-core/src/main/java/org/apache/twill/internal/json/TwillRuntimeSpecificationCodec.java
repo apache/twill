@@ -25,7 +25,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
-import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillRuntimeSpecification;
@@ -51,6 +50,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   private static final String TWILL_SPEC = "twillSpecification";
   private static final String LOG_LEVELS = "logLevels";
   private static final String MAX_RETRIES = "maxRetries";
+  private static final String LOG_COLLECTION_ENABLED = "logCollectionEnabled";
 
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
@@ -71,6 +71,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
              context.serialize(src.getLogLevels(), new TypeToken<Map<String, Map<String, String>>>() { }.getType()));
     json.add(MAX_RETRIES,
              context.serialize(src.getMaxRetries(), new TypeToken<Map<String, Integer>>() { }.getType()));
+    json.addProperty(LOG_COLLECTION_ENABLED, src.isLogCollectionEnabled());
 
     return json;
   }
@@ -98,8 +99,7 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                          jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
                                          logLevels,
                                          maxRetries,
-                                         jsonObj.has(HEAP_RESERVED_MIN_RATIO) ?
-                                         jsonObj.get(HEAP_RESERVED_MIN_RATIO).getAsDouble()
-                                         : Configs.Defaults.HEAP_RESERVED_MIN_RATIO);
+                                         jsonObj.get(HEAP_RESERVED_MIN_RATIO).getAsDouble(),
+                                         jsonObj.get(LOG_COLLECTION_ENABLED).getAsBoolean());
   }
 }

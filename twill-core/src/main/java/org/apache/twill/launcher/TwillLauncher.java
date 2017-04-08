@@ -22,13 +22,11 @@ import org.apache.twill.internal.Constants;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -61,11 +59,12 @@ public final class TwillLauncher {
     boolean userClassPath = Boolean.parseBoolean(args[1]);
 
     // Create ClassLoader
-    URLClassLoader classLoader = createClassLoader(userClassPath);
-    Thread.currentThread().setContextClassLoader(classLoader);
+    URL[] classpath = createClasspath(userClassPath);
+    ClassLoader classLoader = createContainerClassLoader(classpath);
+    System.out.println("Launch class (" + mainClassName + ") using classloader " + classLoader.getClass().getName()
+                         + " with classpath: " + Arrays.toString(classpath));
 
-    System.out.println("Launch class (" + mainClassName + ") with classpath: " +
-                         Arrays.toString(classLoader.getURLs()));
+    Thread.currentThread().setContextClassLoader(classLoader);
 
     Class<?> mainClass = classLoader.loadClass(mainClassName);
     Method mainMethod = mainClass.getMethod("main", String[].class);
@@ -77,7 +76,7 @@ public final class TwillLauncher {
     System.out.println("Launcher completed");
   }
 
-  private static URLClassLoader createClassLoader(boolean useClassPath) throws Exception {
+  private static URL[] createClasspath(boolean useClassPath) throws IOException {
     List<URL> urls = new ArrayList<>();
 
     File appJarDir = new File(Constants.Files.APPLICATION_JAR);
@@ -116,7 +115,33 @@ public final class TwillLauncher {
     }
 
     addClassPathsToList(urls, new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.APPLICATION_CLASSPATH));
-    return new URLClassLoader(urls.toArray(new URL[urls.size()]));
+    return urls.toArray(new URL[urls.size()]);
+  }
+
+  /**
+   * Creates a {@link ClassLoader} to be used by this container that load classes from the given classpath.
+   */
+  private static ClassLoader createContainerClassLoader(URL[] classpath) {
+    String containerClassLoaderName = System.getProperty(Constants.TWILL_CONTAINER_CLASSLOADER);
+    URLClassLoader classLoader = new URLClassLoader(classpath);
+    if (containerClassLoaderName == null) {
+      return classLoader;
+    }
+
+    try {
+      @SuppressWarnings("unchecked")
+      Class<? extends ClassLoader> cls = (Class<? extends ClassLoader>) classLoader.loadClass(containerClassLoaderName);
+
+      // Instantiate with constructor (URL[] classpath, ClassLoader parentClassLoader)
+      return cls.getConstructor(URL[].class, ClassLoader.class).newInstance(classpath, classLoader.getParent());
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException("Failed to load container class loader class " + containerClassLoaderName, e);
+    } catch (NoSuchMethodException e) {
+      throw new RuntimeException("Container class loader must have a public constructor with " +
+                                   "parameters (URL[] classpath, ClassLoader parent)", e);
+    } catch (InstantiationException | InvocationTargetException | IllegalAccessException e) {
+      throw new RuntimeException("Failed to create container class loader of class " + containerClassLoaderName, e);
+    }
   }
 
   private static void addClassPathsToList(List<URL> urls, File classpathFile) throws IOException {
@@ -172,7 +197,6 @@ public final class TwillLauncher {
    * Populates a list of {@link File} under the given directory that has ".jar" as extension.
    */
   private static List<File> listJarFiles(File dir, List<File> result) {
-    System.out.println("listing jars for " + dir.getAbsolutePath());
     File[] files = dir.listFiles();
     if (files == null || files.length == 0) {
       return result;

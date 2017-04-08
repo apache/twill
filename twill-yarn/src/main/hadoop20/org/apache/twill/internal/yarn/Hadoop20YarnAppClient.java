@@ -17,8 +17,6 @@
  */
 package org.apache.twill.internal.yarn;
 
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.AbstractIdleService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -37,8 +35,8 @@ import org.apache.hadoop.yarn.client.YarnClient;
 import org.apache.hadoop.yarn.client.YarnClientImpl;
 import org.apache.hadoop.yarn.exceptions.YarnRemoteException;
 import org.apache.hadoop.yarn.util.Records;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.TwillSpecification;
-import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.ProcessController;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.appmaster.ApplicationMasterInfo;
@@ -47,6 +45,7 @@ import org.apache.twill.internal.appmaster.ApplicationSubmitter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -59,6 +58,7 @@ import javax.annotation.Nullable;
  * Apache Hadoop 2.0.
  * </p>
  */
+@SuppressWarnings("unused")
 public final class Hadoop20YarnAppClient implements YarnAppClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(Hadoop20YarnAppClient.class);
@@ -81,49 +81,56 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
   @Override
   public ProcessLauncher<ApplicationMasterInfo> createLauncher(TwillSpecification twillSpec,
                                                                @Nullable String schedulerQueue) throws Exception {
-    final YarnClient yarnClient = createYarnClient();
-    // Request for new application
-    final GetNewApplicationResponse response = yarnClient.getNewApplication();
-    final ApplicationId appId = response.getApplicationId();
+    YarnClient yarnClient = createYarnClient();
+    try {
+      // Request for new application
+      final GetNewApplicationResponse response = yarnClient.getNewApplication();
+      final ApplicationId appId = response.getApplicationId();
 
-    // Setup the context for application submission
-    final ApplicationSubmissionContext appSubmissionContext = Records.newRecord(ApplicationSubmissionContext.class);
-    appSubmissionContext.setApplicationId(appId);
-    appSubmissionContext.setApplicationName(twillSpec.getName());
-    appSubmissionContext.setUser(user);
+      // Setup the context for application submission
+      final ApplicationSubmissionContext appSubmissionContext = Records.newRecord(ApplicationSubmissionContext.class);
+      appSubmissionContext.setApplicationId(appId);
+      appSubmissionContext.setApplicationName(twillSpec.getName());
+      appSubmissionContext.setUser(user);
 
-    if (schedulerQueue != null) {
-      appSubmissionContext.setQueue(schedulerQueue);
-    }
-
-    // TODO: Make it adjustable through TwillSpec (TWILL-90)
-    // Set the resource requirement for AM
-    Resource amResource = Records.newRecord(Resource.class);
-    amResource.setMemory(Constants.APP_MASTER_MEMORY_MB);
-    final Resource capability = adjustMemory(response, amResource);
-    ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(), 1);
-
-    ApplicationSubmitter submitter = new ApplicationSubmitter() {
-
-      @Override
-      public ProcessController<YarnApplicationReport> submit(YarnLaunchContext launchContext) {
-        ContainerLaunchContext context = launchContext.getLaunchContext();
-        addRMToken(context, yarnClient);
-        context.setUser(appSubmissionContext.getUser());
-        context.setResource(adjustMemory(response, capability));
-        appSubmissionContext.setAMContainerSpec(context);
-
-        try {
-          yarnClient.submitApplication(appSubmissionContext);
-          return new ProcessControllerImpl(yarnClient, appId);
-        } catch (YarnRemoteException e) {
-          LOG.error("Failed to submit application {}", appId, e);
-          throw Throwables.propagate(e);
-        }
+      if (schedulerQueue != null) {
+        appSubmissionContext.setQueue(schedulerQueue);
       }
-    };
 
-    return new ApplicationMasterProcessLauncher(appMasterInfo, submitter);
+
+      int memoryMB = configuration.getInt(Configs.Keys.YARN_AM_MEMORY_MB, Configs.Defaults.YARN_AM_MEMORY_MB);
+      // Set the resource requirement for AM
+      Resource amResource = Records.newRecord(Resource.class);
+      amResource.setMemory(memoryMB);
+      final Resource capability = adjustMemory(response, amResource);
+      ApplicationMasterInfo appMasterInfo = new ApplicationMasterInfo(appId, capability.getMemory(), 1);
+
+      ApplicationSubmitter submitter = new ApplicationSubmitter() {
+
+        @Override
+        public ProcessController<YarnApplicationReport> submit(YarnLaunchContext launchContext) {
+          YarnClient yarnClient = createYarnClient();
+          try {
+            ContainerLaunchContext context = launchContext.getLaunchContext();
+            addRMToken(context, yarnClient);
+            context.setUser(appSubmissionContext.getUser());
+            context.setResource(adjustMemory(response, capability));
+            appSubmissionContext.setAMContainerSpec(context);
+
+            yarnClient.submitApplication(appSubmissionContext);
+            return new ProcessControllerImpl(yarnClient, appId);
+          } catch (YarnRemoteException e) {
+            throw new RuntimeException("Failed to submit application " + appId, e);
+          } finally {
+            yarnClient.stop();
+          }
+        }
+      };
+
+      return new ApplicationMasterProcessLauncher(appMasterInfo, submitter);
+    } finally {
+      yarnClient.stop();
+    }
   }
 
   private Resource adjustMemory(GetNewApplicationResponse response, Resource capability) {
@@ -152,22 +159,21 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
         yarnClient.getRMDelegationToken(new Text(YarnUtils.getYarnTokenRenewer(config))),
         YarnUtils.getRMAddress(config));
 
-      LOG.info("Added RM delegation token {}", token);
+      LOG.debug("Added RM delegation token {}", token);
       credentials.addToken(token.getService(), token);
 
       context.setContainerTokens(YarnUtils.encodeCredentials(credentials));
-
-    } catch (Exception e) {
-      LOG.error("Fails to create credentials.", e);
-      throw Throwables.propagate(e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to acquire RM delegation token", e);
     }
   }
 
-  private <T extends TokenIdentifier> Token<T> convertToken(DelegationToken protoToken, InetSocketAddress serviceAddr) {
-    Token<T> token = new Token<T>(protoToken.getIdentifier().array(),
-                                  protoToken.getPassword().array(),
-                                  new Text(protoToken.getKind()),
-                                  new Text(protoToken.getService()));
+  private <T extends TokenIdentifier> Token<T> convertToken(DelegationToken protoToken,
+                                                            @Nullable InetSocketAddress serviceAddr) {
+    Token<T> token = new Token<>(protoToken.getIdentifier().array(),
+                                 protoToken.getPassword().array(),
+                                 new Text(protoToken.getKind()),
+                                 new Text(protoToken.getService()));
     if (serviceAddr != null) {
       SecurityUtil.setTokenService(token, serviceAddr);
     }
@@ -201,7 +207,7 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
     private final YarnClient yarnClient;
     private final ApplicationId appId;
 
-    public ProcessControllerImpl(YarnClient yarnClient, ApplicationId appId) {
+    ProcessControllerImpl(YarnClient yarnClient, ApplicationId appId) {
       this.yarnClient = yarnClient;
       this.appId = appId;
     }
@@ -211,8 +217,7 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
       try {
         return new Hadoop20YarnApplicationReport(yarnClient.getApplicationReport(appId));
       } catch (YarnRemoteException e) {
-        LOG.error("Failed to get application report {}", appId, e);
-        throw Throwables.propagate(e);
+        throw new RuntimeException("Failed to get application report for " + appId, e);
       }
     }
 
@@ -221,8 +226,7 @@ public final class Hadoop20YarnAppClient implements YarnAppClient {
       try {
         yarnClient.killApplication(appId);
       } catch (YarnRemoteException e) {
-        LOG.error("Failed to kill application {}", appId, e);
-        throw Throwables.propagate(e);
+        throw new RuntimeException("Failed to kill application " + appId, e);
       }
     }
 

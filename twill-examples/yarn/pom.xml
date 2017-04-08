@@ -24,7 +24,7 @@ limitations under the License.
     <parent>
         <artifactId>twill-examples</artifactId>
         <groupId>org.apache.twill</groupId>
-        <version>0.11.0-SNAPSHOT</version>
+        <version>0.12.0-SNAPSHOT</version>
     </parent>
 
     <name>Apache Twill examples: YARN</name>

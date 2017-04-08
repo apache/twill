@@ -67,6 +67,27 @@ public final class Configs {
      */
     public static final String LOCATION_CACHE_ANTIQUE_EXPIRY_MS = "twill.location.cache.antique.expiry.ms";
 
+    /**
+     * Size in MB for the memory size of the YARN application master container.
+     */
+    public static final String YARN_AM_MEMORY_MB = "twill.yarn.am.memory.mb";
+
+    /**
+     * Size in MB for the reserved non-heap memory size for the YARN application Java process.
+     * The actual reserved memory size is limited by the {@link #HEAP_RESERVED_MIN_RATIO}.
+     */
+    public static final String YARN_AM_RESERVED_MEMORY_MB = "twill.yarn.am.reserved.memory.mb";
+
+    /**
+     * Setting for enabling log collection.
+     */
+    public static final String LOG_COLLECTION_ENABLED = "twill.log.collection.enabled";
+
+    /**
+     * The maximum number of FileContext object cached by the FileContextLocationFactory.
+     */
+    public static final String FILE_CONTEXT_CACHE_MAX_SIZE = "twill.file.context.cache.max.size";
+
     private Keys() {
     }
   }
@@ -95,6 +116,27 @@ public final class Configs {
      * Default expiration is five minutes for location cache created by different twill runner.
      */
     public static final long LOCATION_CACHE_ANTIQUE_EXPIRY_MS = TimeUnit.MINUTES.toMillis(5);
+
+    /**
+     * Default AM container memory size.
+     */
+    public static final int YARN_AM_MEMORY_MB = 512;
+
+    /**
+     * Default AM JVM reserved memory.
+     */
+    public static final int YARN_AM_RESERVED_MEMORY_MB = 150;
+
+    /**
+     * Default to enable log collection.
+     */
+    public static final boolean LOG_COLLECTION_ENABLED = true;
+
+    /**
+     * Default size of the file context cache.
+     */
+    public static final int FILE_CONTEXT_CACHE_MAX_SIZE = 100;
+
 
     private Defaults() {
     }

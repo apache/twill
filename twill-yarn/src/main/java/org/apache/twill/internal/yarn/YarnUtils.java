@@ -21,9 +21,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileContext;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.Credentials;
@@ -40,7 +41,6 @@ import org.apache.hadoop.yarn.util.Records;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.ForwardingLocationFactory;
-import org.apache.twill.filesystem.HDFSLocationFactory;
 import org.apache.twill.filesystem.LocationFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,9 +48,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 
 /**
  * Collection of helper methods to simplify YARN calls.
@@ -63,7 +67,8 @@ public class YarnUtils {
   public enum HadoopVersions {
     HADOOP_20,
     HADOOP_21,
-    HADOOP_22
+    HADOOP_22,
+    HADOOP_23
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
@@ -154,26 +159,46 @@ public class YarnUtils {
       return ImmutableList.of();
     }
 
-    LocationFactory factory = unwrap(locationFactory);
-    String renewer = getYarnTokenRenewer(config);
-    List<Token<?>> tokens = ImmutableList.of();
-
-    if (factory instanceof HDFSLocationFactory) {
-      FileSystem fs = ((HDFSLocationFactory) factory).getFileSystem();
-      Token<?>[] fsTokens = fs.addDelegationTokens(renewer, credentials);
-      if (fsTokens != null) {
-        tokens = ImmutableList.copyOf(fsTokens);
+    try (FileSystem fileSystem = getFileSystem(locationFactory)) {
+      if (fileSystem == null) {
+        return ImmutableList.of();
       }
-    } else if (factory instanceof FileContextLocationFactory) {
-      FileContext fc = ((FileContextLocationFactory) factory).getFileContext();
-      tokens = fc.getDelegationTokens(new Path(locationFactory.create("/").toURI()), renewer);
-    }
 
-    for (Token<?> token : tokens) {
-      credentials.addToken(token.getService(), token);
-    }
+      String renewer = YarnUtils.getYarnTokenRenewer(config);
 
-    return ImmutableList.copyOf(tokens);
+      Token<?>[] tokens = fileSystem.addDelegationTokens(renewer, credentials);
+      LOG.debug("Added HDFS DelegationTokens: {}", Arrays.toString(tokens));
+
+      return tokens == null ? ImmutableList.<Token<?>>of() : ImmutableList.copyOf(tokens);
+    }
+  }
+
+  /**
+   * Clones the delegation token to individual host behind the same logical address.
+   *
+   * @param config the hadoop configuration
+   * @throws IOException if failed to get information for the current user.
+   */
+  public static void cloneHaNnCredentials(Configuration config) throws IOException {
+    String scheme = URI.create(config.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
+                                          CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT)).getScheme();
+
+    // Loop through all name services. Each name service could have multiple name node associated with it.
+    for (Map.Entry<String, Map<String, InetSocketAddress>> entry : DFSUtil.getHaNnRpcAddresses(config).entrySet()) {
+      String nsId = entry.getKey();
+      Map<String, InetSocketAddress> addressesInNN = entry.getValue();
+      if (!HAUtil.isHAEnabled(config, nsId) || addressesInNN == null || addressesInNN.isEmpty()) {
+        continue;
+      }
+
+      // The client may have a delegation token set for the logical
+      // URI of the cluster. Clone this token to apply to each of the
+      // underlying IPC addresses so that the IPC code can find it.
+      URI uri = URI.create(scheme + "://" + nsId);
+
+      LOG.info("Cloning delegation token for uri {}", uri);
+      HAUtil.cloneDelegationTokenForLogicalUri(UserGroupInformation.getCurrentUser(), uri, addressesInNN.values());
+    }
   }
 
   /**
@@ -236,7 +261,12 @@ public class YarnUtils {
       Class.forName("org.apache.hadoop.yarn.client.api.NMClient");
       try {
         Class.forName("org.apache.hadoop.yarn.client.cli.LogsCLI");
-        HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
+        try {
+          Class.forName("org.apache.hadoop.yarn.conf.HAUtil");
+          HADOOP_VERSION.set(HadoopVersions.HADOOP_23);
+        } catch (ClassNotFoundException e) {
+          HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
+        }
       } catch (ClassNotFoundException e) {
         HADOOP_VERSION.set(HadoopVersions.HADOOP_21);
       }
@@ -259,6 +289,7 @@ public class YarnUtils {
     }
 
     try {
+      //noinspection unchecked
       return (T) Class.forName(className).newInstance();
     } catch (Exception e) {
       throw Throwables.propagate(e);
@@ -280,14 +311,29 @@ public class YarnUtils {
   }
 
   /**
-   * Unwraps the given {@link LocationFactory} and returns the inner most {@link LocationFactory} which is not
-   * a {@link ForwardingLocationFactory}.
+   * Gets the Hadoop {@link FileSystem} from LocationFactory.
+   *
+   * @return the Hadoop {@link FileSystem} that represents the filesystem used by the given {@link LocationFactory};
+   *         {@code null} will be returned if unable to determine the {@link FileSystem}.
    */
-  private static LocationFactory unwrap(LocationFactory locationFactory) {
-    while (locationFactory instanceof ForwardingLocationFactory) {
-      locationFactory = ((ForwardingLocationFactory) locationFactory).getDelegate();
+  @Nullable
+  private static FileSystem getFileSystem(LocationFactory locationFactory) throws IOException {
+    if (locationFactory instanceof ForwardingLocationFactory) {
+      return getFileSystem(((ForwardingLocationFactory) locationFactory).getDelegate());
     }
-    return locationFactory;
+    // Due to HDFS-10296, for encrypted file systems, FileContext does not acquire the KMS delegation token
+    // Since we know we are in Yarn, it is safe to get the FileSystem directly, bypassing LocationFactory.
+    if (locationFactory instanceof FileContextLocationFactory) {
+      // Disable caching of FileSystem object, as the FileSystem object is only used to get delegation token for the
+      // current user. Caching it may causes leaking of FileSystem object if the method is called with different users.
+      Configuration config = new Configuration(((FileContextLocationFactory) locationFactory).getConfiguration());
+      String scheme = FileSystem.getDefaultUri(config).getScheme();
+      config.set(String.format("fs.%s.impl.disable.cache", scheme), "true");
+      return FileSystem.get(config);
+    }
+
+    LOG.warn("Unexpected: LocationFactory is not backed by FileContextLocationFactory");
+    return null;
   }
 
   private YarnUtils() {

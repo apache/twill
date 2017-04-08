@@ -37,13 +37,6 @@ public final class Constants {
    */
   public static final int CONSTRAINED_PROVISION_REQUEST_TIMEOUT = 5000;
 
-  public static final double HEAP_MIN_RATIO = 0.7d;
-
-  /** Memory size of AM. */
-  public static final int APP_MASTER_MEMORY_MB = 512;
-
-  public static final int APP_MASTER_RESERVED_MEMORY_MB = 150;
-
   /** Command names for the restart runnable instances. */
   public static final String RESTART_ALL_RUNNABLE_INSTANCES = "restartAllRunnableInstances";
   public static final String RESTART_RUNNABLES_INSTANCES = "restartRunnablesInstances";
@@ -58,6 +51,11 @@ public final class Constants {
    * Constants for twill variable names.
    */
   public static final String TWILL_APP_NAME = "TWILL_APP_NAME";
+
+  /**
+   * Constant for the system property name that carries the class name for the container ClassLoader as defined by user.
+   */
+  public static final String TWILL_CONTAINER_CLASSLOADER = "twill.container.class.loader";
 
   /**
    * Constants for names of internal files that are shared between client, AM and containers.

@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.twill.yarn;
+package org.apache.twill.api.security;
 
-import org.apache.twill.api.RunId;
-import org.apache.twill.api.logging.LogHandler;
-import org.apache.twill.internal.ProcessController;
-import org.apache.twill.internal.yarn.YarnApplicationReport;
+import org.apache.twill.api.SecureStore;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 
 /**
- * Factory for creating {@link YarnTwillController}.
+ * A writer provided to {@link SecureStoreRenewer} for writing out {@link SecureStore} during renewal process.
  */
-interface YarnTwillControllerFactory {
+public interface SecureStoreWriter {
 
-  YarnTwillController create(RunId runId, boolean logCollectionEnabled, Iterable<LogHandler> logHandlers,
-                             Callable<ProcessController<YarnApplicationReport>> startUp,
-                             long startTimeout, TimeUnit startTimeoutUnit);
+  /**
+   * Writes the given {@link SecureStore}.
+   *
+   * @param secureStore the {@link SecureStore} to persist
+   * @throws IOException if failed to write out the {@link SecureStore}
+   */
+  void write(SecureStore secureStore) throws IOException;
 }

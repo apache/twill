@@ -17,12 +17,11 @@
  */
 package org.apache.twill.yarn;
 
-import com.google.common.base.Throwables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.Credentials;
 import org.apache.twill.api.RunId;
-import org.apache.twill.api.SecureStore;
-import org.apache.twill.api.SecureStoreUpdater;
+import org.apache.twill.api.security.SecureStoreRenewer;
+import org.apache.twill.api.security.SecureStoreWriter;
 import org.apache.twill.filesystem.LocationFactory;
 import org.apache.twill.internal.yarn.YarnUtils;
 
@@ -31,24 +30,20 @@ import java.io.IOException;
 /**
  * Package private class for updating location related secure store.
  */
-final class LocationSecureStoreUpdater implements SecureStoreUpdater {
+final class LocationSecureStoreRenewer extends SecureStoreRenewer {
 
   private final Configuration configuration;
   private final LocationFactory locationFactory;
 
-  LocationSecureStoreUpdater(Configuration configuration, LocationFactory locationFactory) {
+  LocationSecureStoreRenewer(Configuration configuration, LocationFactory locationFactory) {
     this.configuration = configuration;
     this.locationFactory = locationFactory;
   }
 
   @Override
-  public SecureStore update(String application, RunId runId) {
-    try {
-      Credentials credentials = new Credentials();
-      YarnUtils.addDelegationTokens(configuration, locationFactory, credentials);
-      return YarnSecureStore.create(credentials);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
+  public void renew(String application, RunId runId, SecureStoreWriter secureStoreWriter) throws IOException {
+    Credentials credentials = new Credentials();
+    YarnUtils.addDelegationTokens(configuration, locationFactory, credentials);
+    secureStoreWriter.write(YarnSecureStore.create(credentials));
   }
 }

@@ -18,15 +18,18 @@
 package org.apache.twill.yarn;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.LineReader;
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillRunner;
+import org.apache.twill.api.TwillRunnerService;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.common.Threads;
@@ -159,7 +162,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
     Assert.assertTrue(waitForSize(echoServices, 2, 120));
     // check that we have 2 runnables.
-    ResourceReport report = controller.getResourceReport();
+    ResourceReport report = getResourceReport(controller, 10000);
     Assert.assertEquals(2, report.getRunnableResources("BuggyServer").size());
 
     // cause a divide by 0 in one server
@@ -175,7 +178,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     // takes some time for app master to find out the container completed...
     int count = 0;
     while (count < 100) {
-      report = controller.getResourceReport();
+      report = getResourceReport(controller, 10000);
       // check that we have 1 runnable, not 2.
       if (report.getRunnableResources("BuggyServer").size() == 1) {
         break;
@@ -216,7 +219,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     // wait for 3 echo servers to come up
     Iterable<Discoverable> echoServices = controller.discoverService("echo");
     Assert.assertTrue(waitForSize(echoServices, 3, 120));
-    ResourceReport report = controller.getResourceReport();
+    ResourceReport report = getResourceReport(controller, 10000);
     // make sure resources for echo1 and echo2 are there
     Map<String, Collection<TwillRunResources>> usedResources = report.getResources();
     Assert.assertEquals(2, usedResources.keySet().size());
@@ -226,10 +229,10 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     waitForSize(new Iterable<String>() {
       @Override
       public Iterator<String> iterator() {
-        return controller.getResourceReport().getServices().iterator();
+        return getResourceReport(controller, 10000).getServices().iterator();
       }
     }, 3, 120);
-    report = controller.getResourceReport();
+    report = getResourceReport(controller, 10000);
     Assert.assertEquals(ImmutableSet.of("echo", "echo1", "echo2"), ImmutableSet.copyOf(report.getServices()));
 
     Collection<TwillRunResources> echo1Resources = usedResources.get("echo1");
@@ -252,7 +255,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     controller.changeInstances("echo1", 1).get(60, TimeUnit.SECONDS);
     echoServices = controller.discoverService("echo1");
     Assert.assertTrue(waitForSize(echoServices, 1, 60));
-    report = controller.getResourceReport();
+    report = getResourceReport(controller, 10000);
 
     // make sure resources for echo1 and echo2 are there
     usedResources = report.getResources();
@@ -276,8 +279,40 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       Assert.assertEquals(512, resources.getMemoryMB());
     }
 
+    // Create a new TwillRunner, it should be able to get the same resource report
+    TwillRunnerService newRunnerService = TWILL_TESTER.createTwillRunnerService();
+    newRunnerService.start();
+    try {
+      TwillController newController = newRunnerService.lookup("ResourceApplication", controller.getRunId());
+      // Get the controller of the application
+      int trials = 60;
+      while (newController == null && trials-- > 0) {
+        TimeUnit.SECONDS.sleep(1);
+        newController = newRunnerService.lookup("ResourceApplication", controller.getRunId());
+      }
+      Assert.assertNotNull(newController);
+
+      ResourceReport newReport = getResourceReport(newController, 10000);
+      Assert.assertEquals(report.getResources(), newReport.getResources());
+
+    } finally {
+      newRunnerService.stop();
+    }
+
     controller.terminate().get(120, TimeUnit.SECONDS);
     // Sleep a bit before exiting.
     TimeUnit.SECONDS.sleep(2);
+  }
+
+  private ResourceReport getResourceReport(TwillController controller, long timeoutMillis) {
+    ResourceReport report = controller.getResourceReport();
+    Stopwatch stopwatch = new Stopwatch();
+    while (report == null && stopwatch.elapsedMillis() < timeoutMillis) {
+      Uninterruptibles.sleepUninterruptibly(200, TimeUnit.MILLISECONDS);
+      report = controller.getResourceReport();
+    }
+
+    Assert.assertNotNull(report);
+    return report;
   }
 }

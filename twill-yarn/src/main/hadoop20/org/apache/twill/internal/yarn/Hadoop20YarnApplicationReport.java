@@ -77,12 +77,12 @@ public final class Hadoop20YarnApplicationReport implements YarnApplicationRepor
 
   @Override
   public String getTrackingUrl() {
-    return report.getTrackingUrl();
+    return "http://" + report.getTrackingUrl();
   }
 
   @Override
   public String getOriginalTrackingUrl() {
-    return report.getOriginalTrackingUrl();
+    return "http://" + report.getOriginalTrackingUrl();
   }
 
   @Override
