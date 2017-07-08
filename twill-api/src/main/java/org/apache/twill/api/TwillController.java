@@ -17,15 +17,14 @@
  */
 package org.apache.twill.api;
 
-import org.apache.twill.api.logging.LogEntry;
-import org.apache.twill.api.logging.LogHandler;
-import org.apache.twill.discovery.Discoverable;
-import org.apache.twill.discovery.ServiceDiscovered;
-
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
+import org.apache.twill.api.logging.LogEntry;
+import org.apache.twill.api.logging.LogHandler;
+import org.apache.twill.discovery.Discoverable;
+import org.apache.twill.discovery.ServiceDiscovered;
 
 /**
  * For controlling a running application.
@@ -90,6 +89,15 @@ public interface TwillController extends ServiceController {
    * @return A {@link Future} that will be completed when the restart operation has been done.
    */
   Future<String> restartInstances(String runnable, int instanceId, int... moreInstanceIds);
+
+  /**
+   * Restart instances of some {@link TwillRunnable}.
+   *
+   * @param runnable The name of the runnable to restart.
+   * @param instanceIds Instances to be restarted
+   * @return A {@link Future} that will be completed when the restart operation has been done.
+   */
+  Future<String> restartInstances(String runnable, Set<Integer> instanceIds);
 
   /**
    * Update the log levels for requested logger names for Twill applications running in a container.
