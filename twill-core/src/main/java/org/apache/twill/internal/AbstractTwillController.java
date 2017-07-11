@@ -29,13 +29,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Future;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
@@ -60,6 +53,14 @@ import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 
 /**
  * A abstract base class for {@link TwillController} implementation that uses Zookeeper to controller a
@@ -103,8 +104,8 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
     if (kafkaClient != null && !logHandlers.isEmpty()) {
       kafkaClient.startAndWait();
       logCancellable = kafkaClient.getConsumer().prepare()
-                                  .addFromBeginning(Constants.LOG_TOPIC, 0)
-                                  .consume(new LogMessageCallback(logHandlers));
+        .addFromBeginning(Constants.LOG_TOPIC, 0)
+        .consume(new LogMessageCallback(logHandlers));
     }
   }
 
@@ -168,7 +169,8 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
         @Override
         public String transformEntry(String runnableName, Set<Integer> instanceIds) {
           validateInstanceIds(runnableName, instanceIds);
-          return GSON.toJson(instanceIds, new TypeToken<Set<Integer>>() {}.getType());
+          return GSON.toJson(instanceIds, new TypeToken<Set<Integer>>() {
+          }.getType());
         }
       });
     Command updateStateCommand = Command.Builder.of(Constants.RESTART_RUNNABLES_INSTANCES)
@@ -193,11 +195,11 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   @Override
   public ListenableFuture<String> restartInstances(final String runnable, Set<Integer> instanceIds) {
     return Futures.transform(restartInstances(ImmutableMap.of(runnable, instanceIds)),
-            new Function<Set<String>, String>() {
-              public String apply(Set<String> input) {
-                return runnable;
-              }
-            });
+                             new Function<Set<String>, String>() {
+                               public String apply(Set<String> input) {
+                                 return runnable;
+                               }
+                             });
   }
 
   @Override
@@ -213,11 +215,12 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   }
 
   @Override
-  public Future<String[]> resetLogLevels(String...loggerNames) {
+  public Future<String[]> resetLogLevels(String... loggerNames) {
     return sendMessage(SystemMessages.resetLogLevels(Sets.newHashSet(loggerNames)), loggerNames);
   }
+
   @Override
-  public Future<String[]> resetRunnableLogLevels(String runnableName, String...loggerNames) {
+  public Future<String[]> resetRunnableLogLevels(String runnableName, String... loggerNames) {
     return sendMessage(SystemMessages.resetLogLevels(runnableName, Sets.newHashSet(loggerNames)), loggerNames);
   }
 
