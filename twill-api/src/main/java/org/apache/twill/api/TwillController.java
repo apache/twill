@@ -17,7 +17,6 @@
  */
 package org.apache.twill.api;
 
-
 import org.apache.twill.api.logging.LogEntry;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.discovery.Discoverable;
@@ -28,7 +27,6 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 
-
 /**
  * For controlling a running application.
  */
@@ -36,14 +34,12 @@ public interface TwillController extends ServiceController {
 
   /**
    * Adds a {@link LogHandler} for receiving application log.
-   *
    * @param handler The handler to add.
    */
   void addLogHandler(LogHandler handler);
 
   /**
    * Discovers the set of {@link Discoverable} endpoints that provides service for the given service name.
-   *
    * @param serviceName Name of the service to discovery.
    * @return A {@link org.apache.twill.discovery.ServiceDiscovered} object representing the result.
    */
@@ -55,8 +51,8 @@ public interface TwillController extends ServiceController {
    * @param runnable The name of the runnable.
    * @param newCount Number of instances for the given runnable.
    * @return A {@link Future} that will be completed when the number running instances has been
-   * successfully changed. The future will carry the new count as the result. If there is any error
-   * while changing instances, it'll be reflected in the future.
+   *         successfully changed. The future will carry the new count as the result. If there is any error
+   *         while changing instances, it'll be reflected in the future.
    */
   Future<Integer> changeInstances(String runnable, int newCount);
 
@@ -64,7 +60,7 @@ public interface TwillController extends ServiceController {
    * Get a snapshot of the resources used by the application, broken down by each runnable.
    *
    * @return A {@link ResourceReport} containing information about resources used by the application or
-   * null in case the user calls this before the application completely starts.
+   *         null in case the user calls this before the application completely starts.
    */
   @Nullable
   ResourceReport getResourceReport();
@@ -88,8 +84,8 @@ public interface TwillController extends ServiceController {
   /**
    * Restart instances of some {@link TwillRunnable}.
    *
-   * @param runnable        The name of the runnable to restart.
-   * @param instanceId      The main instance id to be restarted.
+   * @param runnable The name of the runnable to restart.
+   * @param instanceId The main instance id to be restarted.
    * @param moreInstanceIds The optional instance ids.
    * @return A {@link Future} that will be completed when the restart operation has been done.
    */
@@ -106,13 +102,12 @@ public interface TwillController extends ServiceController {
 
   /**
    * Update the log levels for requested logger names for Twill applications running in a container.
-   * The log level for a logger name can be {@code null} except for the root logger,
-   * which will reset the log level for
+   * The log level for a logger name can be {@code null} except for the root logger, which will reset the log level for
    * the specified logger.
    *
    * @param logLevels The {@link Map} contains the requested logger names and log levels that need to be updated.
    * @return A {@link Future} that will be completed when the log level update has been done. It will carry the
-   * {@link Map} of log levels as the result.
+   *         {@link Map} of log levels as the result.
    */
   Future<Map<String, LogEntry.Level>> updateLogLevels(Map<String, LogEntry.Level> logLevels);
 
@@ -122,11 +117,11 @@ public interface TwillController extends ServiceController {
    * which will reset the log level for
    * the specified logger.
    *
-   * @param runnableName         The name of the runnable to update the log level.
+   * @param runnableName The name of the runnable to update the log level.
    * @param logLevelsForRunnable The {@link Map} contains the requested logger name and log level that
    *                             need to be updated.
    * @return A {@link Future} that will be completed when the log level update has been done. It will carry the
-   * {@link Map} of log levels as the result.
+   *         {@link Map} of log levels as the result.
    */
   Future<Map<String, LogEntry.Level>> updateLogLevels(String runnableName,
                                                       Map<String, LogEntry.Level> logLevelsForRunnable);
@@ -138,9 +133,9 @@ public interface TwillController extends ServiceController {
    * @param loggerNames The optional logger names to be reset for all runnables, if not provided, all log levels will
    *                    be reset.
    * @return A {@link Future} that will be completed when the set log level operation has been done. The future result
-   * is the logger names provided in the parameter.
+   *         is the logger names provided in the parameter.
    */
-  Future<String[]> resetLogLevels(String... loggerNames);
+  Future<String[]> resetLogLevels(String...loggerNames);
 
   /**
    * Reset the log levels of the given runnable.
@@ -149,8 +144,8 @@ public interface TwillController extends ServiceController {
    * @param loggerNames The optional logger names to be reset for the runnable, if not provided, all log levels will
    *                    be reset.
    * @return A {@link Future} that will be completed when the set log level operation has been done. The future result
-   * is the logger names provided in the parameter.
+   *         is the logger names provided in the parameter.
    */
-  Future<String[]> resetRunnableLogLevels(String runnableName, String... loggerNames);
+  Future<String[]> resetRunnableLogLevels(String runnableName, String...loggerNames);
 
 }

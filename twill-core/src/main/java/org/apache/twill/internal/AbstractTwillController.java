@@ -104,8 +104,8 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
     if (kafkaClient != null && !logHandlers.isEmpty()) {
       kafkaClient.startAndWait();
       logCancellable = kafkaClient.getConsumer().prepare()
-        .addFromBeginning(Constants.LOG_TOPIC, 0)
-        .consume(new LogMessageCallback(logHandlers));
+                                  .addFromBeginning(Constants.LOG_TOPIC, 0)
+                                  .consume(new LogMessageCallback(logHandlers));
     }
   }
 
@@ -169,8 +169,7 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
         @Override
         public String transformEntry(String runnableName, Set<Integer> instanceIds) {
           validateInstanceIds(runnableName, instanceIds);
-          return GSON.toJson(instanceIds, new TypeToken<Set<Integer>>() {
-          }.getType());
+          return GSON.toJson(instanceIds, new TypeToken<Set<Integer>>() {}.getType());
         }
       });
     Command updateStateCommand = Command.Builder.of(Constants.RESTART_RUNNABLES_INSTANCES)
@@ -215,12 +214,11 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   }
 
   @Override
-  public Future<String[]> resetLogLevels(String... loggerNames) {
+  public Future<String[]> resetLogLevels(String...loggerNames) {
     return sendMessage(SystemMessages.resetLogLevels(Sets.newHashSet(loggerNames)), loggerNames);
   }
-
   @Override
-  public Future<String[]> resetRunnableLogLevels(String runnableName, String... loggerNames) {
+  public Future<String[]> resetRunnableLogLevels(String runnableName, String...loggerNames) {
     return sendMessage(SystemMessages.resetLogLevels(runnableName, Sets.newHashSet(loggerNames)), loggerNames);
   }
 
