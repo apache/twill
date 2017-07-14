@@ -19,6 +19,7 @@ package org.apache.twill.internal.kafka.client;
 
 import kafka.serializer.Encoder;
 import kafka.utils.VerifiableProperties;
+import org.apache.kafka.common.serialization.Serializer;
 
 import java.nio.ByteBuffer;
 

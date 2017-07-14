@@ -19,11 +19,17 @@ package org.apache.twill.internal.kafka.client;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.JdkFutureAdapters;
 import com.google.common.util.concurrent.ListenableFuture;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.clients.producer.internals.DefaultPartitioner;
+import org.apache.kafka.common.serialization.ByteBufferSerializer;
+import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.kafka.client.BrokerService;
@@ -51,20 +57,21 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
   private final BrokerService brokerService;
   private final Ack ack;
   private final Compression compression;
-  private final AtomicReference<Producer<Integer, ByteBuffer>> producer;
+  private final AtomicReference<KafkaProducer<Integer, ByteBuffer>> producer;
   private final AtomicBoolean listenerCancelled;
 
   public SimpleKafkaPublisher(BrokerService brokerService, Ack ack, Compression compression) {
     this.brokerService = brokerService;
     this.ack = ack;
     this.compression = compression;
-    this.producer = new AtomicReference<Producer<Integer, ByteBuffer>>();
+    this.producer = new AtomicReference<KafkaProducer<Integer, ByteBuffer>>();
     this.listenerCancelled = new AtomicBoolean(false);
   }
 
   /**
    * Start the publisher. This method must be called before other methods. This method is only to be called
    * by KafkaClientService who own this object.
+   *
    * @return A Cancellable for closing this publish.
    */
   Cancellable start() {
@@ -95,40 +102,6 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
     return new SimplePreparer(topic);
   }
 
-  private final class SimplePreparer implements Preparer {
-
-    private final String topic;
-    private final List<KeyedMessage<Integer, ByteBuffer>> messages;
-
-    private SimplePreparer(String topic) {
-      this.topic = topic;
-      this.messages = Lists.newLinkedList();
-    }
-
-    @Override
-    public Preparer add(ByteBuffer message, Object partitionKey) {
-      messages.add(new KeyedMessage<Integer, ByteBuffer>(topic, Math.abs(partitionKey.hashCode()), message));
-      return this;
-    }
-
-    @Override
-    public ListenableFuture<Integer> send() {
-      try {
-        int size = messages.size();
-        Producer<Integer, ByteBuffer> kafkaProducer = producer.get();
-        if (kafkaProducer == null) {
-          return Futures.immediateFailedFuture(new IllegalStateException("No kafka producer available."));
-        }
-        kafkaProducer.send(messages);
-        return Futures.immediateFuture(size);
-      } catch (Exception e) {
-        return Futures.immediateFailedFuture(e);
-      } finally {
-        messages.clear();
-      }
-    }
-  }
-
   /**
    * Listener for watching for changes in broker list.
    * This needs to be a static class so that no reference to the publisher instance is held in order for
@@ -138,13 +111,13 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
   private static final class BrokerListChangeListener extends BrokerService.BrokerChangeListener {
 
     private final AtomicBoolean listenerCancelled;
-    private final AtomicReference<Producer<Integer, ByteBuffer>> producer;
+    private final AtomicReference<KafkaProducer<Integer, ByteBuffer>> producer;
     private final Ack ack;
     private final Compression compression;
     private String brokerList;
 
     private BrokerListChangeListener(AtomicBoolean listenerCancelled,
-                                     AtomicReference<Producer<Integer, ByteBuffer>> producer,
+                                     AtomicReference<KafkaProducer<Integer, ByteBuffer>> producer,
                                      Ack ack, Compression compression) {
       this.listenerCancelled = listenerCancelled;
       this.producer = producer;
@@ -169,15 +142,16 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
       }
 
       Properties props = new Properties();
-      props.put("metadata.broker.list", newBrokerList);
-      props.put("serializer.class", ByteBufferEncoder.class.getName());
-      props.put("key.serializer.class", IntegerEncoder.class.getName());
-      props.put("partitioner.class", IntegerPartitioner.class.getName());
+      props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, newBrokerList);
+      props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteBufferSerializer.class);
+      props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class);
+      props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, DefaultPartitioner.class);
       props.put("request.required.acks", Integer.toString(ack.getAck()));
-      props.put("compression.codec", compression.getCodec());
+      props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compression.getCodec());
+//      props.put("compression.codec", compression.getCodec());
 
-      ProducerConfig config = new ProducerConfig(props);
-      Producer<Integer, ByteBuffer> oldProducer = producer.getAndSet(new Producer<Integer, ByteBuffer>(config));
+      KafkaProducer<Integer, ByteBuffer> oldProducer = producer.getAndSet(new KafkaProducer<Integer, ByteBuffer>
+                                                                            (props));
       if (oldProducer != null) {
         oldProducer.close();
       }
@@ -195,11 +169,11 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
     private final ExecutorService executor;
     private final AtomicBoolean listenerCancelled;
     private final Cancellable cancelChangeListener;
-    private final AtomicReference<Producer<Integer, ByteBuffer>> producer;
+    private final AtomicReference<KafkaProducer<Integer, ByteBuffer>> producer;
 
     private ProducerCancellable(ExecutorService executor, AtomicBoolean listenerCancelled,
                                 Cancellable cancelChangeListener,
-                                AtomicReference<Producer<Integer, ByteBuffer>> producer) {
+                                AtomicReference<KafkaProducer<Integer, ByteBuffer>> producer) {
       this.executor = executor;
       this.listenerCancelled = listenerCancelled;
       this.cancelChangeListener = cancelChangeListener;
@@ -217,9 +191,52 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
     public void run() {
       // Call from cancel() through executor only.
       cancelChangeListener.cancel();
-      Producer<Integer, ByteBuffer> kafkaProducer = producer.get();
+      KafkaProducer<Integer, ByteBuffer> kafkaProducer = producer.get();
       kafkaProducer.close();
       executor.shutdownNow();
+    }
+  }
+
+  private final class SimplePreparer implements Preparer {
+
+    private final String topic;
+    private final List<ProducerRecord<Integer, ByteBuffer>> messages;
+
+    private SimplePreparer(String topic) {
+      this.topic = topic;
+      this.messages = Lists.newLinkedList();
+    }
+
+    @Override
+    public Preparer add(ByteBuffer message, Object partitionKey) {
+      messages.add(new ProducerRecord<Integer, ByteBuffer>(topic, Math.abs(partitionKey.hashCode()), message));
+      return this;
+    }
+
+    @Override
+    public ListenableFuture<Integer> send() {
+      try {
+        KafkaProducer<Integer, ByteBuffer> kafkaProducer = producer.get();
+        if (kafkaProducer == null) {
+          return Futures.immediateFailedFuture(new IllegalStateException("No kafka producer available."));
+        }
+
+        List<ListenableFuture<RecordMetadata>> futures = Lists.newArrayList();
+        for (ProducerRecord pr : messages) {
+          futures.add(JdkFutureAdapters.listenInPoolThread(kafkaProducer.send(pr)));
+        }
+        ListenableFuture<List<RecordMetadata>> listListenableFuture = Futures.allAsList(futures);
+        return Futures.transform(listListenableFuture, new AsyncFunction<List<RecordMetadata>, Integer>() {
+          @Override
+          public ListenableFuture<Integer> apply(List<RecordMetadata> input) throws Exception {
+            return Futures.immediateFuture(input.size());
+          }
+        });
+      } catch (Exception e) {
+        return Futures.immediateFailedFuture(e);
+      } finally {
+        messages.clear();
+      }
     }
   }
 }

@@ -166,7 +166,7 @@
         <snappy-java.version>1.0.5</snappy-java.version>
         <jcl-over-slf4j.version>1.7.2</jcl-over-slf4j.version>
         <asm.version>5.0.2</asm.version>
-        <kafka.version>0.8.0</kafka.version>
+        <kafka.version>0.11.0.0</kafka.version>
         <zookeeper.version>3.4.5</zookeeper.version>
         <junit.version>4.11</junit.version>
         <jopt-simple.version>3.2</jopt-simple.version>
@@ -812,7 +812,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>
-                <artifactId>kafka_2.10</artifactId>
+                <artifactId>kafka_2.11</artifactId>
                 <version>${kafka.version}</version>
                 <exclusions>
                     <exclusion>

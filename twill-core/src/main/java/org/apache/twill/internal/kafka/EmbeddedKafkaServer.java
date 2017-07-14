@@ -22,11 +22,15 @@ import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AbstractIdleService;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
-import kafka.utils.Time;
+import kafka.server.KafkaServerStartable;
 import org.I0Itec.zkclient.exception.ZkTimeoutException;
+import org.apache.kafka.common.utils.SystemTime;
+import org.apache.kafka.common.utils.Time;
 import org.apache.twill.internal.utils.Networks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.None;
+import scala.Option;
 
 import java.net.BindException;
 import java.util.Properties;
@@ -46,7 +50,7 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
 
   private final int startTimeoutRetries;
   private final Properties properties;
-  private KafkaServer server;
+  private KafkaServerStartable server;
 
   public EmbeddedKafkaServer(Properties properties) {
     this.startTimeoutRetries = Integer.parseInt(properties.getProperty(START_RETRIES,
@@ -60,7 +64,7 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
     int tries = 0;
     do {
       KafkaConfig kafkaConfig = createKafkaConfig(properties);
-      KafkaServer kafkaServer = createKafkaServer(kafkaConfig);
+      KafkaServerStartable kafkaServer = createKafkaServer(kafkaConfig);
       try {
         kafkaServer.startup();
         server = kafkaServer;
@@ -96,28 +100,8 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
     }
   }
 
-  private KafkaServer createKafkaServer(KafkaConfig kafkaConfig) {
-    return new KafkaServer(kafkaConfig, new Time() {
-
-      @Override
-      public long milliseconds() {
-        return System.currentTimeMillis();
-      }
-
-      @Override
-      public long nanoseconds() {
-        return System.nanoTime();
-      }
-
-      @Override
-      public void sleep(long ms) {
-        try {
-          Thread.sleep(ms);
-        } catch (InterruptedException e) {
-          Thread.interrupted();
-        }
-      }
-    });
+  private KafkaServerStartable createKafkaServer(KafkaConfig kafkaConfig) {
+    return new KafkaServerStartable(kafkaConfig);
   }
 
   /**
