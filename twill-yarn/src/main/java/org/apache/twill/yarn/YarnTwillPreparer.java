@@ -428,7 +428,9 @@ final class YarnTwillPreparer implements TwillPreparer {
 
       boolean logCollectionEnabled = config.getBoolean(Configs.Keys.LOG_COLLECTION_ENABLED,
                                                        Configs.Defaults.LOG_COLLECTION_ENABLED);
-      YarnTwillController controller = controllerFactory.create(runId, logCollectionEnabled,
+      String kafkaBootstrap = config.get(Configs.Keys.LOG_COLLECTION_KAFKA_BOOTSTRAP,
+                                         Configs.Defaults.LOG_COLLECTION_KAFKA_BOOTSTRAP_EMPTY);
+      YarnTwillController controller = controllerFactory.create(runId, logCollectionEnabled, kafkaBootstrap,
                                                                 logHandlers, submitTask, timeout, timeoutUnit);
       controller.start();
       return controller;
@@ -638,13 +640,14 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   /**
    * Based on the given {@link TwillSpecification}, upload LocalFiles to Yarn Cluster.
+   *
    * @param twillSpec The {@link TwillSpecification} for populating resource.
    */
   private Multimap<String, LocalFile> populateRunnableLocalFiles(TwillSpecification twillSpec) throws IOException {
     Multimap<String, LocalFile> localFiles = HashMultimap.create();
 
     LOG.debug("Populating Runnable LocalFiles");
-    for (Map.Entry<String, RuntimeSpecification> entry: twillSpec.getRunnables().entrySet()) {
+    for (Map.Entry<String, RuntimeSpecification> entry : twillSpec.getRunnables().entrySet()) {
       String runnableName = entry.getKey();
       for (LocalFile localFile : entry.getValue().getLocalFiles()) {
         Location location;
@@ -694,11 +697,17 @@ final class YarnTwillPreparer implements TwillPreparer {
                                                                       spec.getPlacementPolicies(), eventHandler);
       boolean logCollectionEnabled = config.getBoolean(Configs.Keys.LOG_COLLECTION_ENABLED,
                                                        Configs.Defaults.LOG_COLLECTION_ENABLED);
+      String kafkaBootstrap = config.get(Configs.Keys.LOG_COLLECTION_KAFKA_BOOTSTRAP,
+                                         Configs.Defaults.LOG_COLLECTION_KAFKA_BOOTSTRAP_EMPTY);
+      // We need embedded kafka server only if log collection enabled and no bootstrap servers provided
+      boolean embeddedKafkaEnabled = logCollectionEnabled && kafkaBootstrap.isEmpty();
       TwillRuntimeSpecificationAdapter.create().toJson(
         new TwillRuntimeSpecification(newTwillSpec, appLocation.getLocationFactory().getHomeLocation().getName(),
                                       appLocation.toURI(), zkConnectString, runId, twillSpec.getName(),
                                       getReservedMemory(), config.get(YarnConfiguration.RM_SCHEDULER_ADDRESS),
-                                      logLevels, maxRetries, getMinHeapRatio(), logCollectionEnabled), writer);
+                                      logLevels, maxRetries, getMinHeapRatio(), logCollectionEnabled, kafkaBootstrap,
+                                      embeddedKafkaEnabled)
+        , writer);
     }
     LOG.debug("Done {}", targetFile);
   }

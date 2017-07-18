@@ -195,6 +195,7 @@ public abstract class ServiceMain {
   private void configureLogger() throws MalformedURLException, JoranException {
     // Check if SLF4J is bound to logback in the current environment
     ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
+    LOG.info("LoggerFactory is {}", loggerFactory);
     if (!(loggerFactory instanceof LoggerContext)) {
       return;
     }
@@ -217,7 +218,7 @@ public abstract class ServiceMain {
     kafkaAppender.setTopic(Constants.LOG_TOPIC);
     kafkaAppender.setHostname(getHostname());
     // The Kafka ZK Connection shouldn't be null as this method only get called if log collection is enabled
-    kafkaAppender.setZookeeper(getTwillRuntimeSpecification().getKafkaZKConnect());
+    kafkaAppender.setKafkaBootstrap(getTwillRuntimeSpecification().getKafkaBootstrap());
     String runnableName = getRunnableName();
     if (runnableName != null) {
       kafkaAppender.setRunnableName(runnableName);

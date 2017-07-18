@@ -31,16 +31,16 @@ public final class ApplicationMasterLiveNodeData {
   private final long appIdClusterTime;
   private final String containerId;
   private final List<LocalFile> localFiles;
-  private final String kafkaZKConnect;
+  private final String kafkaBootstrap;
 
   public ApplicationMasterLiveNodeData(int appId, long appIdClusterTime,
                                        String containerId, List<LocalFile> localFiles,
-                                       @Nullable String kafkaZKConnect) {
+                                       @Nullable String kafkaBootstrap) {
     this.appId = appId;
     this.appIdClusterTime = appIdClusterTime;
     this.containerId = containerId;
     this.localFiles = localFiles;
-    this.kafkaZKConnect = kafkaZKConnect;
+    this.kafkaBootstrap = kafkaBootstrap;
   }
 
   public int getAppId() {
@@ -60,12 +60,12 @@ public final class ApplicationMasterLiveNodeData {
   }
 
   /**
-   * @return the Kafka ZK connection string for the Kafka used for log collection;
+   * @return the Kafka bootstrap connection string for the Kafka used for log collection;
    *         if log collection is turned off, a {@code null} value will be returned.
    */
   @Nullable
-  public String getKafkaZKConnect() {
-    return kafkaZKConnect;
+  public String getKafkaBootstrap() {
+    return kafkaBootstrap;
   }
 
   @Override

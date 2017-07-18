@@ -51,6 +51,8 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
   private static final String LOG_LEVELS = "logLevels";
   private static final String MAX_RETRIES = "maxRetries";
   private static final String LOG_COLLECTION_ENABLED = "logCollectionEnabled";
+  private static final String KAFKA_BOOTSTRAP = "kafkaBootstrap";
+  private static final String IS_EMBEDDED_KAFKA_ENABLED = "embeddedKafkaEnabled";
 
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
@@ -62,6 +64,8 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     json.addProperty(TWILL_APP_NAME, src.getTwillAppName());
     json.addProperty(RESERVED_MEMORY, src.getReservedMemory());
     json.addProperty(HEAP_RESERVED_MIN_RATIO, src.getMinHeapRatio());
+    json.addProperty(KAFKA_BOOTSTRAP, src.getKafkaBootstrap());
+    json.addProperty(IS_EMBEDDED_KAFKA_ENABLED, src.isEmbeddedKafkaEnabled());
     if (src.getRmSchedulerAddr() != null) {
       json.addProperty(RM_SCHEDULER_ADDR, src.getRmSchedulerAddr());
     }
@@ -85,9 +89,9 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
       jsonObj.get(TWILL_SPEC), new TypeToken<TwillSpecification>() { }.getType());
     Map<String, Map<String, String>> logLevels =
       context.deserialize(jsonObj.get(LOG_LEVELS), new TypeToken<Map<String, Map<String, String>>>() { }.getType());
-    Map<String, Integer> maxRetries = 
+    Map<String, Integer> maxRetries =
       context.deserialize(jsonObj.get(MAX_RETRIES), new TypeToken<Map<String, Integer>>() { }.getType());
-    
+
     return new TwillRuntimeSpecification(twillSpecification,
                                          jsonObj.get(FS_USER).getAsString(),
                                          URI.create(jsonObj.get(TWILL_APP_DIR).getAsString()),
@@ -100,6 +104,8 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                          logLevels,
                                          maxRetries,
                                          jsonObj.get(HEAP_RESERVED_MIN_RATIO).getAsDouble(),
-                                         jsonObj.get(LOG_COLLECTION_ENABLED).getAsBoolean());
+                                         jsonObj.get(LOG_COLLECTION_ENABLED).getAsBoolean(),
+                                         jsonObj.get(KAFKA_BOOTSTRAP).getAsString(),
+                                         jsonObj.get(IS_EMBEDDED_KAFKA_ENABLED).getAsBoolean());
   }
 }

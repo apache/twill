@@ -84,6 +84,11 @@ public final class Configs {
     public static final String LOG_COLLECTION_ENABLED = "twill.log.collection.enabled";
 
     /**
+     * Setting for kafka 'bootstrap.servers' for log collection
+     */
+    public static final String LOG_COLLECTION_KAFKA_BOOTSTRAP = "twill.log.collection.kafka.bootstrap";
+
+    /**
      * The maximum number of FileContext object cached by the FileContextLocationFactory.
      */
     public static final String FILE_CONTEXT_CACHE_MAX_SIZE = "twill.file.context.cache.max.size";
@@ -131,6 +136,11 @@ public final class Configs {
      * Default to enable log collection.
      */
     public static final boolean LOG_COLLECTION_ENABLED = true;
+
+    /**
+     * Default is empty
+     */
+    public static final String LOG_COLLECTION_KAFKA_BOOTSTRAP_EMPTY = "";
 
     /**
      * Default size of the file context cache.

@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.Futures;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.internal.Services;
 import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
+import org.apache.twill.internal.kafka.client.BootstrapedKafkaClientService;
 import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
 import org.apache.twill.internal.utils.Networks;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
@@ -156,6 +157,49 @@ public class KafkaTest {
   @Test
   public void testKafkaClient() throws Exception {
     String topic = "testClient";
+
+    Thread t1 = createPublishThread(kafkaClient, topic, Compression.GZIP, "GZIP Testing message", 10);
+    Thread t2 = createPublishThread(kafkaClient, topic, Compression.NONE, "Testing message", 10);
+
+    t1.start();
+    t2.start();
+
+    Thread t3 = createPublishThread(kafkaClient, topic, Compression.SNAPPY, "Snappy Testing message", 10);
+    t2.join();
+    t3.start();
+
+    final CountDownLatch latch = new CountDownLatch(30);
+    final CountDownLatch stopLatch = new CountDownLatch(1);
+    Cancellable cancel = kafkaClient.getConsumer().prepare().add(topic, 0, 0).consume(new KafkaConsumer
+      .MessageCallback() {
+      @Override
+      public long onReceived(Iterator<FetchedMessage> messages) {
+        long nextOffset = -1;
+        while (messages.hasNext()) {
+          FetchedMessage message = messages.next();
+          nextOffset = message.getNextOffset();
+          LOG.info(Charsets.UTF_8.decode(message.getPayload()).toString());
+          latch.countDown();
+        }
+        return nextOffset;
+      }
+
+      @Override
+      public void finished() {
+        stopLatch.countDown();
+      }
+    });
+
+    Assert.assertTrue(latch.await(5, TimeUnit.SECONDS));
+    cancel.cancel();
+    Assert.assertTrue(stopLatch.await(1, TimeUnit.SECONDS));
+  }
+
+  @Test
+  public void testKafkaNewClient() throws Exception {
+    String topic = "testClient";
+    kafkaClient = new BootstrapedKafkaClientService(kafkaServer.getKafkaBootstrap());
+    kafkaClient.startAndWait();
 
     Thread t1 = createPublishThread(kafkaClient, topic, Compression.GZIP, "GZIP Testing message", 10);
     Thread t2 = createPublishThread(kafkaClient, topic, Compression.NONE, "Testing message", 10);

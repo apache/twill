@@ -21,16 +21,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AbstractIdleService;
 import kafka.server.KafkaConfig;
-import kafka.server.KafkaServer;
 import kafka.server.KafkaServerStartable;
 import org.I0Itec.zkclient.exception.ZkTimeoutException;
-import org.apache.kafka.common.utils.SystemTime;
-import org.apache.kafka.common.utils.Time;
 import org.apache.twill.internal.utils.Networks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.None;
-import scala.Option;
 
 import java.net.BindException;
 import java.util.Properties;
@@ -49,21 +44,23 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
   private static final String DEFAULT_START_RETRIES = "5";
 
   private final int startTimeoutRetries;
-  private final Properties properties;
+  private final KafkaConfig kafkaConfig;
   private KafkaServerStartable server;
 
   public EmbeddedKafkaServer(Properties properties) {
     this.startTimeoutRetries = Integer.parseInt(properties.getProperty(START_RETRIES,
                                                                        DEFAULT_START_RETRIES));
-    this.properties = new Properties();
-    this.properties.putAll(properties);
+    this.kafkaConfig = createKafkaConfig(properties);
+  }
+
+  public String getKafkaBootstrap() {
+    return String.format("%s:%d", kafkaConfig.hostName(), kafkaConfig.port());
   }
 
   @Override
   protected void startUp() throws Exception {
     int tries = 0;
     do {
-      KafkaConfig kafkaConfig = createKafkaConfig(properties);
       KafkaServerStartable kafkaServer = createKafkaServer(kafkaConfig);
       try {
         kafkaServer.startup();

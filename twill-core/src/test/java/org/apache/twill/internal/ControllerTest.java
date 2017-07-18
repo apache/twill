@@ -187,7 +187,9 @@ public class ControllerTest {
 
   private TwillController getController(ZKClient zkClient, String appName, RunId runId) {
     AbstractTwillController controller = new AbstractTwillController(appName, runId,
-                                                                     zkClient, false, ImmutableList.<LogHandler>of()) {
+                                                                     zkClient, false,
+                                                                     "",
+                                                                     ImmutableList.<LogHandler>of()) {
 
       @Override
       public void kill() {

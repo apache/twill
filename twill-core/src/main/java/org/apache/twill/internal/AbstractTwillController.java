@@ -43,14 +43,13 @@ import org.apache.twill.discovery.ZKDiscoveryService;
 import org.apache.twill.internal.json.LogEntryDecoder;
 import org.apache.twill.internal.json.LogThrowableCodec;
 import org.apache.twill.internal.json.StackTraceElementCodec;
-import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
+import org.apache.twill.internal.kafka.client.BootstrapedKafkaClientService;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.kafka.client.FetchedMessage;
 import org.apache.twill.kafka.client.KafkaClientService;
 import org.apache.twill.kafka.client.KafkaConsumer;
 import org.apache.twill.zookeeper.ZKClient;
-import org.apache.twill.zookeeper.ZKClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +78,7 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   private Cancellable logCancellable;
 
   public AbstractTwillController(String appName, RunId runId, ZKClient zkClient, boolean logCollectionEnabled,
-                                 Iterable<LogHandler> logHandlers) {
+                                 String kafkaBootstrap, Iterable<LogHandler> logHandlers) {
     super(runId, zkClient);
     this.appName = appName;
     this.runId = runId;
@@ -88,7 +87,8 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
     // When addressing TWILL-147, need to check if the given ZKClient is
     // actually used by the Kafka used for log collection
     if (logCollectionEnabled) {
-      this.kafkaClient = new ZKKafkaClientService(ZKClients.namespace(zkClient, "/" + runId.getId() + "/kafka"));
+      this.kafkaClient = new BootstrapedKafkaClientService(kafkaBootstrap);
+      //new ZKKafkaClientService(ZKClients.namespace(zkClient, "/" + runId.getId() + "/kafka"));
       Iterables.addAll(this.logHandlers, logHandlers);
     } else {
       this.kafkaClient = null;
