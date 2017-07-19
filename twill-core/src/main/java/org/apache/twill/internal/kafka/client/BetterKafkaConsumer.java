@@ -34,6 +34,7 @@ import org.apache.twill.kafka.client.KafkaConsumer;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -59,7 +60,8 @@ public class BetterKafkaConsumer implements KafkaConsumer {
     Properties properties = new Properties();
     properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
-    properties.put(ConsumerConfig.GROUP_ID_CONFIG, "twill-log-consumer-group");
+    properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "twill-log-consumer-group");
+    properties.setProperty(CommonClientConfigs.CLIENT_ID_CONFIG, "twill-log-consumer-client-" + UUID.randomUUID());
     kafkaConsumer = new org.apache.kafka.clients.consumer.KafkaConsumer<>(properties,
                                                                           new IntegerDeserializer(),
                                                                           new ByteBufferDeserializer());
@@ -128,7 +130,7 @@ public class BetterKafkaConsumer implements KafkaConsumer {
 
     @Override
     public Cancellable consume(final MessageCallback callback) {
-      final ScheduledFuture<?> future = executorService.schedule(new Runnable() {
+      final ScheduledFuture<?> future = executorService.scheduleWithFixedDelay(new Runnable() {
         @Override
         public void run() {
           ConsumerRecords<Integer, ByteBuffer> records = kafkaConsumer.poll(POOL_TIMEOUT);
@@ -137,13 +139,17 @@ public class BetterKafkaConsumer implements KafkaConsumer {
               @Nullable
               @Override
               public FetchedMessage apply(@Nullable ConsumerRecord<Integer, ByteBuffer> record) {
-                return new BasicFetchedMessage(new org.apache.twill.kafka.client
-                  .TopicPartition(record.topic(), record.partition()));
+                BasicFetchedMessage fetchedMessage =
+                  new BasicFetchedMessage(new org.apache.twill.kafka.client.TopicPartition(record.topic(),
+                                                                                           record.partition()));
+                fetchedMessage.setPayload(record.value());
+                fetchedMessage.setOffset(record.offset());
+                return fetchedMessage;
               }
             });
           callback.onReceived(fetchedMessages.iterator());
         }
-      }, POOL_DELAY, TimeUnit.MILLISECONDS);
+      }, 0, POOL_DELAY, TimeUnit.MILLISECONDS);
       return new Cancellable() {
         @Override
         public void cancel() {

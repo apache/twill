@@ -55,10 +55,7 @@ public class BetterKafkaPublisher implements KafkaPublisher {
     props.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     props.put(ProducerConfig.ACKS_CONFIG, Integer.toString(ack.getAck()));
     props.put(ProducerConfig.RETRIES_CONFIG, 0);
-    props.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
     props.put(ProducerConfig.LINGER_MS_CONFIG, 1);
-    props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);
-    props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compression.getCodec());
 
     kafkaProducer = new KafkaProducer<>(props,
                                         new IntegerSerializer(),
