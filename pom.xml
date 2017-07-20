@@ -166,7 +166,7 @@
         <snappy-java.version>1.0.5</snappy-java.version>
         <jcl-over-slf4j.version>1.7.2</jcl-over-slf4j.version>
         <asm.version>5.0.2</asm.version>
-        <kafka.version>0.11.0.0</kafka.version>
+        <kafka.version>0.10.2.0</kafka.version>
         <zookeeper.version>3.4.5</zookeeper.version>
         <junit.version>4.11</junit.version>
         <jopt-simple.version>3.2</jopt-simple.version>
@@ -819,10 +819,10 @@
                         <groupId>org.slf4j</groupId>
                         <artifactId>slf4j-simple</artifactId>
                     </exclusion>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>slf4j-log4j12</artifactId>
-                    </exclusion>
+                    <!--<exclusion>-->
+                        <!--<groupId>org.slf4j</groupId>-->
+                        <!--<artifactId>slf4j-log4j12</artifactId>-->
+                    <!--</exclusion>-->
                     <exclusion>
                         <groupId>com.sun.jdmk</groupId>
                         <artifactId>jmxtools</artifactId>

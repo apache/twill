@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 /**
+ * {@link KafkaConsumer} implementation with new kafka api and bootstrap servers
  * Created by SFilippov on 18.07.2017.
  */
 public class BetterKafkaConsumer implements KafkaConsumer {
@@ -81,6 +82,8 @@ public class BetterKafkaConsumer implements KafkaConsumer {
 
   private final class BetterPreparer implements Preparer {
 
+    private TopicPartition topicPartition;
+
     /**
      * Should be invoked only on {@link BetterKafkaConsumer#executorService}.
      *
@@ -89,6 +92,7 @@ public class BetterKafkaConsumer implements KafkaConsumer {
     private void checkSubscription(String topic) {
       if (!kafkaConsumer.subscription().contains(topic)) {
         kafkaConsumer.subscribe(Collections.singleton(topic));
+        kafkaConsumer.poll(0);
       }
     }
 
@@ -98,7 +102,8 @@ public class BetterKafkaConsumer implements KafkaConsumer {
         @Override
         public void run() {
           checkSubscription(topic);
-          kafkaConsumer.seek(new TopicPartition(topic, partition), offset);
+          topicPartition = new TopicPartition(topic, partition);
+          kafkaConsumer.seek(topicPartition, offset);
         }
       });
       return this;
@@ -110,7 +115,8 @@ public class BetterKafkaConsumer implements KafkaConsumer {
         @Override
         public void run() {
           checkSubscription(topic);
-          kafkaConsumer.seekToBeginning(Collections.singleton(new TopicPartition(topic, partition)));
+          topicPartition = new TopicPartition(topic, partition);
+          kafkaConsumer.seekToBeginning(Collections.singleton(topicPartition));
         }
       });
       return this;
@@ -122,7 +128,8 @@ public class BetterKafkaConsumer implements KafkaConsumer {
         @Override
         public void run() {
           checkSubscription(topic);
-          kafkaConsumer.seekToEnd(Collections.singleton(new TopicPartition(topic, partition)));
+          topicPartition = new TopicPartition(topic, partition);
+          kafkaConsumer.seekToEnd(Collections.singleton(topicPartition));
         }
       });
       return this;
@@ -144,16 +151,19 @@ public class BetterKafkaConsumer implements KafkaConsumer {
                                                                                            record.partition()));
                 fetchedMessage.setPayload(record.value());
                 fetchedMessage.setOffset(record.offset());
+                fetchedMessage.setNextOffset(record.offset() + 1);
                 return fetchedMessage;
               }
             });
-          callback.onReceived(fetchedMessages.iterator());
+          long offset = callback.onReceived(fetchedMessages.iterator());
+          if (offset > 0) kafkaConsumer.seek(topicPartition, offset);
         }
       }, 0, POOL_DELAY, TimeUnit.MILLISECONDS);
       return new Cancellable() {
         @Override
         public void cancel() {
           future.cancel(true);
+          callback.finished();
         }
       };
     }

@@ -98,7 +98,9 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
   }
 
   private KafkaServerStartable createKafkaServer(KafkaConfig kafkaConfig) {
-    return new KafkaServerStartable(kafkaConfig);
+    Properties properties = new Properties();
+    properties.putAll(kafkaConfig.props());
+    return KafkaServerStartable.fromProps(properties);
   }
 
   /**
@@ -114,6 +116,15 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
       int randomPort = Networks.getRandomPort();
       Preconditions.checkState(randomPort > 0, "Failed to get random port.");
       prop.setProperty("port", Integer.toString(randomPort));
+    }
+    String brokerId = prop.getProperty("broker.id");
+    if (brokerId == null) {
+      Random random = new Random(System.currentTimeMillis());
+      int i;
+      do {
+        i = random.nextInt(1000);
+      } while (i < 0);
+      prop.setProperty("broker.id", Integer.toString(i));
     }
 
     return new KafkaConfig(prop);

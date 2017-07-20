@@ -40,6 +40,7 @@ import java.util.Properties;
 import java.util.concurrent.Executors;
 
 /**
+ * {@link KafkaPublisher} implementation with new kafka api and bootstrap servers
  * Created by SFilippov on 18.07.2017.
  */
 public class BetterKafkaPublisher implements KafkaPublisher {
@@ -54,7 +55,7 @@ public class BetterKafkaPublisher implements KafkaPublisher {
     final Properties props = new Properties();
     props.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     props.put(ProducerConfig.ACKS_CONFIG, Integer.toString(ack.getAck()));
-    props.put(ProducerConfig.RETRIES_CONFIG, 0);
+    props.put(ProducerConfig.RETRIES_CONFIG, 3);
     props.put(ProducerConfig.LINGER_MS_CONFIG, 1);
 
     kafkaProducer = new KafkaProducer<>(props,

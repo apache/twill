@@ -28,58 +28,27 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
+ * Implementation of {@link KafkaClientService} with bootstrap servers string
  * Created by SFilippov on 11.07.2017.
  */
 public class BootstrapedKafkaClientService extends AbstractIdleService implements KafkaClientService {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(BootstrapedKafkaClientService.class);
 
-  private static final long CONSUMER_EXPIRE_MINUTES = 1L;   // close consumer if not used for 1 minute.
-
   private final String bootstrapServers;
   private final List<BetterKafkaPublisher> publishers;
-  private final BetterKafkaConsumer consumer;
+  private BetterKafkaConsumer consumer;
 
   public BootstrapedKafkaClientService(String bootstrapServers) {
     Preconditions.checkNotNull(bootstrapServers, "Bootstrap server's list cannot be null");
+    Preconditions.checkState(!bootstrapServers.isEmpty(), "Bootstrap server's list cannot be empty");
     this.bootstrapServers = bootstrapServers;
-    consumer = new BetterKafkaConsumer(bootstrapServers);
-    publishers = Lists.newArrayList();
+    this.publishers = Lists.newArrayList();
   }
 
   @Override
   protected void startUp() throws Exception {
-//    this.consumers = CacheBuilder.newBuilder()
-//      .expireAfterAccess(CONSUMER_EXPIRE_MINUTES, TimeUnit.MINUTES)
-//      .removalListener(createRemovalListener())
-//      .build(createConsumerLoader());
-  }
 
-//  /**
-//   * Creates a CacheLoader for creating SimpleConsumer.
-//   */
-//  private CacheLoader<Properties, KafkaConsumer<String, String>> createConsumerLoader() {
-//    return new CacheLoader<Properties, KafkaConsumer<String, String>>() {
-//      @Override
-//      public KafkaConsumer<String, String> load(Properties properties) throws Exception {
-//        return new KafkaConsumer<>(properties);
-//      }
-//    };
-//  }
-//
-//  /**
-//   * Creates a RemovalListener that will close SimpleConsumer on cache removal.
-//   */
-//  private RemovalListener<Properties, KafkaConsumer<String, String>> createRemovalListener() {
-//    return new RemovalListener<Properties, KafkaConsumer<String, String>>() {
-//      @Override
-//      public void onRemoval(RemovalNotification<Properties, KafkaConsumer<String, String>> notification) {
-//        KafkaConsumer<String, String> consumer = notification.getValue();
-//        if (consumer != null) {
-//          consumer.close();
-//        }
-//      }
-//    };
-//  }
+  }
 
   @Override
   protected void shutDown() throws Exception {
@@ -93,7 +62,6 @@ public class BootstrapedKafkaClientService extends AbstractIdleService implement
 
   @Override
   public KafkaPublisher getPublisher(KafkaPublisher.Ack ack, Compression compression) {
-    Preconditions.checkState(isRunning(), "Service is not running.");
     BetterKafkaPublisher publisher = new BetterKafkaPublisher(bootstrapServers, ack, compression);
     publishers.add(publisher);
     return publisher;
@@ -101,7 +69,9 @@ public class BootstrapedKafkaClientService extends AbstractIdleService implement
 
   @Override
   public org.apache.twill.kafka.client.KafkaConsumer getConsumer() {
-    Preconditions.checkState(isRunning(), "Service is not running.");
+    if (consumer == null) {
+      consumer = new BetterKafkaConsumer(bootstrapServers);
+    }
     return consumer;
   }
 }
