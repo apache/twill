@@ -189,6 +189,12 @@ final class YarnTwillPreparer implements TwillPreparer {
   }
 
   @Override
+  public TwillPreparer withKafkaBootstrapServers(String kafkaBootstrapServers) {
+    config.set(Configs.Keys.LOG_COLLECTION_KAFKA_BOOTSTRAP, kafkaBootstrapServers);
+    return this;
+  }
+
+  @Override
   public TwillPreparer setUser(String user) {
     return this;
   }
