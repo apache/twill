@@ -83,39 +83,6 @@ public class KafkaTest {
     zkServer.stopAndWait();
   }
 
-  private static Properties generateKafkaConfig(String zkConnectStr) throws IOException {
-    return generateKafkaConfig(zkConnectStr, TMP_FOLDER.newFolder());
-  }
-
-  private static Properties generateKafkaConfig(String zkConnectStr, File logDir) throws IOException {
-    int port = Networks.getRandomPort();
-    Preconditions.checkState(port > 0, "Failed to get random port.");
-
-    String portString = Integer.toString(port);
-    Properties prop = new Properties();
-    prop.setProperty("log.dir", logDir.getAbsolutePath());
-    prop.setProperty("broker.id", "1");
-    prop.setProperty("port", portString);
-    prop.setProperty("auto.create.topics.enable", "true");
-    prop.setProperty("socket.send.buffer.bytes", "1048576");
-    prop.setProperty("socket.receive.buffer.bytes", "1048576");
-    prop.setProperty("socket.request.max.bytes", "104857600");
-    prop.setProperty("num.partitions", "1");
-    prop.setProperty("log.retention.hours", "1");
-    prop.setProperty("log.flush.interval.messages", "10000");
-    prop.setProperty("log.flush.interval.ms", "1000");
-    prop.setProperty("log.segment.bytes", "536870912");
-    prop.setProperty("message.send.max.retries", "10");
-    prop.setProperty("zookeeper.connect", zkConnectStr);
-    prop.setProperty("zookeeper.connection.timeout.ms", "1000000");
-    prop.setProperty("default.replication.factor", "1");
-
-    // Use a really small file size to force some flush to happen
-    prop.setProperty("log.file.size", "1024");
-    prop.setProperty("log.default.flush.interval.ms", "1000");
-    return prop;
-  }
-
   @Test
   public void testKafkaClientReconnect() throws Exception {
     String topic = "backoff";
@@ -337,6 +304,7 @@ public class KafkaTest {
     KafkaClientService kafkaClient = new BootstrapedKafkaClientService(server1.getKafkaBootstrap());
     kafkaClient.startAndWait();
 
+    // wait a little to mark first broker dead
     TimeUnit.SECONDS.sleep(10);
     // Attach a consumer
     final BlockingQueue<String> consumedMessages = Queues.newLinkedBlockingQueue();
@@ -397,5 +365,39 @@ public class KafkaTest {
         Futures.getUnchecked(preparer.send());
       }
     };
+  }
+
+
+  private static Properties generateKafkaConfig(String zkConnectStr) throws IOException {
+    return generateKafkaConfig(zkConnectStr, TMP_FOLDER.newFolder());
+  }
+
+  private static Properties generateKafkaConfig(String zkConnectStr, File logDir) throws IOException {
+    int port = Networks.getRandomPort();
+    Preconditions.checkState(port > 0, "Failed to get random port.");
+
+    String portString = Integer.toString(port);
+    Properties prop = new Properties();
+    prop.setProperty("log.dir", logDir.getAbsolutePath());
+    prop.setProperty("port", portString);
+    prop.setProperty("broker.id", "1");
+    prop.setProperty("auto.create.topics.enable", "true");
+    prop.setProperty("socket.send.buffer.bytes", "1048576");
+    prop.setProperty("socket.receive.buffer.bytes", "1048576");
+    prop.setProperty("socket.request.max.bytes", "104857600");
+    prop.setProperty("num.partitions", "1");
+    prop.setProperty("log.retention.hours", "1");
+    prop.setProperty("log.flush.interval.messages", "10000");
+    prop.setProperty("log.flush.interval.ms", "1000");
+    prop.setProperty("log.segment.bytes", "536870912");
+    prop.setProperty("message.send.max.retries", "10");
+    prop.setProperty("zookeeper.connect", zkConnectStr);
+    prop.setProperty("zookeeper.connection.timeout.ms", "1000000");
+    prop.setProperty("default.replication.factor", "1");
+
+    // Use a really small file size to force some flush to happen
+    prop.setProperty("log.file.size", "1024");
+    prop.setProperty("log.default.flush.interval.ms", "1000");
+    return prop;
   }
 }

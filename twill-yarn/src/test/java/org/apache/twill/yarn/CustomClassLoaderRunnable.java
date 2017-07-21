@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * Runnable for testing custom classloader.
+ * Runnable for testing custom classloader
  */
 public final class CustomClassLoaderRunnable extends AbstractTwillRunnable {
 

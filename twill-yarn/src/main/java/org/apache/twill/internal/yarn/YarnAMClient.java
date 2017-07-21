@@ -92,12 +92,12 @@ public interface YarnAMClient extends Service {
   ContainerId getContainerId();
 
   /**
-   * Returns the hostname of the node manager that the AM is running on.
+   * Returns the hostname of the node manager that the AM is running on
    */
   String getHost();
 
   /**
-   * Returns the port of the node manager that the AM is running on.
+   * Returns the port of the node manager that the AM is running on
    */
   int getNMPort();
 
@@ -136,14 +136,14 @@ public interface YarnAMClient extends Service {
   interface AllocateHandler {
 
     /**
-     * Invokes when a list of containers has been acquired from YARN.
+     * Invokes when a list of containers has been acquired from YARN
      *
      * @param launchers list of launchers for launching runnables
      */
     void acquired(List<? extends ProcessLauncher<YarnContainerInfo>> launchers);
 
     /**
-     * Invokes when containers completed.
+     * Invokes when containers completed
      *
      * @param completed list of completed container status
      */

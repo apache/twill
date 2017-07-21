@@ -88,7 +88,6 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
     // actually used by the Kafka used for log collection
     if (logCollectionEnabled) {
       this.kafkaClient = new BootstrapedKafkaClientService(kafkaBootstrap);
-      //new ZKKafkaClientService(ZKClients.namespace(zkClient, "/" + runId.getId() + "/kafka"));
       Iterables.addAll(this.logHandlers, logHandlers);
     } else {
       this.kafkaClient = null;

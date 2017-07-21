@@ -148,7 +148,6 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
       props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, DefaultPartitioner.class);
       props.put("request.required.acks", Integer.toString(ack.getAck()));
       props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compression.getCodec());
-//      props.put("compression.codec", compression.getCodec());
 
       KafkaProducer<Integer, ByteBuffer> oldProducer = producer.getAndSet(new KafkaProducer<Integer, ByteBuffer>
                                                                             (props));

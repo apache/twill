@@ -195,7 +195,6 @@ public abstract class ServiceMain {
   private void configureLogger() throws MalformedURLException, JoranException {
     // Check if SLF4J is bound to logback in the current environment
     ILoggerFactory loggerFactory = LoggerFactory.getILoggerFactory();
-    LOG.info("LoggerFactory is {}", loggerFactory);
     if (!(loggerFactory instanceof LoggerContext)) {
       return;
     }

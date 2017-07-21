@@ -61,10 +61,6 @@ public final class ApplicationMasterMain extends ServiceMain {
   private static final Logger LOG = LoggerFactory.getLogger(ApplicationMasterMain.class);
   private final TwillRuntimeSpecification twillRuntimeSpec;
 
-  private ApplicationMasterMain(TwillRuntimeSpecification twillRuntimeSpec) {
-    this.twillRuntimeSpec = twillRuntimeSpec;
-  }
-
   /**
    * Starts the application master.
    */
@@ -75,20 +71,8 @@ public final class ApplicationMasterMain extends ServiceMain {
     new ApplicationMasterMain(twillRuntimeSpec).doMain();
   }
 
-  /**
-   * Optionally sets the RM scheduler address based on the environment variable if it is not set in the cluster config.
-   */
-  private static void setRMSchedulerAddress(Configuration conf, String schedulerAddress) {
-    if (schedulerAddress == null) {
-      return;
-    }
-
-    // If the RM scheduler address is not in the config or it's from yarn-default.xml,
-    // replace it with the one from the env, which is the same as the one client connected to.
-    String[] sources = conf.getPropertySources(YarnConfiguration.RM_SCHEDULER_ADDRESS);
-    if (sources == null || sources.length == 0 || "yarn-default.xml".equals(sources[sources.length - 1])) {
-      conf.set(YarnConfiguration.RM_SCHEDULER_ADDRESS, schedulerAddress);
-    }
+  private ApplicationMasterMain(TwillRuntimeSpecification twillRuntimeSpec) {
+    this.twillRuntimeSpec = twillRuntimeSpec;
   }
 
   private void doMain() throws Exception {
@@ -130,6 +114,22 @@ public final class ApplicationMasterMain extends ServiceMain {
         service,
         prerequisites.toArray(new Service[prerequisites.size()])
       );
+  }
+
+  /**
+   * Optionally sets the RM scheduler address based on the environment variable if it is not set in the cluster config.
+   */
+  private static void setRMSchedulerAddress(Configuration conf, String schedulerAddress) {
+    if (schedulerAddress == null) {
+      return;
+    }
+
+    // If the RM scheduler address is not in the config or it's from yarn-default.xml,
+    // replace it with the one from the env, which is the same as the one client connected to.
+    String[] sources = conf.getPropertySources(YarnConfiguration.RM_SCHEDULER_ADDRESS);
+    if (sources == null || sources.length == 0 || "yarn-default.xml".equals(sources[sources.length - 1])) {
+      conf.set(YarnConfiguration.RM_SCHEDULER_ADDRESS, schedulerAddress);
+    }
   }
 
   @Override

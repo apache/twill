@@ -640,7 +640,6 @@ final class YarnTwillPreparer implements TwillPreparer {
 
   /**
    * Based on the given {@link TwillSpecification}, upload LocalFiles to Yarn Cluster.
-   *
    * @param twillSpec The {@link TwillSpecification} for populating resource.
    */
   private Multimap<String, LocalFile> populateRunnableLocalFiles(TwillSpecification twillSpec) throws IOException {
