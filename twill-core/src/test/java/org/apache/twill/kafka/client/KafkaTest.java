@@ -33,7 +33,6 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
@@ -316,7 +315,6 @@ public class KafkaTest {
   }
 
   @Test
-  @Ignore
   public void testBrokerChange() throws Exception {
     // Create a new namespace in ZK for Kafka server for this test case
     String connectionStr = zkServer.getConnectionStr() + "/broker_change";

@@ -57,6 +57,7 @@ public class BetterKafkaPublisher implements KafkaPublisher {
     props.put(ProducerConfig.ACKS_CONFIG, Integer.toString(ack.getAck()));
     props.put(ProducerConfig.RETRIES_CONFIG, 3);
     props.put(ProducerConfig.LINGER_MS_CONFIG, 1);
+    props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compression.getCodec());
 
     kafkaProducer = new KafkaProducer<>(props,
                                         new IntegerSerializer(),
