@@ -156,7 +156,9 @@ public class BetterKafkaConsumer implements KafkaConsumer {
               }
             });
           long offset = callback.onReceived(fetchedMessages.iterator());
-          if (offset > 0) kafkaConsumer.seek(topicPartition, offset);
+          if (offset > 0) {
+            kafkaConsumer.seek(topicPartition, offset);
+          }
         }
       }, 0, POOL_DELAY, TimeUnit.MILLISECONDS);
       return new Cancellable() {
