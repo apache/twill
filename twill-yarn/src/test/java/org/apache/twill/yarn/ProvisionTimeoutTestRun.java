@@ -28,8 +28,13 @@ import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
+import org.junit.Assert;
+import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -41,12 +46,17 @@ import java.util.concurrent.TimeoutException;
  *
  */
 public final class ProvisionTimeoutTestRun extends BaseYarnTest {
+  @ClassRule
+  public static final TemporaryFolder TMP_FOLDER = new TemporaryFolder();
+  public static final String ABORTED_FILE = "aborted_file";
 
   @Test
-  public void testProvisionTimeout() throws InterruptedException, ExecutionException, TimeoutException {
+  public void testProvisionTimeout() throws InterruptedException, ExecutionException, TimeoutException, IOException {
     TwillRunner runner = getTwillRunner();
-
-    TwillController controller = runner.prepare(new TimeoutApplication())
+    // Create a parent folder to be written by EventHandler#aborted()
+    File parentFolder = TMP_FOLDER.newFolder();
+    parentFolder.setWritable(true, false);
+    TwillController controller = runner.prepare(new TimeoutApplication(parentFolder.getAbsolutePath()))
                                        .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
                                        .start();
 
@@ -54,6 +64,11 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
     // Hence we give 90 seconds max time here.
     try {
       controller.awaitTerminated(90, TimeUnit.SECONDS);
+      // EventHandler#aborted() method should be called to create a file
+      Assert.assertTrue(new File(parentFolder.getAbsolutePath(), ABORTED_FILE).exists());
+      String[] abortedFiles = parentFolder.list();
+      Assert.assertNotNull(abortedFiles);
+      Assert.assertEquals(1, abortedFiles.length);
     } finally {
       // If it timeout, kill the app as cleanup.
       controller.kill();
@@ -65,15 +80,21 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
    */
   public static final class Handler extends EventHandler {
 
+    private final String parentFolderPath;
     private boolean abort;
+
+    public Handler(String parentFolderPath) {
+      this.parentFolderPath = parentFolderPath;
+    }
 
     @Override
     protected Map<String, String> getConfigs() {
-      return ImmutableMap.of("abort", "true");
+      return ImmutableMap.of("abort", "true", "parentFolderPath", parentFolderPath);
     }
 
     @Override
     public void initialize(EventHandlerContext context) {
+      super.initialize(context);
       this.abort = Boolean.parseBoolean(context.getSpecification().getConfigs().get("abort"));
     }
 
@@ -85,12 +106,27 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
         return TimeoutAction.recheck(10, TimeUnit.SECONDS);
       }
     }
+
+    @Override
+    public void aborted() {
+      try {
+        new File(context.getSpecification().getConfigs().get("parentFolderPath"), ABORTED_FILE).createNewFile();
+      } catch (IOException e) {
+        Throwables.propagate(e);
+      }
+    }
   }
 
   /**
    * Testing application for timeout.
    */
   public static final class TimeoutApplication implements TwillApplication {
+
+    private final String parentFolderPath;
+
+    public TimeoutApplication(String parentFolderPath) {
+      this.parentFolderPath = parentFolderPath;
+    }
 
     @Override
     public TwillSpecification configure() {
@@ -103,7 +139,7 @@ public final class ProvisionTimeoutTestRun extends BaseYarnTest {
                .setMemory(8, ResourceSpecification.SizeUnit.GIGA).build())
         .noLocalFiles()
         .anyOrder()
-        .withEventHandler(new Handler())
+        .withEventHandler(new Handler(parentFolderPath))
         .build();
     }
   }

@@ -17,6 +17,8 @@
  */
 package org.apache.twill.api;
 
+import org.apache.twill.internal.Constants;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -124,6 +126,58 @@ public abstract class EventHandler {
   }
 
   /**
+   * Invoked by the application when it starts.
+   */
+  public void started() {
+    // No-op
+  }
+
+  /**
+   * Invoked by the application when new container is launched for a {@link TwillRunnable}.
+   *
+   * @param runnableName name of the runnable to be run in the new container
+   * @param instanceId the instance ID of the runnable instance to be run in the new container
+   * @param containerId the ID of the newly launched container
+   */
+  public void containerLaunched(String runnableName, int instanceId, String containerId) {
+    // No-op
+  }
+
+  /**
+   * Invoked by the application when the container allocated for a {@link TwillRunnable} is stopped.
+   *
+   * @param runnableName name of the runnable in the stopped container
+   * @param instanceId the instance ID of the runnable instance run in the stopped container
+   * @param containerId the ID of the stopped container
+   * @param exitStatus the exit status of the container
+   */
+  public void containerStopped(String runnableName, int instanceId, String containerId, int exitStatus) {
+    // No-op
+  }
+
+  /**
+   * Invoked by the application when all containers complete.
+   */
+  public void completed() {
+    // No-op
+  }
+
+  /**
+   * Invoked by the application when stop command is received to kill the current application.
+   *
+   */
+  public void killed() {
+    // No-op
+  }
+
+  /**
+   * Invoked by the application when the application is aborted because of timeout.
+   */
+  public void aborted() {
+    // No-op
+  }
+
+  /**
    * Invoked by the application when shutting down.
    */
   public void destroy() {
@@ -133,9 +187,11 @@ public abstract class EventHandler {
   /**
    * Invoked when the number of expected instances doesn't match with number of actual instances.
    * @param timeoutEvents An Iterable of {@link TimeoutEvent} that contains information about runnable launch timeout.
-   * @return A {@link TimeoutAction} to govern action to act.
+   * @return A {@link TimeoutAction} to govern action to act. By default it is to recheck after 60 seconds.
    */
-  public abstract TimeoutAction launchTimeout(Iterable<TimeoutEvent> timeoutEvents);
+  public TimeoutAction launchTimeout(Iterable<TimeoutEvent> timeoutEvents) {
+    return new TimeoutAction(Constants.PROVISION_TIMEOUT);
+  }
 
   /**
    * Returns set of configurations available at runtime for access.
