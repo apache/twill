@@ -95,7 +95,7 @@ public final class InMemoryZKServer implements Service {
 
   public String getConnectionStr() {
     InetSocketAddress addr = factory.getLocalAddress();
-    return String.format("%s:%d", addr.getAddress().getHostAddress(), addr.getPort());
+    return String.format("%s:%d", addr.getHostName(), addr.getPort());
   }
 
   public InetSocketAddress getLocalAddress() {
