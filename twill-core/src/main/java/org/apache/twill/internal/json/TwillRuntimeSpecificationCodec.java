@@ -39,18 +39,20 @@ import java.util.Map;
 final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntimeSpecification>,
                                                          JsonDeserializer<TwillRuntimeSpecification> {
 
+  private static final Type MAP_STRING_MAP_STRING_STRING_TYPE =
+    new TypeToken<Map<String, Map<String, String>>>() { }.getType();
+
   private static final String FS_USER = "fsUser";
   private static final String TWILL_APP_DIR = "twillAppDir";
   private static final String ZK_CONNECT_STR = "zkConnectStr";
   private static final String TWILL_RUNID = "twillRunId";
   private static final String TWILL_APP_NAME = "twillAppName";
-  private static final String RESERVED_MEMORY = "reservedMemory";
-  private static final String HEAP_RESERVED_MIN_RATIO = "minHeapRatio";
   private static final String RM_SCHEDULER_ADDR = "rmSchedulerAddr";
   private static final String TWILL_SPEC = "twillSpecification";
   private static final String LOG_LEVELS = "logLevels";
   private static final String MAX_RETRIES = "maxRetries";
-  private static final String LOG_COLLECTION_ENABLED = "logCollectionEnabled";
+  private static final String CONFIG = "config";
+  private static final String RUNNABLE_CONFIGS = "runnableConfigs";
 
   @Override
   public JsonElement serialize(TwillRuntimeSpecification src, Type typeOfSrc, JsonSerializationContext context) {
@@ -60,19 +62,19 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     json.addProperty(ZK_CONNECT_STR, src.getZkConnectStr());
     json.addProperty(TWILL_RUNID, src.getTwillAppRunId().getId());
     json.addProperty(TWILL_APP_NAME, src.getTwillAppName());
-    json.addProperty(RESERVED_MEMORY, src.getReservedMemory());
-    json.addProperty(HEAP_RESERVED_MIN_RATIO, src.getMinHeapRatio());
     if (src.getRmSchedulerAddr() != null) {
       json.addProperty(RM_SCHEDULER_ADDR, src.getRmSchedulerAddr());
     }
     json.add(TWILL_SPEC,
              context.serialize(src.getTwillSpecification(), new TypeToken<TwillSpecification>() { }.getType()));
     json.add(LOG_LEVELS,
-             context.serialize(src.getLogLevels(), new TypeToken<Map<String, Map<String, String>>>() { }.getType()));
+             context.serialize(src.getLogLevels(), MAP_STRING_MAP_STRING_STRING_TYPE));
     json.add(MAX_RETRIES,
              context.serialize(src.getMaxRetries(), new TypeToken<Map<String, Integer>>() { }.getType()));
-    json.addProperty(LOG_COLLECTION_ENABLED, src.isLogCollectionEnabled());
-
+    json.add(CONFIG,
+             context.serialize(src.getConfig(), new TypeToken<Map<String, String>>() { }.getType()));
+    json.add(RUNNABLE_CONFIGS,
+             context.serialize(src.getRunnableConfigs(), MAP_STRING_MAP_STRING_STRING_TYPE));
     return json;
   }
 
@@ -84,9 +86,13 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
     TwillSpecification twillSpecification = context.deserialize(
       jsonObj.get(TWILL_SPEC), new TypeToken<TwillSpecification>() { }.getType());
     Map<String, Map<String, String>> logLevels =
-      context.deserialize(jsonObj.get(LOG_LEVELS), new TypeToken<Map<String, Map<String, String>>>() { }.getType());
+      context.deserialize(jsonObj.get(LOG_LEVELS), MAP_STRING_MAP_STRING_STRING_TYPE);
     Map<String, Integer> maxRetries = 
       context.deserialize(jsonObj.get(MAX_RETRIES), new TypeToken<Map<String, Integer>>() { }.getType());
+    Map<String, String> config =
+      context.deserialize(jsonObj.get(CONFIG), new TypeToken<Map<String, String>>() { }.getType());
+    Map<String, Map<String, String>> runnableConfigs =
+      context.deserialize(jsonObj.get(RUNNABLE_CONFIGS), MAP_STRING_MAP_STRING_STRING_TYPE);
     
     return new TwillRuntimeSpecification(twillSpecification,
                                          jsonObj.get(FS_USER).getAsString(),
@@ -94,12 +100,11 @@ final class TwillRuntimeSpecificationCodec implements JsonSerializer<TwillRuntim
                                          jsonObj.get(ZK_CONNECT_STR).getAsString(),
                                          RunIds.fromString(jsonObj.get(TWILL_RUNID).getAsString()),
                                          jsonObj.get(TWILL_APP_NAME).getAsString(),
-                                         jsonObj.get(RESERVED_MEMORY).getAsInt(),
                                          jsonObj.has(RM_SCHEDULER_ADDR) ?
                                          jsonObj.get(RM_SCHEDULER_ADDR).getAsString() : null,
                                          logLevels,
                                          maxRetries,
-                                         jsonObj.get(HEAP_RESERVED_MIN_RATIO).getAsDouble(),
-                                         jsonObj.get(LOG_COLLECTION_ENABLED).getAsBoolean());
+                                         config,
+                                         runnableConfigs);
   }
 }

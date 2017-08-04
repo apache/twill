@@ -25,17 +25,19 @@ import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
+import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillRunner;
 import org.apache.twill.api.TwillSpecification;
 import org.apache.twill.api.logging.PrinterLogHandler;
 import org.apache.twill.discovery.ServiceDiscovered;
+import org.apache.twill.internal.utils.Resources;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -67,9 +69,16 @@ public class ContainerSizeTestRun extends BaseYarnTest {
   @Test
   public void testMaxHeapSize() throws InterruptedException, TimeoutException, ExecutionException {
     TwillRunner runner = getTwillRunner();
+    String runnableName = "sleep";
+
     TwillController controller = runner.prepare(new MaxHeapApp())
-      // Alter the AM container size
-      .withConfiguration(Collections.singletonMap(Configs.Keys.YARN_AM_MEMORY_MB, "256"))
+      // Alter the AM container size and heap ratio
+      .withConfiguration(ImmutableMap.of(Configs.Keys.YARN_AM_MEMORY_MB, "256",
+                                         Configs.Keys.HEAP_RESERVED_MIN_RATIO, "0.65"))
+      // Use a different heap ratio and reserved memory size for the runnable
+      .withConfiguration(runnableName,
+                         ImmutableMap.of(Configs.Keys.HEAP_RESERVED_MIN_RATIO, "0.8",
+                                         Configs.Keys.JAVA_RESERVED_MEMORY_MB, "1024"))
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .start();
 
@@ -77,10 +86,20 @@ public class ContainerSizeTestRun extends BaseYarnTest {
       ServiceDiscovered discovered = controller.discoverService("sleep");
       Assert.assertTrue(waitForSize(discovered, 1, 120));
 
-      // Verify the AM container size
+      // Verify the AM container size and heap size
       ResourceReport resourceReport = controller.getResourceReport();
       Assert.assertNotNull(resourceReport);
       Assert.assertEquals(256, resourceReport.getAppMasterResources().getMemoryMB());
+      Assert.assertEquals(Resources.computeMaxHeapSize(256, Configs.Defaults.YARN_AM_RESERVED_MEMORY_MB, 0.65d),
+                          resourceReport.getAppMasterResources().getMaxHeapMemoryMB());
+
+      // Verify the runnable container heap size
+      Collection<TwillRunResources> runnableResources = resourceReport.getRunnableResources(runnableName);
+      Assert.assertFalse(runnableResources.isEmpty());
+      TwillRunResources resources = runnableResources.iterator().next();
+      Assert.assertEquals(Resources.computeMaxHeapSize(resources.getMemoryMB(), 1024, 0.8d),
+                          resources.getMaxHeapMemoryMB());
+
     } finally {
       controller.terminate().get(120, TimeUnit.SECONDS);
     }

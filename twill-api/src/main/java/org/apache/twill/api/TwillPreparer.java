@@ -39,6 +39,17 @@ public interface TwillPreparer {
   TwillPreparer withConfiguration(Map<String, String> config);
 
   /**
+   * Overrides the default configuration with the given set of configurations for the given runnable only.
+   * This is useful to override configurations that affects runnables, such as
+   * {@link Configs.Keys#JAVA_RESERVED_MEMORY_MB} and {@link Configs.Keys#HEAP_RESERVED_MIN_RATIO}.
+   *
+   * @param runnableName Name of the {@link TwillRunnable}.
+   * @param config set of configurations to override
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withConfiguration(String runnableName, Map<String, String> config);
+
+  /**
    * Adds a {@link LogHandler} for receiving an application log.
    * @param handler The {@link LogHandler}.
    * @return This {@link TwillPreparer}.

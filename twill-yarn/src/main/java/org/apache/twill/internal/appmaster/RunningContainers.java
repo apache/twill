@@ -163,9 +163,9 @@ final class RunningContainers {
                                                                  containerInfo.getId(),
                                                                  containerInfo.getVirtualCores(),
                                                                  containerInfo.getMemoryMB(),
+                                                                 launcher.getMaxHeapMemoryMB(),
                                                                  containerInfo.getHost().getHostName(),
                                                                  controller);
-
       resourceReport.addRunResources(runnableName, resources);
       containerStats.put(runnableName, containerInfo);
 
@@ -734,9 +734,9 @@ final class RunningContainers {
     private Integer dynamicDebugPort = null;
 
     private DynamicTwillRunResources(int instanceId, String containerId,
-                                     int cores, int memoryMB, String host,
+                                     int cores, int memoryMB, int maxHeapMemoryMB, String host,
                                      TwillContainerController controller) {
-      super(instanceId, containerId, cores, memoryMB, host, null);
+      super(instanceId, containerId, cores, memoryMB, maxHeapMemoryMB, host, null);
       this.controller = controller;
     }
 

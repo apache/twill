@@ -41,6 +41,7 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
   private static final String INSTANCE_ID = "instanceId";
   private static final String HOST = "host";
   private static final String MEMORY_MB = "memoryMB";
+  private static final String MAX_HEAP_MEMORY_MB = "maxHeapMemoryMB";
   private static final String VIRTUAL_CORES = "virtualCores";
   private static final String DEBUG_PORT = "debugPort";
   private static final String LOG_LEVELS = "logLevels";
@@ -53,6 +54,7 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
     json.addProperty(INSTANCE_ID, src.getInstanceId());
     json.addProperty(HOST, src.getHost());
     json.addProperty(MEMORY_MB, src.getMemoryMB());
+    json.addProperty(MAX_HEAP_MEMORY_MB, src.getMaxHeapMemoryMB());
     json.addProperty(VIRTUAL_CORES, src.getVirtualCores());
     if (src.getDebugPort() != null) {
       json.addProperty(DEBUG_PORT, src.getDebugPort());
@@ -69,12 +71,16 @@ public final class TwillRunResourcesCodec implements JsonSerializer<TwillRunReso
     JsonObject jsonObj = json.getAsJsonObject();
     Map<String, LogEntry.Level> logLevels =
       context.deserialize(jsonObj.get(LOG_LEVELS), new TypeToken<Map<String, LogEntry.Level>>() { }.getType());
-    return new DefaultTwillRunResources(jsonObj.get(INSTANCE_ID).getAsInt(),
-                                        jsonObj.get(CONTAINER_ID).getAsString(),
-                                        jsonObj.get(VIRTUAL_CORES).getAsInt(),
-                                        jsonObj.get(MEMORY_MB).getAsInt(),
-                                        jsonObj.get(HOST).getAsString(),
-                                        jsonObj.has(DEBUG_PORT) ? jsonObj.get(DEBUG_PORT).getAsInt() : null,
-                                        logLevels);
+    int memoryMB = jsonObj.get(MEMORY_MB).getAsInt();
+    return new DefaultTwillRunResources(
+      jsonObj.get(INSTANCE_ID).getAsInt(),
+      jsonObj.get(CONTAINER_ID).getAsString(),
+      jsonObj.get(VIRTUAL_CORES).getAsInt(),
+      memoryMB,
+      // For backward compatibility when a newer Twill client re-attached to running app started with older version.
+      jsonObj.has(MAX_HEAP_MEMORY_MB) ? jsonObj.get(MAX_HEAP_MEMORY_MB).getAsInt() : memoryMB,
+      jsonObj.get(HOST).getAsString(),
+      jsonObj.has(DEBUG_PORT) ? jsonObj.get(DEBUG_PORT).getAsInt() : null,
+      logLevels);
   }
 }
