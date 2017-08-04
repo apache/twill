@@ -24,7 +24,7 @@ import com.google.common.util.concurrent.Futures;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.internal.Services;
 import org.apache.twill.internal.kafka.EmbeddedKafkaServer;
-import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
+import org.apache.twill.internal.kafka.client.BootstrapedKafkaClientService;
 import org.apache.twill.internal.utils.Networks;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.apache.twill.zookeeper.ZKClientService;
@@ -67,13 +67,12 @@ public class KafkaTest {
     zkServer = InMemoryZKServer.builder().setDataDir(TMP_FOLDER.newFolder()).build();
     zkServer.startAndWait();
 
-    // Extract the kafka.tgz and start the kafka server
     kafkaServer = new EmbeddedKafkaServer(generateKafkaConfig(zkServer.getConnectionStr()));
     kafkaServer.startAndWait();
 
     zkClientService = ZKClientService.Builder.of(zkServer.getConnectionStr()).build();
 
-    kafkaClient = new ZKKafkaClientService(zkClientService);
+    kafkaClient = new BootstrapedKafkaClientService(kafkaServer.getKafkaBootstrap());
     Services.chainStart(zkClientService, kafkaClient).get();
   }
 
@@ -95,13 +94,13 @@ public class KafkaTest {
     try {
       zkClient.create("/", null, CreateMode.PERSISTENT).get();
 
-      ZKKafkaClientService kafkaClient = new ZKKafkaClientService(zkClient);
+      BootstrapedKafkaClientService kafkaClient = new BootstrapedKafkaClientService(server.getKafkaBootstrap());
       kafkaClient.startAndWait();
 
       try {
         server.startAndWait();
         try {
-          // Publish a messages
+          // Publish a message
           createPublishThread(kafkaClient, topic, Compression.NONE, "First message", 1).start();
 
           // Create a consumer
@@ -195,9 +194,52 @@ public class KafkaTest {
   }
 
   @Test
+  public void testKafkaNewClient() throws Exception {
+    String topic = "testClient";
+    kafkaClient = new BootstrapedKafkaClientService(kafkaServer.getKafkaBootstrap());
+    kafkaClient.startAndWait();
+
+    Thread t1 = createPublishThread(kafkaClient, topic, Compression.GZIP, "GZIP Testing message", 10);
+    Thread t2 = createPublishThread(kafkaClient, topic, Compression.NONE, "Testing message", 10);
+
+    t1.start();
+    t2.start();
+
+    Thread t3 = createPublishThread(kafkaClient, topic, Compression.SNAPPY, "Snappy Testing message", 10);
+    t2.join();
+    t3.start();
+
+    final CountDownLatch latch = new CountDownLatch(30);
+    final CountDownLatch stopLatch = new CountDownLatch(1);
+    Cancellable cancel = kafkaClient.getConsumer().prepare().add(topic, 0, 0).consume(new KafkaConsumer
+      .MessageCallback() {
+      @Override
+      public long onReceived(Iterator<FetchedMessage> messages) {
+        long nextOffset = -1;
+        while (messages.hasNext()) {
+          FetchedMessage message = messages.next();
+          nextOffset = message.getNextOffset();
+          LOG.info(Charsets.UTF_8.decode(message.getPayload()).toString());
+          latch.countDown();
+        }
+        return nextOffset;
+      }
+
+      @Override
+      public void finished() {
+        stopLatch.countDown();
+      }
+    });
+
+    Assert.assertTrue(latch.await(5, TimeUnit.SECONDS));
+    cancel.cancel();
+    Assert.assertTrue(stopLatch.await(1, TimeUnit.SECONDS));
+  }
+
+  @Test
   public void testKafkaClientSkipNext() throws Exception {
     String topic = "testClientSkipNext";
-    // Publish 30 messages with indecies the same as offsets within the range 0 - 29
+    // Publish 30 messages with indexes the same as offsets within the range 0 - 29
     Thread t1 = createPublishThread(kafkaClient, topic, Compression.GZIP, "GZIP Testing message", 10);
     t1.start();
     t1.join();
@@ -248,14 +290,22 @@ public class KafkaTest {
     zkClient.create("/", null, CreateMode.PERSISTENT).get();
 
     // Start a new kafka server
-    File logDir = TMP_FOLDER.newFolder();
-    EmbeddedKafkaServer server = new EmbeddedKafkaServer(generateKafkaConfig(connectionStr, logDir));
-    server.startAndWait();
+    File logDir1 = TMP_FOLDER.newFolder();
+    File logDir2 = TMP_FOLDER.newFolder();
+    EmbeddedKafkaServer server1 = new EmbeddedKafkaServer(generateKafkaConfig(connectionStr, logDir1));
+    server1.startAndWait();
+    Properties properties = generateKafkaConfig(connectionStr, logDir2);
+    properties.setProperty("broker.id", "2");
+    EmbeddedKafkaServer server2 = new EmbeddedKafkaServer(properties);
+    server2.startAndWait();
+
 
     // Start a Kafka client
-    KafkaClientService kafkaClient = new ZKKafkaClientService(zkClient);
+    KafkaClientService kafkaClient = new BootstrapedKafkaClientService(server1.getKafkaBootstrap());
     kafkaClient.startAndWait();
 
+    // wait a little to mark first broker dead
+    TimeUnit.SECONDS.sleep(10);
     // Attach a consumer
     final BlockingQueue<String> consumedMessages = Queues.newLinkedBlockingQueue();
     kafkaClient.getConsumer()
@@ -278,18 +328,15 @@ public class KafkaTest {
     });
 
     // Get a publisher and publish a message
-    KafkaPublisher publisher = kafkaClient.getPublisher(KafkaPublisher.Ack.FIRE_AND_FORGET, Compression.NONE);
+    KafkaPublisher publisher = kafkaClient.getPublisher(KafkaPublisher.Ack.ALL_RECEIVED, Compression.NONE);
     publisher.prepare("test").add(Charsets.UTF_8.encode("Message 0"), 0).send().get();
 
     // Should receive one message
     Assert.assertEquals("Message 0", consumedMessages.poll(5, TimeUnit.SECONDS));
 
     // Now shutdown and restart the server on different port
-    server.stopAndWait();
-    server = new EmbeddedKafkaServer(generateKafkaConfig(connectionStr, logDir));
-    server.startAndWait();
+    server1.stopAndWait();
 
-    // Wait a little while to make sure changes is reflected in broker service
     TimeUnit.SECONDS.sleep(3);
 
     // Now publish again with the same publisher. It should succeed and the consumer should receive the message.
@@ -298,7 +345,7 @@ public class KafkaTest {
 
     kafkaClient.stopAndWait();
     zkClient.stopAndWait();
-    server.stopAndWait();
+    server2.stopAndWait();
   }
 
   private Thread createPublishThread(final KafkaClient kafkaClient, final String topic,
@@ -329,10 +376,12 @@ public class KafkaTest {
     int port = Networks.getRandomPort();
     Preconditions.checkState(port > 0, "Failed to get random port.");
 
+    String portString = Integer.toString(port);
     Properties prop = new Properties();
     prop.setProperty("log.dir", logDir.getAbsolutePath());
-    prop.setProperty("port", Integer.toString(port));
+    prop.setProperty("port", portString);
     prop.setProperty("broker.id", "1");
+    prop.setProperty("auto.create.topics.enable", "true");
     prop.setProperty("socket.send.buffer.bytes", "1048576");
     prop.setProperty("socket.receive.buffer.bytes", "1048576");
     prop.setProperty("socket.request.max.bytes", "104857600");

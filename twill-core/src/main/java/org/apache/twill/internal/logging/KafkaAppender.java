@@ -33,18 +33,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.twill.api.logging.LogThrowable;
 import org.apache.twill.common.Threads;
-import org.apache.twill.internal.Services;
 import org.apache.twill.internal.json.ILoggingEventSerializer;
 import org.apache.twill.internal.json.LogThrowableCodec;
 import org.apache.twill.internal.json.StackTraceElementCodec;
-import org.apache.twill.internal.kafka.client.ZKKafkaClientService;
+import org.apache.twill.internal.kafka.client.BootstrapedKafkaClientService;
 import org.apache.twill.kafka.client.Compression;
 import org.apache.twill.kafka.client.KafkaClientService;
 import org.apache.twill.kafka.client.KafkaPublisher;
-import org.apache.twill.zookeeper.RetryStrategies;
-import org.apache.twill.zookeeper.ZKClientService;
-import org.apache.twill.zookeeper.ZKClientServices;
-import org.apache.twill.zookeeper.ZKClients;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -74,9 +69,8 @@ public final class KafkaAppender extends UnsynchronizedAppenderBase<ILoggingEven
   private final AtomicInteger bufferedSize;
 
   private LogEventConverter eventConverter;
-  private ZKClientService zkClientService;
   private KafkaClientService kafkaClient;
-  private String zkConnectStr;
+  private String kafkaBootstrap;
   private String hostname;
   private String runnableName;
   private String topic;
@@ -93,11 +87,11 @@ public final class KafkaAppender extends UnsynchronizedAppenderBase<ILoggingEven
   }
 
   /**
-   * Sets the zookeeper connection string. Called by slf4j.
+   * Sets the kafka bootstrap string. Called by slf4j.
    */
   @SuppressWarnings("unused")
-  public void setZookeeper(String zkConnectStr) {
-    this.zkConnectStr = zkConnectStr;
+  public void setKafkaBootstrap(String kafkaBootstrap) {
+    this.kafkaBootstrap = kafkaBootstrap;
   }
 
   /**
@@ -142,26 +136,19 @@ public final class KafkaAppender extends UnsynchronizedAppenderBase<ILoggingEven
 
   @Override
   public void start() {
-    Preconditions.checkNotNull(zkConnectStr);
+    Preconditions.checkNotNull(kafkaBootstrap);
 
     eventConverter = new LogEventConverter(hostname, runnableName);
     scheduler = Executors.newSingleThreadScheduledExecutor(Threads.createDaemonThreadFactory(PUBLISH_THREAD_NAME));
 
-    zkClientService = ZKClientServices.delegate(
-      ZKClients.reWatchOnExpire(
-        ZKClients.retryOnFailure(ZKClientService.Builder.of(zkConnectStr).build(),
-                                 RetryStrategies.fixDelay(1, TimeUnit.SECONDS))));
-
-    kafkaClient = new ZKKafkaClientService(zkClientService);
-    Futures.addCallback(Services.chainStart(zkClientService, kafkaClient),
-                        new FutureCallback<List<ListenableFuture<Service.State>>>() {
+    kafkaClient = new BootstrapedKafkaClientService(kafkaBootstrap);
+    Futures.addCallback(kafkaClient.start(),
+                        new FutureCallback<Service.State>() {
       @Override
-      public void onSuccess(List<ListenableFuture<Service.State>> result) {
-        for (ListenableFuture<Service.State> future : result) {
-          Preconditions.checkState(Futures.getUnchecked(future) == Service.State.RUNNING,
+      public void onSuccess(Service.State result) {
+          Preconditions.checkState(result == Service.State.RUNNING,
                                    "Service is not running.");
-        }
-        addInfo("Kafka client started: " + zkConnectStr);
+        addInfo("Kafka client started: " + kafkaBootstrap);
         scheduler.scheduleWithFixedDelay(flushTask, 0, flushPeriod, TimeUnit.MILLISECONDS);
       }
 
@@ -179,7 +166,7 @@ public final class KafkaAppender extends UnsynchronizedAppenderBase<ILoggingEven
   public void stop() {
     super.stop();
     scheduler.shutdownNow();
-    Futures.getUnchecked(Services.chainStop(kafkaClient, zkClientService));
+    Futures.getUnchecked(kafkaClient.stop());
   }
 
   public void forceFlush() {

@@ -68,7 +68,7 @@ public abstract class ServiceMain {
   }
 
   protected final void doMain(final Service mainService,
-                              Service...prerequisites) throws Exception {
+                              Service... prerequisites) throws Exception {
     // Only configure the log collection if it is enabled.
     if (getTwillRuntimeSpecification().isLogCollectionEnabled()) {
       configureLogger();
@@ -216,8 +216,8 @@ public abstract class ServiceMain {
     kafkaAppender.setName("KAFKA");
     kafkaAppender.setTopic(Constants.LOG_TOPIC);
     kafkaAppender.setHostname(getHostname());
-    // The Kafka ZK Connection shouldn't be null as this method only get called if log collection is enabled
-    kafkaAppender.setZookeeper(getTwillRuntimeSpecification().getKafkaZKConnect());
+    // Bootstrap servers string should not be null
+    kafkaAppender.setKafkaBootstrap(getTwillRuntimeSpecification().getKafkaBootstrap());
     String runnableName = getRunnableName();
     if (runnableName != null) {
       kafkaAppender.setRunnableName(runnableName);

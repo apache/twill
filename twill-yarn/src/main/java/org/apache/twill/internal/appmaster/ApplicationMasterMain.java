@@ -96,7 +96,15 @@ public final class ApplicationMasterMain extends ServiceMain {
     );
 
     if (twillRuntimeSpec.isLogCollectionEnabled()) {
-      prerequisites.add(new ApplicationKafkaService(zkClientService, twillRuntimeSpec.getKafkaZKConnect()));
+      if (twillRuntimeSpec.isEmbeddedKafkaEnabled()) {
+        ApplicationKafkaService kafkaService =
+          new ApplicationKafkaService(zkClientService, twillRuntimeSpec.getZkConnectStr());
+
+        prerequisites.add(kafkaService);
+        twillRuntimeSpec.setKafkaBootstrap(twillRuntimeSpec.getKafkaBootstrap()
+                                             .concat(";")
+                                             .concat(kafkaService.getKafkaBootstrap()));
+      }
     } else {
       LOG.info("Log collection through kafka disabled");
     }
@@ -161,6 +169,10 @@ public final class ApplicationMasterMain extends ServiceMain {
       this.zkClient = zkClient;
       this.kafkaServer = new EmbeddedKafkaServer(generateKafkaConfig(kafkaZKConnect));
       this.kafkaZKPath = kafkaZKConnect.substring(zkClient.getConnectString().length());
+    }
+
+    public String getKafkaBootstrap() {
+      return kafkaServer.getKafkaBootstrap();
     }
 
     @Override

@@ -46,6 +46,13 @@ public interface TwillPreparer {
   TwillPreparer addLogHandler(LogHandler handler);
 
   /**
+   * Configures bootstrap servers for kafka log aggregation client
+   * @param kafkaBootstrapServers kafka bootstrap.servers config for log aggregation client
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withKafkaBootstrapServers(String kafkaBootstrapServers);
+
+  /**
    * Sets the user name that runs the application. Default value is get from {@code "user.name"} by calling
    * {@link System#getProperty(String)}.
    * @param user User name

@@ -43,12 +43,15 @@ public class TwillRuntimeSpecification {
   private final Map<String, Integer> maxRetries;
   private final double minHeapRatio;
   private final boolean logCollectionEnabled;
+  private final boolean embeddedKafkaEnabled;
+  private String kafkaBootstrap;
 
   public TwillRuntimeSpecification(TwillSpecification twillSpecification, String fsUser, URI twillAppDir,
                                    String zkConnectStr, RunId twillRunId, String twillAppName,
                                    int reservedMemory, @Nullable String rmSchedulerAddr,
                                    Map<String, Map<String, String>> logLevels, Map<String, Integer> maxRetries,
-                                   double minHeapRatio, boolean logCollectionEnabled) {
+                                   double minHeapRatio, boolean logCollectionEnabled, String kafkaBootstrap,
+                                   boolean embeddedKafkaEnabled) {
     this.twillSpecification = twillSpecification;
     this.fsUser = fsUser;
     this.twillAppDir = twillAppDir;
@@ -61,6 +64,8 @@ public class TwillRuntimeSpecification {
     this.maxRetries = maxRetries;
     this.minHeapRatio = minHeapRatio;
     this.logCollectionEnabled = logCollectionEnabled;
+    this.kafkaBootstrap = kafkaBootstrap;
+    this.embeddedKafkaEnabled = embeddedKafkaEnabled;
   }
 
   public TwillSpecification getTwillSpecification() {
@@ -116,15 +121,18 @@ public class TwillRuntimeSpecification {
   }
 
   /**
-   * Returns the ZK connection string for the Kafka used for log collections,
+   * Returns the bootstrap connection string for the Kafka used for log collections,
    * or {@code null} if log collection is disabled.
    */
-  @Nullable
-  public String getKafkaZKConnect() {
-    if (!isLogCollectionEnabled()) {
-      return null;
-    }
-    // When addressing TWILL-147, a field can be introduced to carry this value.
-    return String.format("%s/%s/%s/kafka", getZkConnectStr(), getTwillAppName(), getTwillAppRunId());
+  public String getKafkaBootstrap() {
+    return kafkaBootstrap;
+  }
+
+  public void setKafkaBootstrap(String kafkaBootstrap) {
+    this.kafkaBootstrap = kafkaBootstrap;
+  }
+
+  public boolean isEmbeddedKafkaEnabled() {
+    return embeddedKafkaEnabled;
   }
 }

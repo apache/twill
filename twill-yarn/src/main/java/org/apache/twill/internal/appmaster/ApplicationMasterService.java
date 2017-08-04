@@ -160,7 +160,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
     this.amLiveNode = new ApplicationMasterLiveNodeData(Integer.parseInt(System.getenv(EnvKeys.YARN_APP_ID)),
                                                         Long.parseLong(System.getenv(EnvKeys.YARN_APP_ID_CLUSTER_TIME)),
                                                         amClient.getContainerId().toString(), getLocalizeFiles(),
-                                                        twillRuntimeSpec.getKafkaZKConnect());
+                                                        twillRuntimeSpec.getKafkaBootstrap());
 
     this.expectedContainers = new ExpectedContainers(twillSpec);
     this.runningContainers = createRunningContainers(amClient.getContainerId(), amClient.getHost());

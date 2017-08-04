@@ -305,12 +305,14 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
     return new YarnTwillPreparer(config, twillSpec, runId, zkClientService.getConnectString(),
                                  appLocation, jvmOptions, locationCache, new YarnTwillControllerFactory() {
       @Override
-      public YarnTwillController create(RunId runId, boolean logCollectionEnabled, Iterable<LogHandler> logHandlers,
+      public YarnTwillController create(RunId runId, boolean logCollectionEnabled, String kafkaBootstrap,
+                                        Iterable<LogHandler> logHandlers,
                                         Callable<ProcessController<YarnApplicationReport>> startUp,
                                         long startTimeout, TimeUnit startTimeoutUnit) {
         ZKClient zkClient = ZKClients.namespace(zkClientService, "/" + appName);
         YarnTwillController controller = listenController(new YarnTwillController(appName, runId, zkClient,
                                                                                   logCollectionEnabled,
+                                                                                  kafkaBootstrap,
                                                                                   logHandlers, startUp,
                                                                                   startTimeout, startTimeoutUnit));
         synchronized (YarnTwillRunnerService.this) {

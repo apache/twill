@@ -78,7 +78,9 @@ final class YarnTwillController extends AbstractTwillController implements Twill
    */
   YarnTwillController(String appName, RunId runId, ZKClient zkClient,
                       final ApplicationMasterLiveNodeData amLiveNodeData, final YarnAppClient yarnAppClient) {
-    super(appName, runId, zkClient, amLiveNodeData.getKafkaZKConnect() != null, Collections.<LogHandler>emptyList());
+    super(appName, runId, zkClient, !amLiveNodeData.getKafkaBootstrap().isEmpty(),
+          amLiveNodeData.getKafkaBootstrap(),
+          Collections.<LogHandler>emptyList());
     this.appName = appName;
     this.amLiveNodeData = amLiveNodeData;
     this.startUp = new Callable<ProcessController<YarnApplicationReport>>() {
@@ -93,9 +95,10 @@ final class YarnTwillController extends AbstractTwillController implements Twill
   }
 
   YarnTwillController(String appName, RunId runId, ZKClient zkClient, boolean logCollectionEnabled,
-                      Iterable<LogHandler> logHandlers, Callable<ProcessController<YarnApplicationReport>> startUp,
+                      String kafkaBootstrap, Iterable<LogHandler> logHandlers,
+                      Callable<ProcessController<YarnApplicationReport>> startUp,
                       long startTimeout, TimeUnit startTimeoutUnit) {
-    super(appName, runId, zkClient, logCollectionEnabled, logHandlers);
+    super(appName, runId, zkClient, logCollectionEnabled, kafkaBootstrap, logHandlers);
     this.appName = appName;
     this.startUp = startUp;
     this.startTimeout = startTimeout;
@@ -176,7 +179,7 @@ final class YarnTwillController extends AbstractTwillController implements Twill
       finalStatus = report.getFinalApplicationStatus();
       ApplicationId appId = report.getApplicationId();
       while (finalStatus == FinalApplicationStatus.UNDEFINED &&
-          stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
+        stopWatch.elapsedTime(TimeUnit.MILLISECONDS) < maxTime) {
         LOG.debug("Yarn application final status for {} {}: {}", appName, appId, finalStatus);
         TimeUnit.SECONDS.sleep(1);
         finalStatus = processController.getReport().getFinalApplicationStatus();

@@ -21,8 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AbstractIdleService;
 import kafka.server.KafkaConfig;
-import kafka.server.KafkaServer;
-import kafka.utils.Time;
+import kafka.server.KafkaServerStartable;
 import org.I0Itec.zkclient.exception.ZkTimeoutException;
 import org.apache.twill.internal.utils.Networks;
 import org.slf4j.Logger;
@@ -45,22 +44,24 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
   private static final String DEFAULT_START_RETRIES = "5";
 
   private final int startTimeoutRetries;
-  private final Properties properties;
-  private KafkaServer server;
+  private final KafkaConfig kafkaConfig;
+  private KafkaServerStartable server;
 
   public EmbeddedKafkaServer(Properties properties) {
     this.startTimeoutRetries = Integer.parseInt(properties.getProperty(START_RETRIES,
                                                                        DEFAULT_START_RETRIES));
-    this.properties = new Properties();
-    this.properties.putAll(properties);
+    this.kafkaConfig = createKafkaConfig(properties);
+  }
+
+  public String getKafkaBootstrap() {
+    return String.format("%s:%d", kafkaConfig.hostName(), kafkaConfig.port());
   }
 
   @Override
   protected void startUp() throws Exception {
     int tries = 0;
     do {
-      KafkaConfig kafkaConfig = createKafkaConfig(properties);
-      KafkaServer kafkaServer = createKafkaServer(kafkaConfig);
+      KafkaServerStartable kafkaServer = createKafkaServer(kafkaConfig);
       try {
         kafkaServer.startup();
         server = kafkaServer;
@@ -96,28 +97,10 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
     }
   }
 
-  private KafkaServer createKafkaServer(KafkaConfig kafkaConfig) {
-    return new KafkaServer(kafkaConfig, new Time() {
-
-      @Override
-      public long milliseconds() {
-        return System.currentTimeMillis();
-      }
-
-      @Override
-      public long nanoseconds() {
-        return System.nanoTime();
-      }
-
-      @Override
-      public void sleep(long ms) {
-        try {
-          Thread.sleep(ms);
-        } catch (InterruptedException e) {
-          Thread.interrupted();
-        }
-      }
-    });
+  private KafkaServerStartable createKafkaServer(KafkaConfig kafkaConfig) {
+    Properties properties = new Properties();
+    properties.putAll(kafkaConfig.props());
+    return KafkaServerStartable.fromProps(properties);
   }
 
   /**
@@ -133,6 +116,15 @@ public final class EmbeddedKafkaServer extends AbstractIdleService {
       int randomPort = Networks.getRandomPort();
       Preconditions.checkState(randomPort > 0, "Failed to get random port.");
       prop.setProperty("port", Integer.toString(randomPort));
+    }
+    String brokerId = prop.getProperty("broker.id");
+    if (brokerId == null) {
+      Random random = new Random(System.currentTimeMillis());
+      int i;
+      do {
+        i = random.nextInt(1000);
+      } while (i < 0);
+      prop.setProperty("broker.id", Integer.toString(i));
     }
 
     return new KafkaConfig(prop);
