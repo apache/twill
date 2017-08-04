@@ -65,8 +65,9 @@ public final class TwillContainerLauncher {
 
   public TwillContainerLauncher(RuntimeSpecification runtimeSpec, ContainerInfo containerInfo,
                                 ProcessLauncher.PrepareLaunchContext launchContext,
-                                ZKClient zkClient, int instanceCount, JvmOptions jvmOpts, int reservedMemory,
-                                Location secureStoreLocation, double minHeapRatio) {
+                                ZKClient zkClient, int instanceCount, JvmOptions jvmOpts,
+                                int reservedMemory, double minHeapRatio,
+                                Location secureStoreLocation) {
     this.runtimeSpec = runtimeSpec;
     this.containerInfo = containerInfo;
     this.launchContext = launchContext;
@@ -151,8 +152,9 @@ public final class TwillContainerLauncher {
                        "-Dtwill.runnable=$" + Constants.TWILL_APP_NAME + ".$" + EnvKeys.TWILL_RUNNABLE_NAME,
                        "-cp", Constants.Files.LAUNCHER_JAR + ":" + classPath,
                        "-Xmx" + maxHeapSizeMB + "m");
-    if (jvmOpts.getExtraOptions() != null) {
-      commandBuilder.add(jvmOpts.getExtraOptions());
+    String extraOptions = jvmOpts.getRunnableExtraOptions(runtimeSpec.getName());
+    if (!extraOptions.isEmpty()) {
+      commandBuilder.add(extraOptions);
     }
     commandBuilder.add(TwillLauncher.class.getName(),
                        mainClass.getName(),

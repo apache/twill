@@ -45,7 +45,8 @@ public class DefaultTwillRunResources implements TwillRunResources {
    */
   public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB, int maxHeapMemoryMB,
                                   String host, Integer debugPort) {
-    this(instanceId, containerId, cores, memoryMB, maxHeapMemoryMB, host, debugPort, Collections.<String, Level>emptyMap());
+    this(instanceId, containerId, cores, memoryMB, maxHeapMemoryMB, host, debugPort,
+         Collections.<String, Level>emptyMap());
   }
 
   public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB, int maxHeapMemoryMB,
