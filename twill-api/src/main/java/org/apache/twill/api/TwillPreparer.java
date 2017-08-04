@@ -87,6 +87,19 @@ public interface TwillPreparer {
   TwillPreparer setJVMOptions(String options);
 
   /**
+   * This methods sets the extra JVM options that will be passed to the java command line for the given runnable
+   * of the application started through this {@link org.apache.twill.api.TwillPreparer} instance.
+   * The options set for the given runnable will be appended to any global options set through the
+   * {@link #setJVMOptions(String)} or {@link #addJVMOptions(String)} method.
+   *
+   * This is intended for advance usage. All options will be passed unchanged to the java command line. Invalid
+   * options could cause application not able to start.
+   *
+   * @param options extra JVM options.
+   */
+  TwillPreparer setJVMOptions(String runnableName, String options);
+
+  /**
    * This methods adds extra JVM options that will be passed to the java command line for every runnable
    * of the application started through this {@link org.apache.twill.api.TwillPreparer} instance.
    *

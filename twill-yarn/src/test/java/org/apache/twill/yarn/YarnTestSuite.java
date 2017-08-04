@@ -33,6 +33,7 @@ import org.junit.runners.Suite;
   EnvironmentTestRun.class,
   FailureRestartTestRun.class,
   InitializeFailTestRun.class,
+  JvmOptionsTestRun.class,
   LocalFileTestRun.class,
   LogHandlerTestRun.class,
   LogLevelChangeTestRun.class,

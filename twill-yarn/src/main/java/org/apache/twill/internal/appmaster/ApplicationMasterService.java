@@ -30,7 +30,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Ranges;
 import com.google.common.collect.Sets;
-import com.google.common.io.InputSupplier;
 import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -65,7 +64,6 @@ import org.apache.twill.internal.JvmOptions;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.TwillContainerLauncher;
 import org.apache.twill.internal.TwillRuntimeSpecification;
-import org.apache.twill.internal.json.JvmOptionsCodec;
 import org.apache.twill.internal.json.LocalFileCodec;
 import org.apache.twill.internal.json.TwillRuntimeSpecificationAdapter;
 import org.apache.twill.internal.state.Message;
@@ -84,7 +82,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -167,14 +164,11 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private JvmOptions loadJvmOptions() throws IOException {
     final File jvmOptsFile = new File(Constants.Files.RUNTIME_CONFIG_JAR, Constants.Files.JVM_OPTIONS);
     if (!jvmOptsFile.exists()) {
-      return new JvmOptions(null, JvmOptions.DebugOptions.NO_DEBUG);
+      return new JvmOptions("", Collections.<String, String>emptyMap(), JvmOptions.DebugOptions.NO_DEBUG);
     }
-    return JvmOptionsCodec.decode(new InputSupplier<Reader>() {
-      @Override
-      public Reader getInput() throws IOException {
-        return new FileReader(jvmOptsFile);
-      }
-    });
+    try (Reader reader = Files.newBufferedReader(jvmOptsFile.toPath(), StandardCharsets.UTF_8)) {
+      return GSON.fromJson(reader, JvmOptions.class);
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -671,8 +665,8 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
       TwillContainerLauncher launcher = new TwillContainerLauncher(
         twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
-        containerCount, jvmOpts, twillRuntimeSpec.getReservedMemory(runnableName), getSecureStoreLocation(),
-        twillRuntimeSpec.getMinHeapRatio(runnableName));
+        containerCount, jvmOpts, twillRuntimeSpec.getReservedMemory(runnableName),
+        twillRuntimeSpec.getMinHeapRatio(runnableName), getSecureStoreLocation());
 
       runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher);
 
