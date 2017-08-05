@@ -698,7 +698,9 @@ final class YarnTwillPreparer implements TwillPreparer {
                                                                       spec.getPlacementPolicies(), eventHandler);
       Map<String, String> configMap = Maps.newHashMap();
       for (Map.Entry<String, String> entry : config) {
-        configMap.put(entry.getKey(), entry.getValue());
+        if (entry.getKey().startsWith("twill.")) {
+          configMap.put(entry.getKey(), entry.getValue());
+        }
       }
 
       TwillRuntimeSpecification twillRuntimeSpec = new TwillRuntimeSpecification(
