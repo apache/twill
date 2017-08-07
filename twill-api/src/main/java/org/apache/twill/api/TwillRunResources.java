@@ -44,6 +44,11 @@ public interface TwillRunResources {
   int getMemoryMB();
 
   /**
+   * @return the maximum amount of memory in MB of Java process heap memory.
+   */
+  int getMaxHeapMemoryMB();
+
+  /**
    * @return the host the runnable is running on.
    */
   String getHost();

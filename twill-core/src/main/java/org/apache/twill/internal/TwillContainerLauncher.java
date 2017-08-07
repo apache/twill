@@ -61,11 +61,13 @@ public final class TwillContainerLauncher {
   private final int reservedMemory;
   private final double minHeapRatio;
   private final Location secureStoreLocation;
+  private int maxHeapSizeMB;
 
   public TwillContainerLauncher(RuntimeSpecification runtimeSpec, ContainerInfo containerInfo,
                                 ProcessLauncher.PrepareLaunchContext launchContext,
-                                ZKClient zkClient, int instanceCount, JvmOptions jvmOpts, int reservedMemory,
-                                Location secureStoreLocation, double minHeapRatio) {
+                                ZKClient zkClient, int instanceCount, JvmOptions jvmOpts,
+                                int reservedMemory, double minHeapRatio,
+                                Location secureStoreLocation) {
     this.runtimeSpec = runtimeSpec;
     this.containerInfo = containerInfo;
     this.launchContext = launchContext;
@@ -144,15 +146,15 @@ public final class TwillContainerLauncher {
       firstCommand = "$JAVA_HOME/bin/java";
     }
 
-    int memory = Resources.computeMaxHeapSize(containerInfo.getMemoryMB(), reservedMemory,
-            minHeapRatio);
+    maxHeapSizeMB = Resources.computeMaxHeapSize(containerInfo.getMemoryMB(), reservedMemory, minHeapRatio);
     commandBuilder.add("-Djava.io.tmpdir=tmp",
                        "-Dyarn.container=$" + EnvKeys.YARN_CONTAINER_ID,
                        "-Dtwill.runnable=$" + Constants.TWILL_APP_NAME + ".$" + EnvKeys.TWILL_RUNNABLE_NAME,
                        "-cp", Constants.Files.LAUNCHER_JAR + ":" + classPath,
-                       "-Xmx" + memory + "m");
-    if (jvmOpts.getExtraOptions() != null) {
-      commandBuilder.add(jvmOpts.getExtraOptions());
+                       "-Xmx" + maxHeapSizeMB + "m");
+    String extraOptions = jvmOpts.getRunnableExtraOptions(runtimeSpec.getName());
+    if (!extraOptions.isEmpty()) {
+      commandBuilder.add(extraOptions);
     }
     commandBuilder.add(TwillLauncher.class.getName(),
                        mainClass.getName(),
@@ -167,6 +169,19 @@ public final class TwillContainerLauncher {
       new TwillContainerControllerImpl(zkClient, runId, runtimeSpec.getName(), instanceId, processController);
     controller.start();
     return controller;
+  }
+
+  /**
+   * Returns the maximum heap memory size in MB of the Java process launched in the container.
+   * This method can only be called after the {@link #start(RunId, int, Class, String, Location)} method.
+   *
+   * @throws IllegalStateException if the {@link #start(RunId, int, Class, String, Location)} was not called yet.
+   */
+  public int getMaxHeapMemoryMB() {
+    if (maxHeapSizeMB <= 0) {
+      throw new IllegalStateException("Unknown maximum heap memory size. Please make sure the container is started");
+    }
+    return maxHeapSizeMB;
   }
 
   private static final class TwillContainerControllerImpl extends AbstractZKServiceController
