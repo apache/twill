@@ -105,15 +105,17 @@ public class TwillRuntimeSpecification {
    * Returns the reserved non-heap memory size in MB for the application master.
    */
   public int getAMReservedMemory() {
-    return getReservedMemory(config, Configs.Defaults.YARN_AM_RESERVED_MEMORY_MB);
+    return getReservedMemory(config, Configs.Keys.YARN_AM_RESERVED_MEMORY_MB,
+                             Configs.Defaults.YARN_AM_RESERVED_MEMORY_MB);
   }
 
   /**
    * Returns the reserved non-heap memory size in MB for the given runnable.
    */
   public int getReservedMemory(String runnableName) {
-    int memory = getReservedMemory(runnableConfigs.get(runnableName), -1);
-    return memory < 0 ? getReservedMemory(config, Configs.Defaults.JAVA_RESERVED_MEMORY_MB) : memory;
+    int memory = getReservedMemory(runnableConfigs.get(runnableName), Configs.Keys.JAVA_RESERVED_MEMORY_MB, -1);
+    return memory < 0 ? getReservedMemory(config, Configs.Keys.JAVA_RESERVED_MEMORY_MB,
+                                          Configs.Defaults.JAVA_RESERVED_MEMORY_MB) : memory;
   }
 
   /**
@@ -169,26 +171,42 @@ public class TwillRuntimeSpecification {
    * Returns the minimum heap ratio ({@link Configs.Keys#HEAP_RESERVED_MIN_RATIO}) based on the given configuration.
    */
   private double getMinHeapRatio(@Nullable Map<String, String> config, double defaultValue) {
-    if (config == null) {
+    if (config == null || !config.containsKey(Configs.Keys.HEAP_RESERVED_MIN_RATIO)) {
       return defaultValue;
     }
 
-    double ratio = config.containsKey(Configs.Keys.HEAP_RESERVED_MIN_RATIO) ?
-      Double.parseDouble(config.get(Configs.Keys.HEAP_RESERVED_MIN_RATIO)) : defaultValue;
-    // Ratio can't be <= 0
-    return ratio <= 0d ? defaultValue : ratio;
+    try {
+      double ratio = Double.parseDouble(config.get(Configs.Keys.HEAP_RESERVED_MIN_RATIO));
+      if (ratio <= 0d) {
+        throw new IllegalArgumentException("Minimum heap ratio configured with key '" +
+                                             Configs.Keys.HEAP_RESERVED_MIN_RATIO +
+                                             "' must be > 0. It is configured to " + ratio);
+      }
+      return ratio;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Failed to parse the minimum heap ratio from configuration with key '" +
+                                           Configs.Keys.HEAP_RESERVED_MIN_RATIO + "'", e);
+    }
   }
 
   /**
-   * Returns the reserved memory size ({@link Configs.Keys#HEAP_RESERVED_MIN_RATIO}) based on the given configuration.
+   * Returns the reserved memory size based on the given configuration.
    */
-  private int getReservedMemory(@Nullable Map<String, String> config, int defaultValue) {
-    if (config == null) {
+  private int getReservedMemory(@Nullable Map<String, String> config, String key, int defaultValue) {
+    if (config == null || !config.containsKey(key)) {
       return defaultValue;
     }
-    int memory = config.containsKey(Configs.Keys.JAVA_RESERVED_MEMORY_MB) ?
-      Integer.parseInt(config.get(Configs.Keys.JAVA_RESERVED_MEMORY_MB)) : defaultValue;
-    // memory size can't be -ve
-    return memory < 0 ? defaultValue : memory;
+
+    try {
+      int memory = Integer.parseInt(config.get(key));
+      if (memory < 0) {
+        throw new IllegalArgumentException("Reserved memory size configured with key '" + key +
+                                             "' must be >= 0. It is configured to " + memory);
+      }
+      return memory;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Failed to parse the reserved memory size from configuration with key '" +
+                                           key + "'", e);
+    }
   }
 }
