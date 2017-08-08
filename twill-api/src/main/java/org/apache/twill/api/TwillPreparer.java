@@ -39,6 +39,17 @@ public interface TwillPreparer {
   TwillPreparer withConfiguration(Map<String, String> config);
 
   /**
+   * Overrides the default configuration with the given set of configurations for the given runnable only.
+   * This is useful to override configurations that affects runnables, such as
+   * {@link Configs.Keys#JAVA_RESERVED_MEMORY_MB} and {@link Configs.Keys#HEAP_RESERVED_MIN_RATIO}.
+   *
+   * @param runnableName Name of the {@link TwillRunnable}.
+   * @param config set of configurations to override
+   * @return This {@link TwillPreparer}
+   */
+  TwillPreparer withConfiguration(String runnableName, Map<String, String> config);
+
+  /**
    * Adds a {@link LogHandler} for receiving an application log.
    * @param handler The {@link LogHandler}.
    * @return This {@link TwillPreparer}.
@@ -74,6 +85,19 @@ public interface TwillPreparer {
    * @param options extra JVM options.
    */
   TwillPreparer setJVMOptions(String options);
+
+  /**
+   * This methods sets the extra JVM options that will be passed to the java command line for the given runnable
+   * of the application started through this {@link org.apache.twill.api.TwillPreparer} instance.
+   * The options set for the given runnable will be appended to any global options set through the
+   * {@link #setJVMOptions(String)} or {@link #addJVMOptions(String)} method.
+   *
+   * This is intended for advance usage. All options will be passed unchanged to the java command line. Invalid
+   * options could cause application not able to start.
+   *
+   * @param options extra JVM options.
+   */
+  TwillPreparer setJVMOptions(String runnableName, String options);
 
   /**
    * This methods adds extra JVM options that will be passed to the java command line for every runnable

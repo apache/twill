@@ -188,12 +188,17 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
       instanceIds.add(id);
     }
 
+    return restartInstances(runnable, instanceIds);
+  }
+
+  @Override
+  public ListenableFuture<String> restartInstances(final String runnable, Set<Integer> instanceIds) {
     return Futures.transform(restartInstances(ImmutableMap.of(runnable, instanceIds)),
                              new Function<Set<String>, String>() {
-      public String apply(Set<String> input) {
-        return runnable;
-      }
-    });
+                               public String apply(Set<String> input) {
+                                 return runnable;
+                               }
+                             });
   }
 
   @Override

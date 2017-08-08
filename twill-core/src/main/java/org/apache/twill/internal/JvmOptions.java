@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Booleans;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -30,15 +31,27 @@ import java.util.Set;
 public final class JvmOptions {
 
   private final String extraOptions;
+  private final Map<String, String> runnableExtraOptions;
   private final DebugOptions debugOptions;
 
-  public JvmOptions(String extraOptions, DebugOptions debugOptions) {
+  public JvmOptions(String extraOptions, Map<String, String> runnableExtraOptions, DebugOptions debugOptions) {
     this.extraOptions = extraOptions;
+    this.runnableExtraOptions = runnableExtraOptions;
     this.debugOptions = debugOptions;
   }
 
-  public String getExtraOptions() {
+  /**
+   * Returns the extra options for the application master.
+   */
+  public String getAMExtraOptions() {
     return extraOptions;
+  }
+
+  /**
+   * Returns the extra options for the given runnable.
+   */
+  public String getRunnableExtraOptions(String runnableName) {
+    return runnableExtraOptions.containsKey(runnableName) ? runnableExtraOptions.get(runnableName) : extraOptions;
   }
 
   public DebugOptions getDebugOptions() {

@@ -35,6 +35,7 @@ public class DefaultTwillRunResources implements TwillRunResources {
   private final int instanceId;
   private final int virtualCores;
   private final int memoryMB;
+  private final int maxHeapMemoryMB;
   private final String host;
   private final Integer debugPort;
   private final Map<String, LogEntry.Level> logLevels;
@@ -42,17 +43,19 @@ public class DefaultTwillRunResources implements TwillRunResources {
   /**
    * Constructor to create an instance of {@link DefaultTwillRunResources} with empty log levels.
    */
-  public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
+  public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB, int maxHeapMemoryMB,
                                   String host, Integer debugPort) {
-    this(instanceId, containerId, cores, memoryMB, host, debugPort, Collections.<String, Level>emptyMap());
+    this(instanceId, containerId, cores, memoryMB, maxHeapMemoryMB, host, debugPort,
+         Collections.<String, Level>emptyMap());
   }
 
-  public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB,
+  public DefaultTwillRunResources(int instanceId, String containerId, int cores, int memoryMB, int maxHeapMemoryMB,
                                   String host, Integer debugPort, Map<String, LogEntry.Level> logLevels) {
     this.instanceId = instanceId;
     this.containerId = containerId;
     this.virtualCores = cores;
     this.memoryMB = memoryMB;
+    this.maxHeapMemoryMB = maxHeapMemoryMB;
     this.host = host;
     this.debugPort = debugPort;
     this.logLevels = new HashMap<>(logLevels);
@@ -89,6 +92,11 @@ public class DefaultTwillRunResources implements TwillRunResources {
   @Override
   public int getMemoryMB() {
     return memoryMB;
+  }
+
+  @Override
+  public int getMaxHeapMemoryMB() {
+    return maxHeapMemoryMB;
   }
 
   /**

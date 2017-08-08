@@ -92,6 +92,15 @@ public interface TwillController extends ServiceController {
   Future<String> restartInstances(String runnable, int instanceId, int... moreInstanceIds);
 
   /**
+   * Restart instances of some {@link TwillRunnable}.
+   *
+   * @param runnable    The name of the runnable to restart.
+   * @param instanceIds Instances to be restarted
+   * @return A {@link Future} that will be completed when the restart operation has been done.
+   */
+  Future<String> restartInstances(String runnable, Set<Integer> instanceIds);
+
+  /**
    * Update the log levels for requested logger names for Twill applications running in a container.
    * The log level for a logger name can be {@code null} except for the root logger, which will reset the log level for
    * the specified logger.
@@ -104,7 +113,8 @@ public interface TwillController extends ServiceController {
 
   /**
    * Update the log levels for requested logger names for a {@link TwillRunnable}.
-   * The log level for a logger name can be {@code null} except for the root logger, which will reset the log level for
+   * The log level for a logger name can be {@code null} except for the root logger,
+   * which will reset the log level for
    * the specified logger.
    *
    * @param runnableName The name of the runnable to update the log level.
