@@ -41,7 +41,8 @@ public final class CustomClassLoaderRunnable extends AbstractTwillRunnable {
     try {
       Class<?> cls = Class.forName(GENERATED_CLASS_NAME);
       java.lang.reflect.Method announce = cls.getMethod("announce", ServiceAnnouncer.class, String.class, int.class);
-      announce.invoke(cls.newInstance(), getContext(), System.getProperty("service.name"), 54321);
+      announce.invoke(cls.newInstance(), getContext(), System.getProperty("service.name"),
+                      Integer.getInteger("service.port"));
       Uninterruptibles.awaitUninterruptibly(stopLatch);
     } catch (Exception e) {
       LOG.error("Failed to call announce on " + GENERATED_CLASS_NAME, e);
