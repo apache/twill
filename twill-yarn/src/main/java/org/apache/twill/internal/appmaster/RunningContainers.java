@@ -38,6 +38,7 @@ import com.google.common.util.concurrent.Service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.yarn.api.records.ContainerState;
+import org.apache.twill.api.EventHandler;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.RuntimeSpecification;
@@ -53,6 +54,7 @@ import org.apache.twill.internal.DefaultTwillRunResources;
 import org.apache.twill.internal.RunIds;
 import org.apache.twill.internal.TwillContainerController;
 import org.apache.twill.internal.TwillContainerLauncher;
+import org.apache.twill.internal.TwillRuntimeSpecification;
 import org.apache.twill.internal.container.TwillContainerMain;
 import org.apache.twill.internal.state.Message;
 import org.apache.twill.internal.state.SystemMessages;
@@ -116,9 +118,12 @@ final class RunningContainers {
   private final Map<String, Map<String, String>> logLevels;
   private final Map<String, Integer> maxRetries;
   private final Map<String, Map<Integer, AtomicInteger>> numRetries;
+  private final EventHandler eventHandler;
 
-  RunningContainers(String appId, TwillRunResources appMasterResources, ZKClient zookeeperClient,
-    Location applicationLocation, Map<String, RuntimeSpecification> runnables, Map<String, Integer> maxRetriesMap) {
+  RunningContainers(TwillRuntimeSpecification twillRuntimeSpec, String appId, TwillRunResources appMasterResources,
+                    ZKClient zookeeperClient, Location applicationLocation,
+                    Map<String, RuntimeSpecification> runnables,
+                    EventHandler eventHandler) {
     containers = HashBasedTable.create();
     runnableInstances = Maps.newHashMap();
     completedContainerCount = Maps.newHashMap();
@@ -131,8 +136,9 @@ final class RunningContainers {
     this.applicationLocation = applicationLocation;
     this.runnableNames = runnables.keySet();
     this.logLevels = new TreeMap<>();
-    this.maxRetries = Maps.newHashMap(maxRetriesMap);
+    this.maxRetries = Maps.newHashMap(twillRuntimeSpec.getMaxRetries());
     this.numRetries = Maps.newHashMap();
+    this.eventHandler = eventHandler;
   }
 
   /**
@@ -172,8 +178,9 @@ final class RunningContainers {
       if (startSequence.isEmpty() || !runnableName.equals(startSequence.peekLast())) {
         startSequence.addLast(runnableName);
       }
-      containerChange.signalAll();
-
+      containerChange.signalAll();       
+      // call event handler containerLaunched. 
+      eventHandler.containerLaunched(runnableName, instanceId, containerInfo.getId());
     } finally {
       containerLock.unlock();
     }
@@ -267,6 +274,7 @@ final class RunningContainers {
 
         resourceReport.removeRunnableResources(runnableName, containerId);
         containerChange.signalAll();
+        eventHandler.containerStopped(runnableName, instanceId, containerId, ContainerExitCodes.ABORTED);
       }
     } finally {
       containerLock.unlock();
@@ -401,6 +409,20 @@ final class RunningContainers {
     // When we acquire this lock, all stopped runnables should have been cleaned up by handleCompleted() method
     containerLock.lock();
     try {
+      for (Map.Entry<String, Map<String, TwillContainerController>> entry : containers.rowMap().entrySet()) {
+        String runnableName = entry.getKey();
+        Collection<ContainerInfo> containerInfos = containerStats.get(runnableName);
+        for (Map.Entry<String, TwillContainerController> containerControllerEntry : entry.getValue().entrySet()) {
+          for (ContainerInfo containerInfo : containerInfos) {
+            if (containerInfo.getId().equals(containerControllerEntry.getKey())) {
+              // Only call eventHandler.containerStopped if container is not removed by handleCompleted
+              eventHandler.containerStopped(runnableName, containerControllerEntry.getValue().getInstanceId(),
+                                            containerControllerEntry.getKey(), ContainerExitCodes.ABORTED);
+              break;
+            }
+          }
+        }
+      }
       containers.clear();
       runnableInstances.clear();
       numRetries.clear();
@@ -468,6 +490,7 @@ final class RunningContainers {
         // TODO: won't they get added back when the container is re-requested?
         removeInstanceId(runnableName, controller.getInstanceId());
         resourceReport.removeRunnableResources(runnableName, containerId);
+        eventHandler.containerStopped(runnableName, instanceId, containerId, exitStatus);
       }
       
 

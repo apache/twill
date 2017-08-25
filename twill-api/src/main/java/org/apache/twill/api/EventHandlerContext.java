@@ -22,5 +22,18 @@ package org.apache.twill.api;
  */
 public interface EventHandlerContext {
 
+  /**
+   * @return Name of the {@link TwillApplication} containing the {@link EventHandler}
+   */
+  String getApplicationName();
+
+  /**
+   * @return the unique ID of the current run of the {@link TwillApplication} containing the {@link EventHandler}
+   */
+  RunId getRunId();
+
+  /**
+   * @return {@link EventHandlerSpecification} of the {@link EventHandler}
+   */
   EventHandlerSpecification getSpecification();
 }
