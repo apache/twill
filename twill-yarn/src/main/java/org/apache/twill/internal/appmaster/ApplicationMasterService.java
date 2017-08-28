@@ -771,7 +771,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
         twillSpec.getRunnables().get(runnableName), processLauncher.getContainerInfo(), launchContext,
         ZKClients.namespace(zkClient, getZKNamespace(runnableName)),
         containerCount, jvmOpts, twillRuntimeSpec.getReservedMemory(runnableName),
-        twillRuntimeSpec.getMinHeapRatio(runnableName), getSecureStoreLocation());
+        twillRuntimeSpec.getMinHeapRatio(runnableName), getSecureStoreLocation(), amClient.getTrackerURL());
 
       runningContainers.start(runnableName, processLauncher.getContainerInfo(), launcher);
 

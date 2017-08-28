@@ -27,7 +27,7 @@ import java.util.concurrent.locks.Lock;
 /**
  * Represents the runtime context of a {@link TwillRunnable}.
  */
-public interface TwillContext extends ServiceAnnouncer, DiscoveryServiceClient {
+public interface TwillContext extends ServiceAnnouncer, DiscoveryServiceClient, ResourceReporter {
 
   /**
    * Returns the {@link RunId} of this running instance of {@link TwillRunnable}.

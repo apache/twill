@@ -56,6 +56,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.Reader;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -91,6 +92,7 @@ public final class TwillContainerMain extends ServiceMain {
     String runnableName = System.getenv(EnvKeys.TWILL_RUNNABLE_NAME);
     int instanceId = Integer.valueOf(System.getenv(EnvKeys.TWILL_INSTANCE_ID));
     int instanceCount = Integer.valueOf(System.getenv(EnvKeys.TWILL_INSTANCE_COUNT));
+    URL trackerURL = new URL(System.getenv(EnvKeys.TWILL_TRACKER_SERVICE_URL));
     Map<String, String> defaultLogLevels = twillRuntimeSpec.getLogLevels().get(runnableName);
     Map<String, String> dynamicLogLevels = loadLogLevels().get(runnableName);
 
@@ -118,7 +120,7 @@ public final class TwillContainerMain extends ServiceMain {
       arguments.getRunnableArguments().get(runnableName).toArray(new String[0]),
       arguments.getArguments().toArray(new String[0]),
       runnableSpec, instanceId, discoveryService, discoveryService, appRunZkClient,
-      instanceCount, containerInfo.getMemoryMB(), containerInfo.getVirtualCores()
+      instanceCount, containerInfo.getMemoryMB(), containerInfo.getVirtualCores(), trackerURL
     );
 
     ZKClient containerZKClient = getContainerZKClient(zkClientService, appRunId, runnableName);

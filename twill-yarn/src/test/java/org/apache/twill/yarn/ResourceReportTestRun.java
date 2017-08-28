@@ -23,9 +23,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.LineReader;
 import com.google.common.util.concurrent.Uninterruptibles;
+import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillApplication;
+import org.apache.twill.api.TwillContext;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillRunner;
@@ -46,6 +48,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
@@ -61,22 +64,64 @@ public final class ResourceReportTestRun extends BaseYarnTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(ResourceReportTestRun.class);
 
-  private class ResourceApplication implements TwillApplication {
+  /**
+   * Application for testing resource report.
+   */
+  public static final class ResourceApplication implements TwillApplication {
     @Override
     public TwillSpecification configure() {
       return TwillSpecification.Builder.with()
         .setName("ResourceApplication")
         .withRunnable()
-          .add("echo1", new EchoServer(), ResourceSpecification.Builder.with()
+          .add("echo1", new ResourceRunnable(), ResourceSpecification.Builder.with()
             .setVirtualCores(1)
             .setMemory(256, ResourceSpecification.SizeUnit.MEGA)
             .setInstances(2).build()).noLocalFiles()
-          .add("echo2", new EchoServer(), ResourceSpecification.Builder.with()
+          .add("echo2", new ResourceRunnable(), ResourceSpecification.Builder.with()
             .setVirtualCores(2)
             .setMemory(512, ResourceSpecification.SizeUnit.MEGA)
             .setInstances(1).build()).noLocalFiles()
         .anyOrder()
         .build();
+    }
+  }
+
+  /**
+   * Twill runnable for testing resource report.
+   */
+  public static final class ResourceRunnable extends AbstractTwillRunnable {
+
+    private final CountDownLatch stopLatch = new CountDownLatch(1);
+    private volatile boolean stopped;
+
+    @Override
+    public void run() {
+      TwillContext context = getContext();
+
+      // Wait until all instances smaller than this one has started before announcing itself
+      // This is to verify the ResourceReport API in runnable
+      String runnableName = context.getSpecification().getName();
+      Collection<TwillRunResources> resources = context.getInstancesResources(runnableName);
+      try {
+        while (resources.size() < context.getInstanceId() && !stopped) {
+          stopLatch.await(1000, TimeUnit.MILLISECONDS);
+          resources = context.getInstancesResources(runnableName);
+        }
+        for (String serviceName : Arrays.asList(context.getApplicationArguments()[0], context.getArguments()[0])) {
+          int port = 54321 + context.getInstanceId() * 10 + Integer.parseInt(runnableName.substring("echo".length()));
+          context.announce(serviceName, port);
+        }
+
+        stopLatch.await();
+      } catch (InterruptedException e) {
+        // Just return
+      }
+    }
+
+    @Override
+    public void stop() {
+      stopped = true;
+      stopLatch.countDown();
     }
   }
 
@@ -147,6 +192,7 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       .addLogHandler(new PrinterLogHandler(new PrintWriter(System.out, true)))
       .withApplicationArguments("echo")
       .withArguments("BuggyServer", "echo2")
+      .withMaxRetries("BuggyServer", 0)     // Make sure AM won't restart runnable terminated on error
       .start();
 
     final CountDownLatch running = new CountDownLatch(1);
@@ -235,6 +281,8 @@ public final class ResourceReportTestRun extends BaseYarnTest {
     report = getResourceReport(controller, 10000);
     Assert.assertEquals(ImmutableSet.of("echo", "echo1", "echo2"), ImmutableSet.copyOf(report.getServices()));
 
+    // Fetch resources usage of all runnables
+    usedResources = controller.getRunnablesResources();
     Collection<TwillRunResources> echo1Resources = usedResources.get("echo1");
     // 2 instances of echo1
     Assert.assertEquals(2, echo1Resources.size());
@@ -243,8 +291,9 @@ public final class ResourceReportTestRun extends BaseYarnTest {
       Assert.assertEquals(256, resources.getMemoryMB());
     }
 
-    Collection<TwillRunResources> echo2Resources = usedResources.get("echo2");
-    // 2 instances of echo1
+    // Fetch resources usage of one runnable
+    Collection<TwillRunResources> echo2Resources = controller.getInstancesResources("echo2");
+    // 1 instances of echo2
     Assert.assertEquals(1, echo2Resources.size());
     // TODO: check cores after hadoop-2.1.0
     for (TwillRunResources resources : echo2Resources) {

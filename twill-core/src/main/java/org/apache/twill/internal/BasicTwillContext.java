@@ -18,8 +18,11 @@
 package org.apache.twill.internal;
 
 import org.apache.twill.api.ElectionHandler;
+import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.ResourceReporter;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillContext;
+import org.apache.twill.api.TwillRunResources;
 import org.apache.twill.api.TwillRunnable;
 import org.apache.twill.api.TwillRunnableSpecification;
 import org.apache.twill.common.Cancellable;
@@ -32,7 +35,13 @@ import org.apache.twill.zookeeper.ZKClient;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.locks.Lock;
+import javax.annotation.Nullable;
 
 /**
  * Implementation of {@link TwillContext} that provides the basic runtime information of a {@link TwillRunnable}.
@@ -52,13 +61,14 @@ public final class BasicTwillContext implements TwillContext {
   private final int virtualCores;
   private final ZKClient zkClient;
   private final ElectionRegistry elections;
+  private final ResourceReporter resourceReporter;
   private volatile int instanceCount;
 
   public BasicTwillContext(RunId runId, RunId appRunId, InetAddress host, String[] args, String[] appArgs,
                            TwillRunnableSpecification spec, int instanceId,
                            DiscoveryService discoveryService, DiscoveryServiceClient discoveryServiceClient,
-                           ZKClient zkClient,
-                           int instanceCount, int allowedMemoryMB, int virtualCores) {
+                           ZKClient zkClient, int instanceCount, int allowedMemoryMB, int virtualCores,
+                           URL trackerURL) {
     this.runId = runId;
     this.appRunId = appRunId;
     this.host = host;
@@ -73,6 +83,16 @@ public final class BasicTwillContext implements TwillContext {
     this.instanceCount = instanceCount;
     this.allowedMemoryMB = allowedMemoryMB;
     this.virtualCores = virtualCores;
+    ResourceReporter resourceReporter;
+    try {
+      resourceReporter = new ResourceReportClient(Collections.singletonList(
+        new URL(trackerURL.getProtocol(), trackerURL.getHost(),
+                trackerURL.getPort(), trackerURL.getPath() + Constants.TRACKER_SERVICE_BASE_URI)));
+    } catch (MalformedURLException e) {
+      // This shouldn't happen. If it does, use a noop resource reporter
+      resourceReporter = new NoopResourceReporter();
+    }
+    this.resourceReporter = resourceReporter;
   }
 
   @Override
@@ -159,5 +179,27 @@ public final class BasicTwillContext implements TwillContext {
    */
   public void stop() {
     elections.shutdown();
+  }
+
+  @Nullable
+  @Override
+  public ResourceReport getResourceReport() {
+    return resourceReporter.getResourceReport();
+  }
+
+  @Nullable
+  @Override
+  public TwillRunResources getApplicationMasterResources() {
+    return resourceReporter.getApplicationMasterResources();
+  }
+
+  @Override
+  public Map<String, Collection<TwillRunResources>> getRunnablesResources() {
+    return resourceReporter.getRunnablesResources();
+  }
+
+  @Override
+  public Collection<TwillRunResources> getInstancesResources(String runnableName) {
+    return resourceReporter.getInstancesResources(runnableName);
   }
 }

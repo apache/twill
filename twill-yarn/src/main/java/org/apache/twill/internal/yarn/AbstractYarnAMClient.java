@@ -102,6 +102,14 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
   }
 
   @Override
+  public URL getTrackerURL() {
+    if (trackerUrl == null) {
+      throw new IllegalStateException("Tracker URL is not yet setup");
+    }
+    return this.trackerUrl;
+  }
+
+  @Override
   public final synchronized void allocate(float progress, AllocateHandler handler) throws Exception {
     // In one allocate cycle, either only do new container request or removal of requests.
     // This is a workaround for YARN-314.

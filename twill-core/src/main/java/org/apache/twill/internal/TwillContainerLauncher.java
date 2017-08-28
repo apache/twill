@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -61,13 +62,14 @@ public final class TwillContainerLauncher {
   private final int reservedMemory;
   private final double minHeapRatio;
   private final Location secureStoreLocation;
+  private final URL trackerServiceURL;
   private int maxHeapSizeMB;
 
   public TwillContainerLauncher(RuntimeSpecification runtimeSpec, ContainerInfo containerInfo,
                                 ProcessLauncher.PrepareLaunchContext launchContext,
                                 ZKClient zkClient, int instanceCount, JvmOptions jvmOpts,
                                 int reservedMemory, double minHeapRatio,
-                                Location secureStoreLocation) {
+                                Location secureStoreLocation, URL trackerServiceURL) {
     this.runtimeSpec = runtimeSpec;
     this.containerInfo = containerInfo;
     this.launchContext = launchContext;
@@ -77,6 +79,7 @@ public final class TwillContainerLauncher {
     this.reservedMemory = reservedMemory;
     this.minHeapRatio = minHeapRatio;
     this.secureStoreLocation = secureStoreLocation;
+    this.trackerServiceURL = trackerServiceURL;
   }
 
   /**
@@ -122,7 +125,8 @@ public final class TwillContainerLauncher {
       .addEnvironment(EnvKeys.TWILL_RUN_ID, runId.getId())
       .addEnvironment(EnvKeys.TWILL_RUNNABLE_NAME, runtimeSpec.getName())
       .addEnvironment(EnvKeys.TWILL_INSTANCE_ID, Integer.toString(instanceId))
-      .addEnvironment(EnvKeys.TWILL_INSTANCE_COUNT, Integer.toString(instanceCount));
+      .addEnvironment(EnvKeys.TWILL_INSTANCE_COUNT, Integer.toString(instanceCount))
+      .addEnvironment(EnvKeys.TWILL_TRACKER_SERVICE_URL, trackerServiceURL);
 
     // assemble the command based on jvm options
     ImmutableList.Builder<String> commandBuilder = ImmutableList.builder();

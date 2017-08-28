@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Service;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.ResourceReporter;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.logging.LogHandler;
@@ -210,6 +211,11 @@ public class ControllerTest {
       @Override
       public ResourceReport getResourceReport() {
         return null;
+      }
+
+      @Override
+      protected ResourceReporter getResourceReporter() {
+        return new NoopResourceReporter();
       }
     };
     controller.startAndWait();

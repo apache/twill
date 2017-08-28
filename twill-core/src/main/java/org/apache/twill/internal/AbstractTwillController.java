@@ -31,6 +31,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.twill.api.Command;
 import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.ResourceReporter;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.TwillRunResources;
@@ -61,6 +62,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
+import javax.annotation.Nullable;
 
 /**
  * A abstract base class for {@link TwillController} implementation that uses Zookeeper to controller a
@@ -221,6 +223,32 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
   public Future<String[]> resetRunnableLogLevels(String runnableName, String...loggerNames) {
     return sendMessage(SystemMessages.resetLogLevels(runnableName, Sets.newHashSet(loggerNames)), loggerNames);
   }
+
+  @Override
+  public ResourceReport getResourceReport() {
+    return getResourceReporter().getResourceReport();
+  }
+
+  @Nullable
+  @Override
+  public TwillRunResources getApplicationMasterResources() {
+    return getResourceReporter().getApplicationMasterResources();
+  }
+
+  @Override
+  public Map<String, Collection<TwillRunResources>> getRunnablesResources() {
+    return getResourceReporter().getRunnablesResources();
+  }
+
+  @Override
+  public Collection<TwillRunResources> getInstancesResources(String runnableName) {
+    return getResourceReporter().getInstancesResources(runnableName);
+  }
+
+  /**
+   * Returns a {@link ResourceReporter} for fetching {@link ResourceReport}.
+   */
+  protected abstract ResourceReporter getResourceReporter();
 
   private void validateInstanceIds(String runnable, Set<Integer> instanceIds) {
     ResourceReport resourceReport = getResourceReport();

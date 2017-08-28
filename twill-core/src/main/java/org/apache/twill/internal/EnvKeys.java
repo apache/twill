@@ -25,10 +25,8 @@ public final class EnvKeys {
   public static final String TWILL_RUN_ID = "TWILL_RUN_ID";
   public static final String TWILL_INSTANCE_ID = "TWILL_INSTANCE_ID";
   public static final String TWILL_INSTANCE_COUNT = "TWILL_INSTANCE_COUNT";
+  public static final String TWILL_TRACKER_SERVICE_URL = "TWILL_TRACKER_SERVICE_URL";
 
-  /**
-   * Cluster filesystem directory for storing twill app related files.
-   */
   public static final String TWILL_RUNNABLE_NAME = "TWILL_RUNNABLE_NAME";
 
   public static final String YARN_APP_ID = "YARN_APP_ID";

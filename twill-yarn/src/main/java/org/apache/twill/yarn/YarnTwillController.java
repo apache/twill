@@ -25,14 +25,16 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.ResourceReporter;
 import org.apache.twill.api.RunId;
 import org.apache.twill.api.TwillController;
 import org.apache.twill.api.logging.LogHandler;
 import org.apache.twill.internal.AbstractTwillController;
 import org.apache.twill.internal.Constants;
+import org.apache.twill.internal.NoopResourceReporter;
 import org.apache.twill.internal.ProcessController;
+import org.apache.twill.internal.ResourceReportClient;
 import org.apache.twill.internal.appmaster.ApplicationMasterLiveNodeData;
-import org.apache.twill.internal.appmaster.TrackerService;
 import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.internal.yarn.YarnAppClient;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
@@ -61,6 +63,7 @@ import javax.annotation.Nullable;
 final class YarnTwillController extends AbstractTwillController implements TwillController {
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnTwillController.class);
+  private static final ResourceReporter NOOP_REPORTER = new NoopResourceReporter();
 
   private final String appName;
   private final Callable<ProcessController<YarnApplicationReport>> startUp;
@@ -323,22 +326,17 @@ final class YarnTwillController extends AbstractTwillController implements Twill
     return false;
   }
 
-  @Override
-  public ResourceReport getResourceReport() {
-    // Only has resource report if the app is running.
-    if (state() != State.RUNNING) {
-      return null;
-    }
-    ResourceReportClient resourcesClient = getResourcesClient();
-    return (resourcesClient == null) ? null : resourcesClient.get();
-  }
-
   /**
-   * Returns the {@link ResourceReportClient} for fetching resource report from the AM.
+   * Returns a {@link ResourceReport} for fetching resource report from the AM.
    * It first consults the RM for the tracking URL and get the resource report from there.
    */
-  @Nullable
-  private ResourceReportClient getResourcesClient() {
+  @Override
+  protected ResourceReporter getResourceReporter() {
+    // Only has resource report if the app is running.
+    if (state() != State.RUNNING) {
+      return NOOP_REPORTER;
+    }
+
     YarnApplicationReport report = processController.getReport();
     List<URL> urls = new ArrayList<>(2);
 
@@ -353,17 +351,13 @@ final class YarnTwillController extends AbstractTwillController implements Twill
             path = path.substring(0, path.length() - 1);
           }
           urls.add(new URL(trackingUrl.getProtocol(), trackingUrl.getHost(),
-                           trackingUrl.getPort(), path + TrackerService.PATH));
+                           trackingUrl.getPort(), path + Constants.TRACKER_SERVICE_BASE_URI));
         } catch (MalformedURLException e) {
           LOG.debug("Invalid tracking URL {} from YARN application report for {}:{}", url, appName, getRunId());
         }
       }
     }
 
-    if (urls.isEmpty()) {
-      return null;
-    }
-
-    return new ResourceReportClient(urls);
+    return urls.isEmpty() ? NOOP_REPORTER : new ResourceReportClient(urls);
   }
 }

@@ -41,19 +41,20 @@ public final class DefaultResourceReport implements ResourceReport {
   private final AtomicReference<List<String>> services;
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources) {
-    this(applicationId, masterResources, Collections.<String, Collection<TwillRunResources>>emptyMap(),
+    this(applicationId, masterResources, Collections.<String, Collection<? extends TwillRunResources>>emptyMap(),
          Collections.<String>emptyList());
   }
 
   public DefaultResourceReport(String applicationId, TwillRunResources masterResources,
-                               Map<String, Collection<TwillRunResources>> resources, List<String> services) {
+                               Map<String, ? extends Collection<? extends TwillRunResources>> resources,
+                               Collection<String> services) {
     this.applicationId = applicationId;
     this.appMasterResources = masterResources;
     this.usedResources = HashMultimap.create();
-    for (Map.Entry<String, Collection<TwillRunResources>> entry : resources.entrySet()) {
+    for (Map.Entry<String, ? extends Collection<? extends TwillRunResources>> entry : resources.entrySet()) {
       this.usedResources.putAll(entry.getKey(), entry.getValue());
     }
-    this.services = new AtomicReference<>(services);
+    this.services = new AtomicReference<List<String>>(ImmutableList.copyOf(services));
   }
 
   /**

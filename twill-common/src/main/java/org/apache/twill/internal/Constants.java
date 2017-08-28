@@ -58,6 +58,11 @@ public final class Constants {
   public static final String TWILL_CONTAINER_CLASSLOADER = "twill.container.class.loader";
 
   /**
+   * The base URI for the tracker service resource reporting.
+   */
+  public static final String TRACKER_SERVICE_BASE_URI = "/resources";
+
+  /**
    * Constants for names of internal files that are shared between client, AM and containers.
    */
   public static final class Files {

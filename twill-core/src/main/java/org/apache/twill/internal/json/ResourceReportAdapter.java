@@ -19,45 +19,49 @@ package org.apache.twill.internal.json;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
+import com.google.gson.TypeAdapterFactory;
+import com.google.gson.reflect.TypeToken;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.TwillRunResources;
 
-import java.io.Reader;
-import java.io.Writer;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map;
 
 /**
  * This class provides utility to help encode/decode {@link ResourceReport} to/from Json.
  */
 public final class ResourceReportAdapter {
 
-  private final Gson gson;
+  public static final Type RUNNABLES_RESOURCES_TYPE =
+    new TypeToken<Map<String, Collection<TwillRunResources>>>() { }.getType();
+  public static final Type INSTANCES_RESOURCES_TYPE =
+    new TypeToken<Collection<TwillRunResources>>() { }.getType();
 
-  public static ResourceReportAdapter create() {
-    return new ResourceReportAdapter();
-  }
+  public static final Gson GSON = new GsonBuilder()
+    .serializeNulls()
+    .setPrettyPrinting()
+    .registerTypeAdapter(TwillRunResources.class, new TwillRunResourcesCodec())
+    .registerTypeAdapter(ResourceReport.class, new ResourceReportCodec())
+    .registerTypeAdapterFactory(new TypeAdapterFactory() {
+      @SuppressWarnings("unchecked")
+      @Override
+      public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
+        Class<? super T> rawType = type.getRawType();
 
-  private ResourceReportAdapter() {
-    gson = new GsonBuilder()
-              .serializeNulls()
-              .setPrettyPrinting()
-              .registerTypeAdapter(TwillRunResources.class, new TwillRunResourcesCodec())
-              .registerTypeAdapter(ResourceReport.class, new ResourceReportCodec())
-              .create();
-  }
+        // For any sub-type of ResourceReport, use the TypeAdapter of ResourceReport
+        // For any sub-type of TwillRunResources, use the TypeAdapter of TwillRunResources
+        for (Class<?> cls : Arrays.asList(ResourceReport.class, TwillRunResources.class)) {
+          if (!cls.equals(rawType) && cls.isAssignableFrom(rawType)) {
+            return (TypeAdapter<T>) gson.getAdapter(cls);
+          }
+        }
 
-  public String toJson(ResourceReport report) {
-    return gson.toJson(report, ResourceReport.class);
-  }
-
-  public void toJson(ResourceReport report, Writer writer) {
-    gson.toJson(report, ResourceReport.class, writer);
-  }
-
-  public ResourceReport fromJson(String json) {
-    return gson.fromJson(json, ResourceReport.class);
-  }
-
-  public ResourceReport fromJson(Reader reader) {
-    return gson.fromJson(reader, ResourceReport.class);
-  }
+        // For all other types, use the default
+        return null;
+      }
+    })
+    .create();
 }

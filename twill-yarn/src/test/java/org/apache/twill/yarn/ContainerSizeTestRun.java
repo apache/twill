@@ -21,7 +21,6 @@ package org.apache.twill.yarn;
 import com.google.common.collect.ImmutableMap;
 import org.apache.twill.api.AbstractTwillRunnable;
 import org.apache.twill.api.Configs;
-import org.apache.twill.api.ResourceReport;
 import org.apache.twill.api.ResourceSpecification;
 import org.apache.twill.api.TwillApplication;
 import org.apache.twill.api.TwillController;
@@ -86,24 +85,24 @@ public class ContainerSizeTestRun extends BaseYarnTest {
       Assert.assertTrue(waitForSize(discovered, 2, 120));
 
       // Verify the AM container size and heap size
-      ResourceReport resourceReport = controller.getResourceReport();
-      Assert.assertNotNull(resourceReport);
-      Assert.assertEquals(256, resourceReport.getAppMasterResources().getMemoryMB());
+      TwillRunResources amResources = controller.getApplicationMasterResources();
+      Assert.assertNotNull(amResources);
+      Assert.assertEquals(256, amResources.getMemoryMB());
       Assert.assertEquals(Resources.computeMaxHeapSize(256, Configs.Defaults.YARN_AM_RESERVED_MEMORY_MB, 0.65d),
-                          resourceReport.getAppMasterResources().getMaxHeapMemoryMB());
+                          amResources.getMaxHeapMemoryMB());
 
       // Verify the runnable container heap size
-      Collection<TwillRunResources> runnableResources = resourceReport.getRunnableResources("sleep");
-      Assert.assertFalse(runnableResources.isEmpty());
-      TwillRunResources resources = runnableResources.iterator().next();
+      Collection<TwillRunResources> instancesResources = controller.getInstancesResources("sleep");
+      Assert.assertFalse(instancesResources.isEmpty());
+      TwillRunResources resources = instancesResources.iterator().next();
       Assert.assertEquals(Resources.computeMaxHeapSize(resources.getMemoryMB(), 1024, 0.8d),
                           resources.getMaxHeapMemoryMB());
 
       // For the sleep2 runnable, we don't set any ratio and reserved memory.
       // The ratio should get default to 0.65 (app) and reserved memory to 200
-      runnableResources = resourceReport.getRunnableResources("sleep2");
-      Assert.assertFalse(runnableResources.isEmpty());
-      resources = runnableResources.iterator().next();
+      instancesResources = controller.getInstancesResources("sleep2");
+      Assert.assertFalse(instancesResources.isEmpty());
+      resources = instancesResources.iterator().next();
       Assert.assertEquals(
         Resources.computeMaxHeapSize(resources.getMemoryMB(), Configs.Defaults.YARN_AM_RESERVED_MEMORY_MB, 0.65d),
         resources.getMaxHeapMemoryMB());

@@ -25,12 +25,11 @@ import org.apache.twill.discovery.ServiceDiscovered;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
-import javax.annotation.Nullable;
 
 /**
  * For controlling a running application.
  */
-public interface TwillController extends ServiceController {
+public interface TwillController extends ServiceController, ResourceReporter {
 
   /**
    * Adds a {@link LogHandler} for receiving application log.
@@ -55,15 +54,6 @@ public interface TwillController extends ServiceController {
    *         while changing instances, it'll be reflected in the future.
    */
   Future<Integer> changeInstances(String runnable, int newCount);
-
-  /**
-   * Get a snapshot of the resources used by the application, broken down by each runnable.
-   *
-   * @return A {@link ResourceReport} containing information about resources used by the application or
-   *         null in case the user calls this before the application completely starts.
-   */
-  @Nullable
-  ResourceReport getResourceReport();
 
   /**
    * Restart all instances of a particular {@link TwillRunnable}.

@@ -21,6 +21,8 @@ import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.twill.api.ResourceReport;
+import org.apache.twill.api.TwillRunResources;
+import org.apache.twill.internal.Constants;
 import org.apache.twill.internal.json.ResourceReportAdapter;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -51,13 +53,13 @@ import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpResponseEncoder;
 import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import org.jboss.netty.handler.codec.http.HttpVersion;
-import org.jboss.netty.util.CharsetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.lang.reflect.Type;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URL;
@@ -72,9 +74,6 @@ import java.util.concurrent.TimeUnit;
  * breakdown of resource usage as a {@link org.apache.twill.api.ResourceReport}.
  */
 public final class TrackerService extends AbstractIdleService {
-
-  // TODO: This is temporary. When support more REST API, this would get moved.
-  public static final String PATH = "/resources";
 
   private static final Logger LOG  = LoggerFactory.getLogger(TrackerService.class);
   private static final int NUM_BOSS_THREADS = 1;
@@ -177,11 +176,6 @@ public final class TrackerService extends AbstractIdleService {
    * the host and port set when this application master registered itself to the resource manager.
    */
   final class ReportHandler extends SimpleChannelUpstreamHandler {
-    private final ResourceReportAdapter reportAdapter;
-
-    ReportHandler() {
-      this.reportAdapter = ResourceReportAdapter.create();
-    }
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
@@ -189,35 +183,71 @@ public final class TrackerService extends AbstractIdleService {
       if (request.getMethod() != HttpMethod.GET) {
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED);
         response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "text/plain; charset=UTF-8");
-        response.setContent(ChannelBuffers.wrappedBuffer("Only GET is supported".getBytes(StandardCharsets.UTF_8)));
+        response.setContent(toChannelBuffer("Only GET is supported"));
         writeResponse(e.getChannel(), response);
         return;
       }
 
-      if (!PATH.equals(request.getUri())) {
-        // Redirect all GET call to the /resources path.
+      String requestURI = URI.create(request.getUri()).normalize().getPath();
+      if (!requestURI.startsWith("/")) {
+        requestURI = "/" + requestURI;
+      }
+
+      // Redirect "/" call to the /resources path.
+      if (requestURI.equals("/")) {
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.TEMPORARY_REDIRECT);
-        response.setHeader(HttpHeaders.Names.LOCATION, PATH);
+        response.setHeader(HttpHeaders.Names.LOCATION, Constants.TRACKER_SERVICE_BASE_URI);
         writeResponse(e.getChannel(), response);
         return;
       }
 
-      writeResourceReport(e.getChannel());
+      // Strip off "/" at the end
+      if (requestURI.endsWith("/")) {
+        requestURI = requestURI.substring(0, requestURI.length() - 1);
+      }
+
+      // See if it is requesting the full report, application master or runnable(s).
+      if (requestURI.equals(Constants.TRACKER_SERVICE_BASE_URI)) {
+        // Full report
+        encodeAndWrite(e.getChannel(), resourceReport.get(), ResourceReport.class);
+      } else if (requestURI.equals(Constants.TRACKER_SERVICE_BASE_URI + "/master")) {
+        // Application master
+        encodeAndWrite(e.getChannel(), resourceReport.get().getAppMasterResources(), TwillRunResources.class);
+      } else if (requestURI.equals(Constants.TRACKER_SERVICE_BASE_URI + "/runnables")) {
+        // All runnables
+        encodeAndWrite(e.getChannel(), resourceReport.get().getResources(),
+                       ResourceReportAdapter.RUNNABLES_RESOURCES_TYPE);
+      } else if (requestURI.startsWith(Constants.TRACKER_SERVICE_BASE_URI + "/runnables/")) {
+        // Single runnable
+        String runnableName = requestURI.substring((Constants.TRACKER_SERVICE_BASE_URI + "/runnables/").length());
+        encodeAndWrite(e.getChannel(), resourceReport.get().getRunnableResources(runnableName),
+                       ResourceReportAdapter.INSTANCES_RESOURCES_TYPE);
+      } else {
+        // Otherwise, it is a not found.
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
+        response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "text/plain; charset=UTF-8");
+        response.setContent(ChannelBuffers.EMPTY_BUFFER);
+        writeResponse(e.getChannel(), response);
+      }
     }
 
-    private void writeResourceReport(Channel channel) {
+    private <T> void encodeAndWrite(Channel channel, T report, Type reportType) {
       HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
       response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "application/json; charset=UTF-8");
 
-      ChannelBuffer content = ChannelBuffers.dynamicBuffer();
-      Writer writer = new OutputStreamWriter(new ChannelBufferOutputStream(content), CharsetUtil.UTF_8);
-      reportAdapter.toJson(resourceReport.get(), writer);
       try {
-        writer.close();
-      } catch (IOException e1) {
-        LOG.error("error writing resource report", e1);
+        ChannelBuffer content = ChannelBuffers.dynamicBuffer();
+        try (Writer writer = new OutputStreamWriter(new ChannelBufferOutputStream(content), StandardCharsets.UTF_8)) {
+          ResourceReportAdapter.GSON.toJson(report, reportType, writer);
+        }
+        response.setContent(content);
+      } catch (IOException e) {
+        // This shouldn't happen
+        response.setStatus(HttpResponseStatus.INTERNAL_SERVER_ERROR);
+        response.setContent(toChannelBuffer("Failed to write ResourceReport" + e.getMessage()));
+        LOG.error("Failed to write ResourceReport", e);
       }
-      response.setContent(content);
+
       writeResponse(channel, response);
     }
 
@@ -229,6 +259,13 @@ public final class TrackerService extends AbstractIdleService {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) {
       e.getChannel().close();
+    }
+
+    /**
+     * Encodes a string into {@link ChannelBuffer} with UTF-8.
+     */
+    private ChannelBuffer toChannelBuffer(String str) {
+      return ChannelBuffers.wrappedBuffer(StandardCharsets.UTF_8.encode(str));
     }
   }
 }

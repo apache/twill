@@ -107,6 +107,14 @@ public interface YarnAMClient extends Service {
   void setTracker(InetSocketAddress trackerAddr, URL trackerUrl);
 
   /**
+   * Returns the tracker url set through the {@link #setTracker(InetSocketAddress, URL)} method.
+   *
+   * @return the tracker url
+   * @throws IllegalStateException if the tracker url hasn't been set
+   */
+  URL getTrackerURL();
+
+  /**
    * The heartbeat call to RM.
    */
   void allocate(float progress, AllocateHandler handler) throws Exception;
