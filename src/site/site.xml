@@ -51,12 +51,14 @@
 
         <menu name="Documentation">
             <item name="Getting Started" href="./GettingStarted.html"/>
-            <item name="API (0.12.0-SNAPSHOT)" href="./apidocs/index.html"/>
+            <item name="API (0.13.0-SNAPSHOT)" href="./apidocs/index.html"/>
+            <item name="API (0.12.0)" href="./apidocs-0.12.0/index.html"/>
             <item name="API (0.11.0)" href="./apidocs-0.11.0/index.html"/>
             <item name="API (0.10.0)" href="./apidocs-0.10.0/index.html"/>
         </menu>
 
         <menu name="Releases">
+            <item name="0.12.0" href="./releases/0.12.0.html"/>
             <item name="0.11.0" href="./releases/0.11.0.html"/>
             <item name="0.10.0" href="./releases/0.10.0.html"/>
         </menu>
