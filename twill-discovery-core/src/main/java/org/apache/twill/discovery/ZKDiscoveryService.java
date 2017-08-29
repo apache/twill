@@ -50,7 +50,9 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -231,7 +233,9 @@ public class ZKDiscoveryService implements DiscoveryService, DiscoveryServiceCli
     List<ListenableFuture<?>> futures = new ArrayList<>();
     lock.lock();
     try {
-      for (Map.Entry<Discoverable, DiscoveryCancellable> entry : discoverables.entries()) {
+      // Copy the entries to avoid concurrent modification from the asyncCancel call.
+      Collection<Map.Entry<Discoverable, DiscoveryCancellable>> entries = new LinkedList<>(discoverables.entries());
+      for (Map.Entry<Discoverable, DiscoveryCancellable> entry : entries) {
         LOG.debug("Un-registering service {} - {}", entry.getKey().getName(), entry.getKey().getSocketAddress());
         futures.add(entry.getValue().asyncCancel());
       }

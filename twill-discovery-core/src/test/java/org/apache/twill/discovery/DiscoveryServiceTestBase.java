@@ -75,13 +75,32 @@ public abstract class DiscoveryServiceTestBase {
       Assert.assertTrue(waitTillExpected(0, serviceDiscovered));
 
       Assert.assertFalse(serviceDiscovered.contains(discoverable));
+
+      // Register some more services, then go ahead and shutdown the discover service
+      // It should get unregistered automatically
+      register(discoveryService, "foo", "localhost", 8090, payload);
+      register(discoveryService, "foo1", "localhost", 8091, payload);
+      register(discoveryService, "foo1", "localhost", 8092, payload);
+
+      Assert.assertTrue(waitTillExpected(1, serviceDiscovered));
     } finally {
       closeServices(entry);
     }
+
+    // Check to make sure the close does un-register all services
+    entry = create();
+
+    // Register a new one to act as a gate to know that the client service has see all changes.
+    register(entry.getKey(), "foo", "localhost", 8093, payload);
+    register(entry.getKey(), "foo1", "localhost", 8094, payload);
+
+    Assert.assertTrue(waitTillExpected(1, entry.getValue().discover("foo")));
+    Assert.assertTrue(waitTillExpected(1, entry.getValue().discover("foo1")));
+    closeServices(entry);
   }
 
   @Test
-  public void testChangeListener() throws InterruptedException {
+  public void testChangeListener() throws Exception {
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
     try {
       DiscoveryService discoveryService = entry.getKey();
@@ -146,7 +165,7 @@ public abstract class DiscoveryServiceTestBase {
   }
 
   @Test
-  public void testCancelChangeListener() throws InterruptedException {
+  public void testCancelChangeListener() throws Exception {
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
     try {
       DiscoveryService discoveryService = entry.getKey();
@@ -271,7 +290,7 @@ public abstract class DiscoveryServiceTestBase {
   }
 
   @Test
-  public void testIterator() throws InterruptedException {
+  public void testIterator() throws Exception {
     // This test is to verify TWILL-75
     Map.Entry<DiscoveryService, DiscoveryServiceClient> entry = create();
     try {
@@ -327,20 +346,12 @@ public abstract class DiscoveryServiceTestBase {
     }
   }
 
-  protected final void closeServices(Map.Entry<DiscoveryService, DiscoveryServiceClient> entry) {
+  protected final void closeServices(Map.Entry<DiscoveryService, DiscoveryServiceClient> entry) throws Exception {
     if (entry.getKey() instanceof AutoCloseable) {
-      try {
-        ((AutoCloseable) entry.getKey()).close();
-      } catch (Exception e) {
-        LOG.warn("Failed to close DiscoveryService {}", entry.getKey(), e);
-      }
+      ((AutoCloseable) entry.getKey()).close();
     }
     if (entry.getValue() instanceof AutoCloseable) {
-      try {
-        ((AutoCloseable) entry.getValue()).close();
-      } catch (Exception e) {
-        LOG.warn("Failed to close DiscoveryServiceClient {}", entry.getValue(), e);
-      }
+      ((AutoCloseable) entry.getValue()).close();
     }
   }
 }
