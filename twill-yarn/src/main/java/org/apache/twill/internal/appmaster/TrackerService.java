@@ -20,38 +20,36 @@ package org.apache.twill.internal.appmaster;
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContentCompressor;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.internal.json.ResourceReportAdapter;
-import org.jboss.netty.bootstrap.ServerBootstrap;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBufferOutputStream;
-import org.jboss.netty.buffer.ChannelBuffers;
-import org.jboss.netty.channel.Channel;
-import org.jboss.netty.channel.ChannelFactory;
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelFutureListener;
-import org.jboss.netty.channel.ChannelHandlerContext;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.ExceptionEvent;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
-import org.jboss.netty.channel.group.ChannelGroup;
-import org.jboss.netty.channel.group.DefaultChannelGroup;
-import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
-import org.jboss.netty.handler.codec.http.DefaultHttpResponse;
-import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
-import org.jboss.netty.handler.codec.http.HttpContentCompressor;
-import org.jboss.netty.handler.codec.http.HttpHeaders;
-import org.jboss.netty.handler.codec.http.HttpMethod;
-import org.jboss.netty.handler.codec.http.HttpRequest;
-import org.jboss.netty.handler.codec.http.HttpRequestDecoder;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-import org.jboss.netty.handler.codec.http.HttpResponseEncoder;
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
-import org.jboss.netty.handler.codec.http.HttpVersion;
-import org.jboss.netty.util.CharsetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +60,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -78,14 +74,15 @@ public final class TrackerService extends AbstractIdleService {
 
   private static final Logger LOG  = LoggerFactory.getLogger(TrackerService.class);
   private static final int NUM_BOSS_THREADS = 1;
+  private static final int NUM_WORKER_THREADS = 10;
   private static final int CLOSE_CHANNEL_TIMEOUT = 5;
   private static final int MAX_INPUT_SIZE = 100 * 1024 * 1024;
 
   private final Supplier<ResourceReport> resourceReport;
-  private final ChannelGroup channelGroup;
 
   private String host;
   private ServerBootstrap bootstrap;
+  private Channel serverChannel;
   private InetSocketAddress bindAddress;
   private URL url;
 
@@ -95,7 +92,6 @@ public final class TrackerService extends AbstractIdleService {
    * @param resourceReport live report that the service will return to clients.
    */
   TrackerService(Supplier<ResourceReport> resourceReport) {
-    this.channelGroup = new DefaultChannelGroup("appMasterTracker");
     this.resourceReport = resourceReport;
   }
 
@@ -123,52 +119,40 @@ public final class TrackerService extends AbstractIdleService {
 
   @Override
   protected void startUp() throws Exception {
-    Executor bossThreads = Executors.newFixedThreadPool(NUM_BOSS_THREADS,
-                                                        new ThreadFactoryBuilder()
-                                                          .setDaemon(true)
-                                                          .setNameFormat("boss-thread")
-                                                          .build());
+    EventLoopGroup bossGroup = new NioEventLoopGroup(NUM_BOSS_THREADS,
+                                                     new ThreadFactoryBuilder()
+                                                       .setDaemon(true).setNameFormat("boss-thread").build());
+    EventLoopGroup workerGroup = new NioEventLoopGroup(NUM_WORKER_THREADS,
+                                                       new ThreadFactoryBuilder()
+                                                         .setDaemon(true).setNameFormat("worker-thread#%d").build());
 
-    Executor workerThreads = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
-                                                             .setDaemon(true)
-                                                             .setNameFormat("worker-thread#%d")
-                                                             .build());
+    bootstrap = new ServerBootstrap()
+      .group(bossGroup, workerGroup)
+      .channel(NioServerSocketChannel.class)
+      .childHandler(new ChannelInitializer<SocketChannel>() {
+        @Override
+        protected void initChannel(SocketChannel ch) throws Exception {
+          ChannelPipeline pipeline = ch.pipeline();
+          pipeline.addLast("codec", new HttpServerCodec());
+          pipeline.addLast("compressor", new HttpContentCompressor());
+          pipeline.addLast("aggregator", new HttpObjectAggregator(MAX_INPUT_SIZE));
+          pipeline.addLast("handler", new ReportHandler());
+        }
+      });
 
-    ChannelFactory factory = new NioServerSocketChannelFactory(bossThreads, workerThreads);
-
-    bootstrap = new ServerBootstrap(factory);
-
-    bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
-      public ChannelPipeline getPipeline() {
-        ChannelPipeline pipeline = Channels.pipeline();
-
-        pipeline.addLast("decoder", new HttpRequestDecoder());
-        pipeline.addLast("aggregator", new HttpChunkAggregator(MAX_INPUT_SIZE));
-        pipeline.addLast("encoder", new HttpResponseEncoder());
-        pipeline.addLast("compressor", new HttpContentCompressor());
-        pipeline.addLast("handler", new ReportHandler());
-
-        return pipeline;
-      }
-    });
-
-    Channel channel = bootstrap.bind(new InetSocketAddress(host, 0));
-    bindAddress = (InetSocketAddress) channel.getLocalAddress();
+    serverChannel = bootstrap.bind(new InetSocketAddress(host, 0)).sync().channel();
+    bindAddress = (InetSocketAddress) serverChannel.localAddress();
     url = URI.create(String.format("http://%s:%d", host, bindAddress.getPort())).toURL();
-    channelGroup.add(channel);
 
     LOG.info("Tracker service started at {}", url);
   }
 
   @Override
   protected void shutDown() throws Exception {
-    try {
-      if (!channelGroup.close().await(CLOSE_CHANNEL_TIMEOUT, TimeUnit.SECONDS)) {
-        LOG.warn("Timeout when closing all channels.");
-      }
-    } finally {
-      bootstrap.releaseExternalResources();
-    }
+    serverChannel.close().await();
+    bootstrap.config().group().shutdownGracefully(1, CLOSE_CHANNEL_TIMEOUT, TimeUnit.SECONDS).await();
+    bootstrap.config().childGroup().shutdownGracefully(1, CLOSE_CHANNEL_TIMEOUT, TimeUnit.SECONDS).await();
+
     LOG.info("Tracker service stopped at {}", url);
   }
 
@@ -176,7 +160,7 @@ public final class TrackerService extends AbstractIdleService {
    * Handler to return resources used by this application master, which will be available through
    * the host and port set when this application master registered itself to the resource manager.
    */
-  final class ReportHandler extends SimpleChannelUpstreamHandler {
+  final class ReportHandler extends ChannelInboundHandlerAdapter {
     private final ResourceReportAdapter reportAdapter;
 
     ReportHandler() {
@@ -184,51 +168,68 @@ public final class TrackerService extends AbstractIdleService {
     }
 
     @Override
-    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-      HttpRequest request = (HttpRequest) e.getMessage();
-      if (request.getMethod() != HttpMethod.GET) {
-        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED);
-        response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "text/plain; charset=UTF-8");
-        response.setContent(ChannelBuffers.wrappedBuffer("Only GET is supported".getBytes(StandardCharsets.UTF_8)));
-        writeResponse(e.getChannel(), response);
-        return;
-      }
-
-      if (!PATH.equals(request.getUri())) {
-        // Redirect all GET call to the /resources path.
-        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.TEMPORARY_REDIRECT);
-        response.setHeader(HttpHeaders.Names.LOCATION, PATH);
-        writeResponse(e.getChannel(), response);
-        return;
-      }
-
-      writeResourceReport(e.getChannel());
-    }
-
-    private void writeResourceReport(Channel channel) {
-      HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
-      response.setHeader(HttpHeaders.Names.CONTENT_TYPE, "application/json; charset=UTF-8");
-
-      ChannelBuffer content = ChannelBuffers.dynamicBuffer();
-      Writer writer = new OutputStreamWriter(new ChannelBufferOutputStream(content), CharsetUtil.UTF_8);
-      reportAdapter.toJson(resourceReport.get(), writer);
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
       try {
-        writer.close();
-      } catch (IOException e1) {
-        LOG.error("error writing resource report", e1);
-      }
-      response.setContent(content);
-      writeResponse(channel, response);
-    }
+        if (!(msg instanceof HttpRequest)) {
+          // Ignore if it is not HttpRequest
+          return;
+        }
 
-    private void writeResponse(Channel channel, HttpResponse response) {
-      ChannelFuture future = channel.write(response);
-      future.addListener(ChannelFutureListener.CLOSE);
+        HttpRequest request = (HttpRequest) msg;
+        if (!HttpMethod.GET.equals(request.method())) {
+          FullHttpResponse response = new DefaultFullHttpResponse(
+            HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED,
+            Unpooled.copiedBuffer("Only GET is supported", StandardCharsets.UTF_8));
+
+          HttpUtil.setContentLength(response, response.content().readableBytes());
+          response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
+          writeAndClose(ctx.channel(), response);
+          return;
+        }
+
+        if (!PATH.equals(request.uri())) {
+          // Redirect all GET call to the /resources path.
+          HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                                                              HttpResponseStatus.TEMPORARY_REDIRECT);
+          HttpUtil.setContentLength(response, 0);
+          response.headers().set(HttpHeaderNames.LOCATION, PATH);
+          writeAndClose(ctx.channel(), response);
+          return;
+        }
+
+        writeResourceReport(ctx.channel());
+      } finally {
+        ReferenceCountUtil.release(msg);
+      }
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) {
-      e.getChannel().close();
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+      ctx.channel().close();
+    }
+
+    private void writeResourceReport(Channel channel) {
+      ByteBuf content = Unpooled.buffer();
+      Writer writer = new OutputStreamWriter(new ByteBufOutputStream(content), CharsetUtil.UTF_8);
+      try {
+        reportAdapter.toJson(resourceReport.get(), writer);
+        writer.close();
+      } catch (IOException e) {
+        LOG.error("error writing resource report", e);
+        writeAndClose(channel, new DefaultFullHttpResponse(
+          HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR,
+          Unpooled.copiedBuffer(e.getMessage(), StandardCharsets.UTF_8)));
+        return;
+      }
+
+      FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, content);
+      HttpUtil.setContentLength(response, content.readableBytes());
+      response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
+      channel.writeAndFlush(response);
+    }
+
+    private void writeAndClose(Channel channel, HttpResponse response) {
+      channel.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
     }
   }
 }
