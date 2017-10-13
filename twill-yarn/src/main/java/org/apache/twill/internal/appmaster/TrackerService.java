@@ -47,6 +47,7 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 import org.apache.twill.api.ResourceReport;
 import org.apache.twill.internal.json.ResourceReportAdapter;
 import org.slf4j.Logger;
@@ -168,34 +169,38 @@ public final class TrackerService extends AbstractIdleService {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-      if (!(msg instanceof HttpRequest)) {
-        // Ignore if it is not HttpRequest
-        return;
+      try {
+        if (!(msg instanceof HttpRequest)) {
+          // Ignore if it is not HttpRequest
+          return;
+        }
+
+        HttpRequest request = (HttpRequest) msg;
+        if (!HttpMethod.GET.equals(request.method())) {
+          FullHttpResponse response = new DefaultFullHttpResponse(
+            HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED,
+            Unpooled.copiedBuffer("Only GET is supported", StandardCharsets.UTF_8));
+
+          HttpUtil.setContentLength(response, response.content().readableBytes());
+          response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
+          writeAndClose(ctx.channel(), response);
+          return;
+        }
+
+        if (!PATH.equals(request.uri())) {
+          // Redirect all GET call to the /resources path.
+          HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                                                              HttpResponseStatus.TEMPORARY_REDIRECT);
+          HttpUtil.setContentLength(response, 0);
+          response.headers().set(HttpHeaderNames.LOCATION, PATH);
+          writeAndClose(ctx.channel(), response);
+          return;
+        }
+
+        writeResourceReport(ctx.channel());
+      } finally {
+        ReferenceCountUtil.release(msg);
       }
-
-      HttpRequest request = (HttpRequest) msg;
-      if (!HttpMethod.GET.equals(request.method())) {
-        FullHttpResponse response = new DefaultFullHttpResponse(
-          HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED,
-          Unpooled.copiedBuffer("Only GET is supported", StandardCharsets.UTF_8));
-
-        HttpUtil.setContentLength(response, response.content().readableBytes());
-        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
-        writeAndClose(ctx.channel(), response);
-        return;
-      }
-
-      if (!PATH.equals(request.uri())) {
-        // Redirect all GET call to the /resources path.
-        HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
-                                                            HttpResponseStatus.TEMPORARY_REDIRECT);
-        HttpUtil.setContentLength(response, 0);
-        response.headers().set(HttpHeaderNames.LOCATION, PATH);
-        writeAndClose(ctx.channel(), response);
-        return;
-      }
-
-      writeResourceReport(ctx.channel());
     }
 
     @Override
