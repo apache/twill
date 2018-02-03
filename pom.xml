@@ -171,7 +171,6 @@
         <junit.version>4.11</junit.version>
         <jopt-simple.version>3.2</jopt-simple.version>
         <commons-compress.version>1.5</commons-compress.version>
-        <hadoop.version>[2.0.2-alpha,2.3.0]</hadoop.version>
         <hadoop20.output.dir>target/hadoop20-classes</hadoop20.output.dir>
     </properties>
 
@@ -538,9 +537,6 @@
             <properties>
                 <hadoop.version>2.3.0</hadoop.version>
             </properties>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
             <build>
                 <plugins>
                     <plugin>
@@ -702,6 +698,53 @@
                                         <source>src/main/hadoop21</source>
                                         <source>src/main/hadoop22</source>
                                         <source>src/main/hadoop23</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>add-source-2.0</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/main/hadoop20</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>hadoop-2.6</id>
+            <properties>
+                <hadoop.version>2.6.5</hadoop.version>
+            </properties>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>1.8</version>
+                        <executions>
+                            <execution>
+                                <id>add-source</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/main/hadoop21</source>
+                                        <source>src/main/hadoop22</source>
+                                        <source>src/main/hadoop23</source>
+                                        <source>src/main/hadoop26</source>
                                     </sources>
                                 </configuration>
                             </execution>
