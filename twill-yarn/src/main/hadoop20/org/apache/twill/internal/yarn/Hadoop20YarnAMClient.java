@@ -26,11 +26,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.twill.internal.appmaster.RunnableProcessLauncher;
 import org.apache.twill.internal.yarn.ports.AMRMClient;
 import org.apache.twill.internal.yarn.ports.AMRMClientImpl;
@@ -69,6 +71,11 @@ public final class Hadoop20YarnAMClient extends AbstractYarnAMClient<AMRMClient.
     this.amrmClient = new AMRMClientImpl(containerId.getApplicationAttemptId());
     this.amrmClient.init(conf);
     this.nmClient = new Hadoop20YarnNMClient(YarnRPC.create(conf), conf);
+  }
+
+  @Override
+  protected ContainerId containerIdLookup(String containerIdStr) {
+    return (ConverterUtils.toContainerId(containerIdStr));
   }
 
   @Override

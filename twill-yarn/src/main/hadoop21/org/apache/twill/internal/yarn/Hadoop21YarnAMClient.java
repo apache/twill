@@ -27,11 +27,13 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterResponse;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.twill.internal.appmaster.RunnableProcessLauncher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,11 @@ public class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.Contai
         return new Hadoop21YarnContainerStatus(status);
       }
     };
+  }
+
+  @Override
+  protected ContainerId containerIdLookup(String containerIdStr) {
+    return (ConverterUtils.toContainerId(containerIdStr));
   }
 
   protected final AMRMClient<AMRMClient.ContainerRequest> amrmClient;

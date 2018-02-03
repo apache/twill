@@ -27,7 +27,6 @@ import com.google.common.util.concurrent.AbstractIdleService;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.twill.internal.ProcessLauncher;
 import org.apache.twill.internal.appmaster.RunnableProcessLauncher;
 import org.slf4j.Logger;
@@ -80,7 +79,7 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
     String masterContainerId = System.getenv().get(containerIdEnvName);
     Preconditions.checkArgument(masterContainerId != null,
                                 "Missing %s from environment", containerIdEnvName);
-    this.containerId = ConverterUtils.toContainerId(masterContainerId);
+    this.containerId = containerIdLookup(masterContainerId);
     this.inflightRequests = ArrayListMultimap.create();
     this.pendingRequests = ArrayListMultimap.create();
     this.pendingRemoves = Lists.newLinkedList();
@@ -88,7 +87,6 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
     this.blacklistRemovals = Lists.newArrayList();
     this.blacklistedResources = Lists.newArrayList();
   }
-
 
   @Override
   public final ContainerId getContainerId() {
@@ -225,6 +223,14 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
     unsupportedFeatures.add(unsupportedFeature);
     return true;
   }
+
+  /**
+   * Returns the ContainerId given a container ID string
+   *
+   * @param containerIdStr the container ID string to lookup
+   * @return A {@link ContainerId} instance representing the result.
+   */
+  protected abstract ContainerId containerIdLookup(String containerIdStr);
 
   /**
    * Adjusts the given resource capability to fit in the cluster limit.
