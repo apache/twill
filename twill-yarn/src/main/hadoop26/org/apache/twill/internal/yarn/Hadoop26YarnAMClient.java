@@ -18,25 +18,25 @@
 package org.apache.twill.internal.yarn;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 /**
- * Wrapper class for AMRMClient for Hadoop version 2.2 or greater.
+ * Wrapper class for AMRMClient for Hadoop version 2.6 or greater.
  */
-public class Hadoop22YarnAMClient extends Hadoop21YarnAMClient {
+public final class Hadoop26YarnAMClient extends Hadoop22YarnAMClient {
 
-  private static final Logger LOG = LoggerFactory.getLogger(Hadoop22YarnAMClient.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Hadoop26YarnAMClient.class);
 
-  public Hadoop22YarnAMClient(Configuration conf) {
+  public Hadoop26YarnAMClient(Configuration conf) {
     super(conf);
   }
 
   @Override
-  protected void updateBlacklist(List<String> blacklistAdditions, List<String> blacklistRemovals) {
-    LOG.debug("Blacklist Additions: {} , Blacklist Removals: {}", blacklistAdditions, blacklistRemovals);
-    amrmClient.updateBlacklist(blacklistAdditions, blacklistRemovals);
+  protected final ContainerId containerIdLookup(String containerIdStr) {
+    return (ContainerId.fromString(containerIdStr));
   }
 }

@@ -68,7 +68,8 @@ public class YarnUtils {
     HADOOP_20,
     HADOOP_21,
     HADOOP_22,
-    HADOOP_23
+    HADOOP_23,
+    HADOOP_26
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
@@ -263,7 +264,15 @@ public class YarnUtils {
         Class.forName("org.apache.hadoop.yarn.client.cli.LogsCLI");
         try {
           Class.forName("org.apache.hadoop.yarn.conf.HAUtil");
-          HADOOP_VERSION.set(HadoopVersions.HADOOP_23);
+          try {
+            Class[] args = new Class[1];
+            args[0] = String.class;
+            // see if we have a org.apache.hadoop.yarn.api.records.ContainerId.fromString() method
+            Class.forName("org.apache.hadoop.yarn.api.records.ContainerId").getMethod("fromString", args);
+            HADOOP_VERSION.set(HadoopVersions.HADOOP_26);
+          } catch (NoSuchMethodException e) {
+            HADOOP_VERSION.set(HadoopVersions.HADOOP_23);
+          }
         } catch (ClassNotFoundException e) {
           HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
         }
