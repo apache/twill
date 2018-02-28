@@ -165,8 +165,8 @@ public class Hadoop21YarnAMClient extends AbstractYarnAMClient<AMRMClient.Contai
 
     int updatedMemory = Math.min(resource.getMemory(), maxCapability.getMemory());
     if (resource.getMemory() != updatedMemory) {
-      resource.setMemory(updatedMemory);
       LOG.info("Adjust memory requirement from {} to {} MB.", resource.getMemory(), updatedMemory);
+      resource.setMemory(updatedMemory);
     }
 
     return resource;
