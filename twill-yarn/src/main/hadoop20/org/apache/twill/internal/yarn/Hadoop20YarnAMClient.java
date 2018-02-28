@@ -126,8 +126,8 @@ public final class Hadoop20YarnAMClient extends AbstractYarnAMClient<AMRMClient.
     updatedMemory = (int) Math.ceil(((double) updatedMemory / minMemory)) * minMemory;
 
     if (resource.getMemory() != updatedMemory) {
-      resource.setMemory(updatedMemory);
       LOG.info("Adjust memory requirement from {} to {} MB.", resource.getMemory(), updatedMemory);
+      resource.setMemory(updatedMemory);
     }
 
     return resource;
