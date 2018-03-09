@@ -178,6 +178,19 @@
             </build>
         </profile>
         <profile>
+            <id>hadoop-2.6</id>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>${hadoop20.output.dir}</directory>
+                    </resource>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+        <profile>
             <id>mapr-hadoop-2.4</id>
             <dependencies>
                 <dependency>
