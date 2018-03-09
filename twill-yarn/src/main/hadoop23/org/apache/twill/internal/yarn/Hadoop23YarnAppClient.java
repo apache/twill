@@ -48,14 +48,12 @@ import java.util.List;
  * </p>
  */
 @SuppressWarnings("unused")
-public final class Hadoop23YarnAppClient extends Hadoop21YarnAppClient {
+public class Hadoop23YarnAppClient extends Hadoop21YarnAppClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(Hadoop23YarnAppClient.class);
-  private final Configuration configuration;
 
   public Hadoop23YarnAppClient(Configuration configuration) {
     super(configuration);
-    this.configuration = configuration;
   }
 
   /**

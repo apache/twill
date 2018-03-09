@@ -172,6 +172,7 @@
         <jopt-simple.version>3.2</jopt-simple.version>
         <commons-compress.version>1.5</commons-compress.version>
         <hadoop20.output.dir>target/hadoop20-classes</hadoop20.output.dir>
+        <force.mac.tests>false</force.mac.tests>
     </properties>
 
     <scm>
@@ -338,6 +339,7 @@
                     <redirectTestOutputToFile>${surefire.redirectTestOutputToFile}</redirectTestOutputToFile>
                     <systemPropertyVariables>
                         <java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
+                        <force.mac.tests>${force.mac.tests}</force.mac.tests>
                     </systemPropertyVariables>
                     <reuseForks>false</reuseForks>
                     <reportFormat>plain</reportFormat>
@@ -353,6 +355,18 @@
     </build>
 
     <profiles>
+        <profile>
+            <!--
+                This profile is to force certain tests to run on Mac.
+                Those tests are disabled due to orphan processes left after the test run (HADOOP-12317).
+                If this profile is enabled, after the test finished, run the `jps` command
+                and delete all `TwillLauncher` processes
+            -->
+            <id>force-mac-tests</id>
+            <properties>
+                <force.mac.tests>true</force.mac.tests>
+            </properties>
+        </profile>
         <profile>
             <id>apache-release</id>
             <build>

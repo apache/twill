@@ -79,6 +79,18 @@ public final class Configs {
     public static final String YARN_AM_RESERVED_MEMORY_MB = "twill.yarn.am.reserved.memory.mb";
 
     /**
+     * Maximum number of attempts to run the application by YARN if there is failure.
+     */
+    public static final String YARN_MAX_APP_ATTEMPTS = "twill.yarn.max.app.attempts";
+
+    /**
+     * Interval time in milliseconds for the attempt failures validity interval in YARN. YARN only limit to
+     * the maximum attempt count for failures in the given interval.
+     */
+    public static final String YARN_ATTEMPT_FAILURES_VALIDITY_INTERVAL =
+      "twill.yarn.attempt.failures.validity.interval";
+
+    /**
      * Setting for enabling log collection.
      */
     public static final String LOG_COLLECTION_ENABLED = "twill.log.collection.enabled";

@@ -21,6 +21,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -68,6 +69,7 @@ final class YarnTwillController extends AbstractTwillController implements Twill
   private final TimeUnit startTimeoutUnit;
   private volatile ApplicationMasterLiveNodeData amLiveNodeData;
   private ProcessController<YarnApplicationReport> processController;
+  private ApplicationAttemptId currentAttemptId;
 
   // Thread for polling yarn for application status if application got ZK session expire.
   // Only used by the instanceUpdate/Delete method, which is from serialized call from ZK callback.
@@ -141,6 +143,8 @@ final class YarnTwillController extends AbstractTwillController implements Twill
         LOG.info("Yarn application {} {} is not in running state. Shutting down controller.", appName, appId);
         forceShutDown();
       }
+
+      currentAttemptId = report.getCurrentApplicationAttemptId();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
@@ -273,6 +277,13 @@ final class YarnTwillController extends AbstractTwillController implements Twill
               shutdown = true;
               break;
             }
+            ApplicationAttemptId attemptId = report.getCurrentApplicationAttemptId();
+            if (currentAttemptId.compareTo(attemptId) != 0) {
+              LOG.info("Application attempt ID change from {} to {}", currentAttemptId, attemptId);
+              currentAttemptId = attemptId;
+              resetLogHandler();
+            }
+
             // Make a sync exists call to instance node and re-watch if the node exists
             try {
               // The timeout is arbitrary, as it's just for avoiding block forever

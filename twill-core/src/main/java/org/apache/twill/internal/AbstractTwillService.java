@@ -206,7 +206,7 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
   }
 
   /**
-   * Update the live node for the runnable.
+   * Update the live node for the service.
    *
    * @return A {@link OperationFuture} that will be completed when the update is done.
    */
@@ -216,11 +216,15 @@ public abstract class AbstractTwillService extends AbstractExecutionThreadServic
     return zkClient.setData(liveNodePath, serializeLiveNode());
   }
 
+  /**
+   * Creates the live node for the service. If the node already exists, it will be deleted before creation.
+   *
+   * @return A {@link OperationFuture} that will be completed when the creation is done.
+   */
   private OperationFuture<String> createLiveNode() {
-    String liveNodePath = getLiveNodePath();
-    LOG.info("Create live node {}{}", zkClient.getConnectString(), liveNodePath);
-    return ZKOperations.ignoreError(zkClient.create(liveNodePath, serializeLiveNode(), CreateMode.EPHEMERAL),
-                                    KeeperException.NodeExistsException.class, liveNodePath);
+    final String liveNodePath = getLiveNodePath();
+    LOG.info("Creating live node {}{}", zkClient.getConnectString(), liveNodePath);
+    return ZKOperations.createDeleteIfExists(zkClient, liveNodePath, serializeLiveNode(), CreateMode.EPHEMERAL, true);
   }
 
   private OperationFuture<String> removeLiveNode() {
