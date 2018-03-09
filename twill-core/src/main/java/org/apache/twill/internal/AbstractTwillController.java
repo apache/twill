@@ -222,6 +222,24 @@ public abstract class AbstractTwillController extends AbstractZKServiceControlle
     return sendMessage(SystemMessages.resetLogLevels(runnableName, Sets.newHashSet(loggerNames)), loggerNames);
   }
 
+  /**
+   * Reset the log handler to poll from the beginning of Kafka.
+   */
+  protected final synchronized void resetLogHandler() {
+    if (kafkaClient == null) {
+      return;
+    }
+    if (logCancellable != null) {
+      logCancellable.cancel();
+      logCancellable = null;
+    }
+    if (!logHandlers.isEmpty()) {
+      logCancellable = kafkaClient.getConsumer().prepare()
+        .addFromBeginning(Constants.LOG_TOPIC, 0)
+        .consume(new LogMessageCallback(logHandlers));
+    }
+  }
+
   private void validateInstanceIds(String runnable, Set<Integer> instanceIds) {
     ResourceReport resourceReport = getResourceReport();
     if (resourceReport == null) {

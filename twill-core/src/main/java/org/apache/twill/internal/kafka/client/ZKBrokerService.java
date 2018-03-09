@@ -51,6 +51,8 @@ import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -58,6 +60,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 
 /**
  * A {@link BrokerService} that watches kafka zk nodes for updates of broker lists and leader for
@@ -136,11 +139,13 @@ public final class ZKBrokerService extends AbstractIdleService implements Broker
       return brokerList.get();
     }
 
-    final SettableFuture<?> readerFuture = SettableFuture.create();
-    final AtomicReference<Iterable<BrokerInfo>> brokers =
-      new AtomicReference<Iterable<BrokerInfo>>(ImmutableList.<BrokerInfo>of());
+    final SettableFuture<?> readyFuture = SettableFuture.create();
+    final AtomicReference<List<BrokerInfo>> brokers = new AtomicReference<>(Collections.<BrokerInfo>emptyList());
 
     actOnExists(BROKER_IDS_PATH, new Runnable() {
+
+      final Runnable thisRunnable = this;
+
       @Override
       public void run() {
         // Callback for fetching children list. This callback should be executed in the executorService.
@@ -154,19 +159,19 @@ public final class ZKBrokerService extends AbstractIdleService implements Broker
                   Iterables.transform(
                     brokerInfos.getAll(Iterables.transform(result.getChildren(), BROKER_ID_TRANSFORMER)).values(),
                     Suppliers.<BrokerInfo>supplierFunction())));
-              readerFuture.set(null);
+              readyFuture.set(null);
 
               for (ListenerExecutor listener : listeners) {
                 listener.changed(ZKBrokerService.this);
               }
             } catch (ExecutionException e) {
-              readerFuture.setException(e.getCause());
+              readyFuture.setException(e.getCause());
             }
           }
 
           @Override
           public void onFailure(Throwable t) {
-            readerFuture.setException(t);
+            readyFuture.setException(t);
           }
         };
 
@@ -179,15 +184,25 @@ public final class ZKBrokerService extends AbstractIdleService implements Broker
             }
             if (event.getType() == Event.EventType.NodeChildrenChanged) {
               Futures.addCallback(zkClient.getChildren(BROKER_IDS_PATH, this), childrenCallback, executorService);
+            } else if (event.getType() == Event.EventType.NodeDeleted) {
+              // If the ids node is deleted, clear the broker list and re-watch.
+              // This could happen when the Kafka server is restarted and have the ZK node cleanup
+              // The readyFuture for this call doesn't matter, as we don't need to block on anything
+              brokers.set(Collections.<BrokerInfo>emptyList());
+              for (ListenerExecutor listener : listeners) {
+                listener.changed(ZKBrokerService.this);
+              }
+              actOnExists(BROKER_IDS_PATH, thisRunnable, SettableFuture.create(),
+                          FAILURE_RETRY_SECONDS, TimeUnit.SECONDS);
             }
           }
         }), childrenCallback, executorService);
       }
-    }, readerFuture, FAILURE_RETRY_SECONDS, TimeUnit.SECONDS);
+    }, readyFuture, FAILURE_RETRY_SECONDS, TimeUnit.SECONDS);
 
-    brokerList = createSupplier(brokers);
+    brokerList = this.<Iterable<BrokerInfo>>createSupplier(brokers);
     try {
-      readerFuture.get();
+      readyFuture.get();
     } catch (Exception e) {
       throw Throwables.propagate(e);
     }
@@ -223,7 +238,7 @@ public final class ZKBrokerService extends AbstractIdleService implements Broker
       public Supplier<T> load(final K key) throws Exception {
         // A future to tell if the result is ready, even it is failure.
         final SettableFuture<T> readyFuture = SettableFuture.create();
-        final AtomicReference<T> resultValue = new AtomicReference<T>();
+        final AtomicReference<T> resultValue = new AtomicReference<>();
 
         // Fetch for node data when it exists.
         final String path = key.getPath();
@@ -312,7 +327,7 @@ public final class ZKBrokerService extends AbstractIdleService implements Broker
       }
     }), new FutureCallback<Stat>() {
       @Override
-      public void onSuccess(Stat result) {
+      public void onSuccess(@Nullable Stat result) {
         if (result != null) {
           action.run();
         } else {
@@ -345,7 +360,7 @@ public final class ZKBrokerService extends AbstractIdleService implements Broker
   /**
    * Creates a supplier that always return latest copy from an {@link java.util.concurrent.atomic.AtomicReference}.
    */
-  private <T> Supplier<T> createSupplier(final AtomicReference<T> ref) {
+  private <T> Supplier<T> createSupplier(final AtomicReference<? extends T> ref) {
     return new Supplier<T>() {
       @Override
       public T get() {

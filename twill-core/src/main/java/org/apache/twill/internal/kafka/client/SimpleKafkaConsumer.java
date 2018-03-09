@@ -340,17 +340,17 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
           continue;
         }
 
-        // If offset < 0, meaning it's special offset value that needs to fetch either the earliest or latest offset
-        // from kafak server.
-        long off = offset.get();
-        if (off < 0) {
-          offset.set(getLastOffset(topicPart, off));
-        }
-
-        SimpleConsumer consumer = consumerEntry.getValue();
-
-        // Fire a fetch message request
         try {
+          // If offset < 0, meaning it's special offset value that needs to fetch either the earliest or latest offset
+          // from kafak server.
+          long off = offset.get();
+          if (off < 0) {
+            offset.set(getLastOffset(topicPart, off));
+          }
+
+          SimpleConsumer consumer = consumerEntry.getValue();
+
+          // Fire a fetch message request
           FetchResponse response = fetchMessages(consumer, offset.get());
 
           // Failure response, set consumer entry to null and let next round of loop to handle it.
@@ -364,6 +364,7 @@ final class SimpleKafkaConsumer implements KafkaConsumer {
 
             consumers.refresh(consumerEntry.getKey());
             consumerEntry = null;
+            backoff.backoff();
             continue;
           }
 

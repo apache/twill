@@ -165,9 +165,10 @@ public final class ApplicationMasterMain extends ServiceMain {
 
     @Override
     protected void startUp() throws Exception {
-      ZKOperations.ignoreError(
-        zkClient.create(kafkaZKPath, null, CreateMode.PERSISTENT),
-        KeeperException.NodeExistsException.class, kafkaZKPath).get();
+      // Create the ZK node for Kafka to use. If the node already exists, delete it to make sure there is
+      // no left over content from previous AM attempt.
+      LOG.info("Preparing Kafka ZK path {}{}", zkClient.getConnectString(), kafkaZKPath);
+      ZKOperations.createDeleteIfExists(zkClient, kafkaZKPath, null, CreateMode.PERSISTENT, true).get();
       kafkaServer.startAndWait();
     }
 
