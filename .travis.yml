@@ -41,9 +41,10 @@ env:
   - PROFILE='hadoop-2.2'
   - PROFILE='hadoop-2.4'
   - PROFILE='hadoop-2.5'
+  - PROFILE='hadoop-2.6'
   - PROFILE='cdh-4.4.0'
   - PROFILE='mapr-hadoop-2.4'
-  - PROFILE='hadoop-2.5,java8-test'
+  - PROFILE='hadoop-2.6,java8-test'
 
 # Only runs JDK8 on hadoop-2.5 profile
 matrix:
@@ -59,11 +60,13 @@ matrix:
     - jdk: oraclejdk8
       env: PROFILE='hadoop-2.5'
     - jdk: oraclejdk8
+      env: PROFILE='hadoop-2.6'
+    - jdk: oraclejdk8
       env: PROFILE='cdh-4.4.0'
     - jdk: oraclejdk8
       env: PROFILE='mapr-hadoop-2.4'
     - jdk: oraclejdk7
-      env: PROFILE='hadoop-2.5,java8-test'
+      env: PROFILE='hadoop-2.6,java8-test'
 
 sudo: false
 

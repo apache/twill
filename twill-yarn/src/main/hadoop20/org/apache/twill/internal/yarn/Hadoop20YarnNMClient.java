@@ -18,6 +18,7 @@
 package org.apache.twill.internal.yarn;
 
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.ContainerManager;
@@ -36,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -102,14 +104,16 @@ public final class Hadoop20YarnNMClient implements YarnNMClient {
       stopRequest.setContainerId(container.getId());
       try {
         manager.stopContainer(stopRequest);
-        boolean completed = false;
-        while (!completed) {
+        while (true) {
           GetContainerStatusRequest statusRequest = Records.newRecord(GetContainerStatusRequest.class);
           statusRequest.setContainerId(container.getId());
           GetContainerStatusResponse statusResponse = manager.getContainerStatus(statusRequest);
-          LOG.info("Container status: {} {}", statusResponse.getStatus(), statusResponse.getStatus().getDiagnostics());
+          LOG.trace("Container status: {} {}", statusResponse.getStatus(), statusResponse.getStatus().getDiagnostics());
 
-          completed = (statusResponse.getStatus().getState() == ContainerState.COMPLETE);
+          if (statusResponse.getStatus().getState() == ContainerState.COMPLETE) {
+            break;
+          }
+          Uninterruptibles.sleepUninterruptibly(200, TimeUnit.MILLISECONDS);
         }
         LOG.info("Container {} stopped.", container.getId());
       } catch (YarnRemoteException e) {
