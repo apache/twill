@@ -113,6 +113,14 @@
                 <role>Committer</role>
             </roles>
         </developer>
+        <developer>
+            <id>yufeldman</id>
+            <name>Yuliya Feldman</name>
+            <email>yufeldman@apache.org</email>
+            <roles>
+                <role>Committer</role>
+            </roles>
+        </developer>
     </developers>
 
     <modules>
