@@ -25,16 +25,21 @@ import com.google.common.util.concurrent.SettableFuture;
 import org.apache.twill.common.Cancellable;
 import org.apache.twill.common.Threads;
 import org.apache.twill.internal.zookeeper.SettableOperationFuture;
+import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nullable;
 
 /**
  * Collection of helper methods for common operations that usually needed when interacting with ZooKeeper.
@@ -279,6 +284,73 @@ public final class ZKOperations {
     }, Threads.SAME_THREAD_EXECUTOR);
 
     return resultFuture;
+  }
+
+  /**
+   * Creates a ZK node of the given path. If the node already exists, deletion of the node (recursively) will happen
+   * and the creation will be retried.
+   */
+  public static OperationFuture<String> createDeleteIfExists(final ZKClient zkClient, final String path,
+                                                             @Nullable final byte[] data, final CreateMode createMode,
+                                                             final boolean createParent, final ACL...acls) {
+    final SettableOperationFuture<String> resultFuture = SettableOperationFuture.create(path,
+                                                                                        Threads.SAME_THREAD_EXECUTOR);
+    final List<ACL> createACLs = acls.length == 0 ? ZooDefs.Ids.OPEN_ACL_UNSAFE : Arrays.asList(acls);
+    createNode(zkClient, path, data, createMode, createParent, createACLs, new FutureCallback<String>() {
+
+      final FutureCallback<String> createCallback = this;
+
+      @Override
+      public void onSuccess(String result) {
+        // Create succeeded, just set the result to the resultFuture
+        resultFuture.set(result);
+      }
+
+      @Override
+      public void onFailure(final Throwable createFailure) {
+        // If create failed not because of the NodeExistsException, just set the exception to the result future
+        if (!(createFailure instanceof KeeperException.NodeExistsException)) {
+          resultFuture.setException(createFailure);
+          return;
+        }
+
+        // Try to delete the path
+        LOG.info("Node {}{} already exists. Deleting it and retry creation", zkClient.getConnectString(), path);
+        Futures.addCallback(recursiveDelete(zkClient, path), new FutureCallback<String>() {
+          @Override
+          public void onSuccess(String result) {
+            // If delete succeeded, perform the creation again.
+            createNode(zkClient, path, data, createMode, createParent, createACLs, createCallback);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            // If deletion failed because of NoNodeException, fail the result operation future
+            if (!(t instanceof KeeperException.NoNodeException)) {
+              createFailure.addSuppressed(t);
+              resultFuture.setException(createFailure);
+              return;
+            }
+
+            // If can't delete because the node no longer exists, just go ahead and recreate the node
+            createNode(zkClient, path, data, createMode, createParent, createACLs, createCallback);
+          }
+        }, Threads.SAME_THREAD_EXECUTOR);
+      }
+    });
+
+    return resultFuture;
+  }
+
+  /**
+   * Private helper method to create a ZK node based on the parameter. The result of the creation is always
+   * communicate via the provided {@link FutureCallback}.
+   */
+  private static void createNode(ZKClient zkClient, String path, @Nullable byte[] data,
+                                 CreateMode createMode, boolean createParent,
+                                 Iterable<ACL> acls, FutureCallback<String> callback) {
+    Futures.addCallback(zkClient.create(path, data, createMode, createParent, acls),
+                        callback, Threads.SAME_THREAD_EXECUTOR);
   }
 
   /**
