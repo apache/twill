@@ -109,12 +109,17 @@ public class LocationCacheTest {
     newTwillRunner.start();
 
     // Force a cleanup using the antique expiry. The list of locations that need to be cleanup was already
-    // collected when the new twill runner was started
+    // collected when the new twill runner was started.
+    // Need to add some time in addition to the antique expiry time because the cache cleaner collects
+    // pending list asynchronously, which the "current" time it uses to calculate the expiration time might be
+    // later than the System.currentTimeMillis() call in the next line.
     ((YarnTwillRunnerService) newTwillRunner)
-      .forceLocationCacheCleanup(System.currentTimeMillis() + Configs.Defaults.LOCATION_CACHE_ANTIQUE_EXPIRY_MS);
+      .forceLocationCacheCleanup(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(30) +
+                                   Configs.Defaults.LOCATION_CACHE_ANTIQUE_EXPIRY_MS);
 
     // Now there shouldn't be any file under the current session cache directory
-    Assert.assertTrue(currentSessionCache.list().isEmpty());
+    List<Location> locations = currentSessionCache.list();
+    Assert.assertTrue("Location is not empty " + locations, locations.isEmpty());
   }
 
   /**

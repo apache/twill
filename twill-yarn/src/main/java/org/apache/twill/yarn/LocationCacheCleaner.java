@@ -144,7 +144,9 @@ final class LocationCacheCleaner extends AbstractIdleService {
               }
               // If the location is already pending for cleanup, this won't update the expire time as
               // the comparison of PendingCleanup is only by location.
-              pendingCleanups.add(new PendingCleanup(location, expireTime));
+              if (pendingCleanups.add(new PendingCleanup(location, expireTime))) {
+                LOG.debug("Pending deletion of location {} with expiration time at {}", location, expireTime);
+              }
             }
           }
         } catch (IOException e) {

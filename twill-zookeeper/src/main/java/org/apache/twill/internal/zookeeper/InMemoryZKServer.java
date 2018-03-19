@@ -18,7 +18,6 @@
 package org.apache.twill.internal.zookeeper;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.io.Files;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -32,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.concurrent.Executor;
 
 /**
@@ -103,17 +101,11 @@ public final class InMemoryZKServer implements Service {
   }
 
   private InetSocketAddress getAddress(int port) {
-    try {
-      int socketPort = port < 0 ? 0 : port;
-      // This property is needed so that in certain CI environment (e.g. Travis-CI) it can only works properly if
-      // it is binded to the wildcard (0.0.0.0) address
-      if (Boolean.parseBoolean(System.getProperties().getProperty("twill.zk.server.localhost", "true"))) {
-        return new InetSocketAddress(InetAddress.getLocalHost(), socketPort);
-      } else {
-        return new InetSocketAddress(socketPort);
-      }
-    } catch (UnknownHostException e) {
-      throw Throwables.propagate(e);
+    int socketPort = port < 0 ? 0 : port;
+    if (Boolean.parseBoolean(System.getProperties().getProperty("twill.zk.server.localhost", "true"))) {
+      return new InetSocketAddress(InetAddress.getLoopbackAddress(), socketPort);
+    } else {
+      return new InetSocketAddress(socketPort);
     }
   }
 

@@ -31,7 +31,7 @@ branches:
     - /^branch\-.*$/
     - /^feature\/.*$/
 
-script: mvn --batch-mode test -P $PROFILE -Dsurefire.redirectTestOutputToFile=false -Dtwill.zk.server.localhost=false
+script: mvn --batch-mode test -P $PROFILE -Dsurefire.redirectTestOutputToFile=false
 
 install: mvn --batch-mode install -P $PROFILE -DskipTests=true
 
