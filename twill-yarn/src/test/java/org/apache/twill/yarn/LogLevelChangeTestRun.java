@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -172,20 +173,20 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
 
     // assert that log level is DEBUG
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG), 1);
 
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG), 1);
 
     // change the log level to INFO
     controller.updateLogLevels(ImmutableMap.of(Logger.ROOT_LOGGER_NAME, LogEntry.Level.INFO)).get();
 
     // assert log level has changed to INFO
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", LogEntry.Level.INFO));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", LogEntry.Level.INFO), 1);
 
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", LogEntry.Level.INFO));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.INFO, ImmutableMap.of("ROOT", LogEntry.Level.INFO), 1);
 
     // change the log level of LogLevelTestRunnable to WARN,
     // change the log level of LogLevelTestSecondRunnable to TRACE
@@ -195,16 +196,16 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     controller.updateLogLevels(LogLevelTestSecondRunnable.class.getSimpleName(), logLevelSecondRunnable).get();
 
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, ImmutableMap.of("ROOT", LogEntry.Level.WARN));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, ImmutableMap.of("ROOT", LogEntry.Level.WARN), 1);
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.TRACE, ImmutableMap.of("ROOT", LogEntry.Level.TRACE));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.TRACE, ImmutableMap.of("ROOT", LogEntry.Level.TRACE), 1);
 
     // change a particular logger to log level warn and reset it back.
     logLevelFirstRunnable = ImmutableMap.of("test", LogEntry.Level.WARN);
     controller.updateLogLevels(LogLevelTestRunnable.class.getSimpleName(), logLevelFirstRunnable).get();
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
                     20L, TimeUnit.SECONDS, LogEntry.Level.WARN,
-                    ImmutableMap.of("ROOT", LogEntry.Level.WARN, "test", LogEntry.Level.WARN));
+                    ImmutableMap.of("ROOT", LogEntry.Level.WARN, "test", LogEntry.Level.WARN), 1);
     logLevelFirstRunnable = new HashMap<>();
     logLevelFirstRunnable.put("test", null);
     controller.updateLogLevels(LogLevelTestRunnable.class.getSimpleName(), logLevelFirstRunnable).get();
@@ -212,13 +213,13 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     result.put("ROOT", LogEntry.Level.WARN);
     result.put("test", null);
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, result);
+                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, result, 1);
 
     // reset the log level for a particular logger of LogLevelTestRunnable
     controller.resetRunnableLogLevels(LogLevelTestRunnable.class.getSimpleName(), "test").get();
     result.remove("test");
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, result);
+                    20L, TimeUnit.SECONDS, LogEntry.Level.WARN, result, 1);
 
     // change the log level of LogLevelTestSecondRunnable to INFO and change instances of it to test if the log level
     // request get applied to container started up later
@@ -228,14 +229,14 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
     controller.changeInstances(LogLevelTestSecondRunnable.class.getSimpleName(), 2).get();
     TimeUnit.SECONDS.sleep(5);
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(), 20L, TimeUnit.SECONDS,
-                    LogEntry.Level.INFO, logLevelSecondRunnable);
+                    LogEntry.Level.INFO, logLevelSecondRunnable, 2);
 
     // reset the log levels back to default.
     controller.resetLogLevels().get();
     waitForLogLevel(controller, LogLevelTestRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG), 1);
     waitForLogLevel(controller, LogLevelTestSecondRunnable.class.getSimpleName(),
-                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG));
+                    20L, TimeUnit.SECONDS, LogEntry.Level.DEBUG, ImmutableMap.of("ROOT", LogEntry.Level.DEBUG), 2);
 
     // stop
     controller.terminate().get(120, TimeUnit.SECONDS);
@@ -248,29 +249,37 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
   // could return null if the application has not fully started.
   private void waitForLogLevel(TwillController controller, String runnable, long timeout,
                                TimeUnit timeoutUnit, LogEntry.Level expected,
-                               Map<String, LogEntry.Level> expectedArgs) throws InterruptedException {
+                               Map<String, LogEntry.Level> expectedArgs,
+                               int expectedInstances) throws InterruptedException {
 
     Stopwatch stopwatch = new Stopwatch();
     stopwatch.start();
-    LogEntry.Level actual = null;
-    Map<String, LogEntry.Level> actualArgs = null;
-    boolean stopped = false;
-    do {
+    while (stopwatch.elapsedTime(timeoutUnit) < timeout) {
       ResourceReport report = controller.getResourceReport();
+
       if (report == null || report.getRunnableResources(runnable) == null) {
+        TimeUnit.MILLISECONDS.sleep(100);
         continue;
       }
+
+      int matchCount = 0;
       for (TwillRunResources resources : report.getRunnableResources(runnable)) {
-        actual = resources.getLogLevels().get(Logger.ROOT_LOGGER_NAME);
-        actualArgs = resources.getLogLevels();
-        if (actual != null && actual.equals(expected)) {
-          stopped = true;
-          break;
+        LogEntry.Level actual = resources.getLogLevels().get(Logger.ROOT_LOGGER_NAME);
+        Map<String, LogEntry.Level> actualArgs = resources.getLogLevels();
+        if (Objects.equals(expected, actual) && Objects.equals(expectedArgs, actualArgs)) {
+          matchCount++;
+        } else {
+          LOG.info("Log levels not match for {}. {} != {} or {} != {}",
+                   runnable, expected, actual, expectedArgs, actualArgs);
         }
       }
+
+      if (matchCount == expectedInstances) {
+        return;
+      }
       TimeUnit.MILLISECONDS.sleep(100);
-    } while (!stopped && stopwatch.elapsedTime(timeoutUnit) < timeout);
-    Assert.assertEquals(expected, actual);
-    Assert.assertEquals(expectedArgs, actualArgs);
+    }
+
+    Assert.fail("Timeout waiting for expected log levels");
   }
 }
