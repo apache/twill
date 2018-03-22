@@ -54,11 +54,11 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
   private final AtomicReference<Producer<Integer, ByteBuffer>> producer;
   private final AtomicBoolean listenerCancelled;
 
-  public SimpleKafkaPublisher(BrokerService brokerService, Ack ack, Compression compression) {
+  SimpleKafkaPublisher(BrokerService brokerService, Ack ack, Compression compression) {
     this.brokerService = brokerService;
     this.ack = ack;
     this.compression = compression;
-    this.producer = new AtomicReference<Producer<Integer, ByteBuffer>>();
+    this.producer = new AtomicReference<>();
     this.listenerCancelled = new AtomicBoolean(false);
   }
 
@@ -107,7 +107,7 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
 
     @Override
     public Preparer add(ByteBuffer message, Object partitionKey) {
-      messages.add(new KeyedMessage<Integer, ByteBuffer>(topic, Math.abs(partitionKey.hashCode()), message));
+      messages.add(new KeyedMessage<>(topic, Math.abs(partitionKey.hashCode()), message));
       return this;
     }
 
@@ -159,30 +159,37 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
       }
 
       String newBrokerList = brokerService.getBrokerList();
-      if (newBrokerList.isEmpty()) {
-        LOG.warn("Broker list is empty. No Kafka producer is created.");
-        return;
-      }
 
+      // If there is no change, whether it is empty or not, just return
       if (Objects.equal(brokerList, newBrokerList)) {
         return;
       }
 
-      Properties props = new Properties();
-      props.put("metadata.broker.list", newBrokerList);
-      props.put("serializer.class", ByteBufferEncoder.class.getName());
-      props.put("key.serializer.class", IntegerEncoder.class.getName());
-      props.put("partitioner.class", IntegerPartitioner.class.getName());
-      props.put("request.required.acks", Integer.toString(ack.getAck()));
-      props.put("compression.codec", compression.getCodec());
+      Producer<Integer, ByteBuffer> newProducer = null;
+      if (!newBrokerList.isEmpty()) {
+        Properties props = new Properties();
+        props.put("metadata.broker.list", newBrokerList);
+        props.put("serializer.class", ByteBufferEncoder.class.getName());
+        props.put("key.serializer.class", IntegerEncoder.class.getName());
+        props.put("partitioner.class", IntegerPartitioner.class.getName());
+        props.put("request.required.acks", Integer.toString(ack.getAck()));
+        props.put("compression.codec", compression.getCodec());
 
-      ProducerConfig config = new ProducerConfig(props);
-      Producer<Integer, ByteBuffer> oldProducer = producer.getAndSet(new Producer<Integer, ByteBuffer>(config));
+        ProducerConfig config = new ProducerConfig(props);
+        newProducer = new Producer<>(config);
+      }
+
+      // If the broker list is empty, the producer will be set to null
+      Producer<Integer, ByteBuffer> oldProducer = producer.getAndSet(newProducer);
       if (oldProducer != null) {
         oldProducer.close();
       }
 
-      LOG.info("Update Kafka producer broker list: {}", newBrokerList);
+      if (newBrokerList.isEmpty()) {
+        LOG.warn("Empty Kafka producer broker list, publish will fail.");
+      } else {
+        LOG.info("Updated Kafka producer broker list: {}", newBrokerList);
+      }
       brokerList = newBrokerList;
     }
   }

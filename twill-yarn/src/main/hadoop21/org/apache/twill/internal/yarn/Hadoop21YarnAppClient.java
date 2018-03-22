@@ -59,7 +59,7 @@ import javax.annotation.Nullable;
 public class Hadoop21YarnAppClient implements YarnAppClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(Hadoop21YarnAppClient.class);
-  private final Configuration configuration;
+  protected final Configuration configuration;
 
   public Hadoop21YarnAppClient(Configuration configuration) {
     this.configuration = configuration;
@@ -108,7 +108,7 @@ public class Hadoop21YarnAppClient implements YarnAppClient {
             addRMToken(launchContext, yarnClient, appId);
             appSubmissionContext.setAMContainerSpec(launchContext);
             appSubmissionContext.setResource(capability);
-            appSubmissionContext.setMaxAppAttempts(2);
+            configureAppSubmissionContext(appSubmissionContext);
 
             yarnClient.submitApplication(appSubmissionContext);
             return new ProcessControllerImpl(appId);
@@ -123,6 +123,19 @@ public class Hadoop21YarnAppClient implements YarnAppClient {
       return new ApplicationMasterProcessLauncher(appMasterInfo, submitter);
     } finally {
       yarnClient.stop();
+    }
+  }
+
+  /**
+   * Updates the {@link ApplicationSubmissionContext} based on configuration.
+   */
+  protected void configureAppSubmissionContext(ApplicationSubmissionContext context) {
+    int maxAttempts = configuration.getInt(Configs.Keys.YARN_MAX_APP_ATTEMPTS, -1);
+    if (maxAttempts > 0) {
+      context.setMaxAppAttempts(maxAttempts);
+    } else {
+      // Preserve the old behavior
+      context.setMaxAppAttempts(2);
     }
   }
 

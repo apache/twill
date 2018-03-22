@@ -78,7 +78,9 @@ import org.apache.twill.internal.yarn.YarnContainerStatus;
 import org.apache.twill.internal.yarn.YarnUtils;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.twill.zookeeper.ZKClients;
+import org.apache.twill.zookeeper.ZKOperations;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -318,8 +320,12 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
 
     instanceChangeExecutor = Executors.newSingleThreadExecutor(Threads.createDaemonThreadFactory("instanceChanger"));
 
-    // Creates ZK path for runnable
-    zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT).get();
+    // Creates ZK path for runnable. It's ok if the path already exists.
+    // That's for the case when the AM get killed and restarted
+    ZKOperations.ignoreError(
+      zkClient.create("/" + runId.getId() + "/runnables", null, CreateMode.PERSISTENT),
+      KeeperException.NodeExistsException.class, null)
+      .get();
     runningContainers.addWatcher(Constants.DISCOVERY_PATH_PREFIX);
     runnableContainerRequests = initContainerRequests();
   }

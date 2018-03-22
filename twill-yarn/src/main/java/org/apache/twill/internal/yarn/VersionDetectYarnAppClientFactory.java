@@ -39,9 +39,13 @@ public final class VersionDetectYarnAppClientFactory implements YarnAppClientFac
           // 2.1 and 2.2 uses the same YarnAppClient
           clzName = getClass().getPackage().getName() + ".Hadoop21YarnAppClient";
           break;
-        default:
+        case HADOOP_23:
           // 2.3 and above uses the 2.3 YarnAppClient to support RM HA
           clzName = getClass().getPackage().getName() + ".Hadoop23YarnAppClient";
+          break;
+        default:
+          // Anything above 2.3 will be 2.6 and beyond
+          clzName = getClass().getPackage().getName() + ".Hadoop26YarnAppClient";
       }
       Class<YarnAppClient> clz = (Class<YarnAppClient>) Class.forName(clzName);
       return clz.getConstructor(Configuration.class).newInstance(configuration);
