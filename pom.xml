@@ -175,6 +175,7 @@
         <jcl-over-slf4j.version>1.7.2</jcl-over-slf4j.version>
         <asm.version>5.0.2</asm.version>
         <kafka.version>0.8.0</kafka.version>
+        <zkclient.version>0.10</zkclient.version>
         <zookeeper.version>3.4.5</zookeeper.version>
         <junit.version>4.11</junit.version>
         <jopt-simple.version>3.2</jopt-simple.version>
@@ -649,6 +650,11 @@
                 <version>${findbugs.jsr305.version}</version>
                 <optional>true</optional>
             </dependency>
+            <dependency>
+                <groupId>com.101tec</groupId>
+                <artifactId>zkclient</artifactId>
+                <version>${zkclient.version}</version>
+            </dependency> 
             <dependency>
                 <groupId>com.google.code.gson</groupId>
                 <artifactId>gson</artifactId>
