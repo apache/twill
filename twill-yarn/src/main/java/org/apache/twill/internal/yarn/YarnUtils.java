@@ -53,6 +53,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 
@@ -60,6 +61,10 @@ import javax.annotation.Nullable;
  * Collection of helper methods to simplify YARN calls.
  */
 public class YarnUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
+
+  private static final String EMPTY = "";
 
   /**
    * Defines different versions of Hadoop.
@@ -72,7 +77,23 @@ public class YarnUtils {
     HADOOP_26
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
+  private static boolean iDFSUtilClientExists = false; // use this to judge if the hadoop version is above 2.8
+
+  private static Method getHaNnRpcAddressesMethod;
+
+  static {
+    try {
+      Class dfsUtilsClientClazz = Class.forName("org.apache.hadoop.hdfs.DFSUtilClient");
+      getHaNnRpcAddressesMethod = dfsUtilsClientClazz.getMethod("getHaNnRpcAddresses",
+          Configuration.class);
+      iDFSUtilClientExists = true;
+    } catch (ClassNotFoundException e) {
+      handleLogAction(e);
+    } catch (NoSuchMethodException e) {
+      handleLogAction(e);
+    }
+  }
+
   private static final AtomicReference<HadoopVersions> HADOOP_VERSION = new AtomicReference<>();
 
   public static YarnLocalResource createLocalResource(LocalFile localFile) {
@@ -185,7 +206,7 @@ public class YarnUtils {
                                           CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT)).getScheme();
 
     // Loop through all name services. Each name service could have multiple name node associated with it.
-    for (Map.Entry<String, Map<String, InetSocketAddress>> entry : DFSUtil.getHaNnRpcAddresses(config).entrySet()) {
+    for (Map.Entry<String, Map<String, InetSocketAddress>> entry : getEntries(config)) {
       String nsId = entry.getKey();
       Map<String, InetSocketAddress> addressesInNN = entry.getValue();
       if (!HAUtil.isHAEnabled(config, nsId) || addressesInNN == null || addressesInNN.isEmpty()) {
@@ -200,6 +221,28 @@ public class YarnUtils {
       LOG.info("Cloning delegation token for uri {}", uri);
       HAUtil.cloneDelegationTokenForLogicalUri(UserGroupInformation.getCurrentUser(), uri, addressesInNN.values());
     }
+  }
+
+  /***
+   * When hadoop_version > 2.8.0, class DFSUtils has no method getHaNnRpcAddresses(Configuration config)
+   * @param config
+   * @return
+   */
+  private static Set<Map.Entry<String, Map<String, InetSocketAddress>>> getEntries(Configuration config) {
+    return iDFSUtilClientExists ? invoke(config) :
+        DFSUtil.getHaNnRpcAddresses(config).entrySet();
+  }
+
+  private static Set<Map.Entry<String, Map<String, InetSocketAddress>>> invoke(Configuration config) {
+    try {
+      return ((Map) getHaNnRpcAddressesMethod.invoke(null, config)).entrySet();
+    } catch (Exception e) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(e.getMessage(), e);
+      }
+      throw Throwables.propagate(e);
+    }
+
   }
 
   /**
@@ -343,6 +386,28 @@ public class YarnUtils {
 
     LOG.warn("Unexpected: LocationFactory is not backed by FileContextLocationFactory");
     return null;
+  }
+
+  private static void handleLogAction(Exception e) {
+
+    if (e == null) {
+      LOG.warn("exception is null.");
+      return;
+    }
+
+    String message = e.getClass().getSimpleName();
+
+    int exceptionPos = message.indexOf("Exception");
+
+    message = exceptionPos == 0 ? EMPTY : message.substring(0, exceptionPos - 1);
+
+    if (LOG.isWarnEnabled()) {
+      LOG.warn("{} {}", message, e.getMessage());
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(String.format("%s %s", message, e.getMessage()), e);
+    }
   }
 
   private YarnUtils() {
