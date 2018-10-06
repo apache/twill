@@ -51,11 +51,12 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+
 
 /**
  * Collection of helper methods to simplify YARN calls.
@@ -64,7 +65,6 @@ public class YarnUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnUtils.class);
 
-  private static final String EMPTY = "";
 
   /**
    * Defines different versions of Hadoop.
@@ -77,20 +77,29 @@ public class YarnUtils {
     HADOOP_26
   }
 
-  private static boolean iDFSUtilClientExists = false; // use this to judge if the hadoop version is above 2.8
+  private static boolean hasDFSUtilClient = false; // use this to judge if the hadoop version is above 2.8
+
+  private static boolean hasHAUtilsClient = false;
 
   private static Method getHaNnRpcAddressesMethod;
+
+  private static Method cloneDelegationTokenForLogicalUriMethod;
 
   static {
     try {
       Class dfsUtilsClientClazz = Class.forName("org.apache.hadoop.hdfs.DFSUtilClient");
       getHaNnRpcAddressesMethod = dfsUtilsClientClazz.getMethod("getHaNnRpcAddresses",
           Configuration.class);
-      iDFSUtilClientExists = true;
+      hasDFSUtilClient = true;
+      Class haUtilClientClazz = Class.forName("org.apache.hadoop.hdfs.HAUtilClient");
+      cloneDelegationTokenForLogicalUriMethod = haUtilClientClazz.getMethod(
+          "cloneDelegationTokenForLogicalUri", UserGroupInformation.class,
+          URI.class, Collection.class);
+      hasHAUtilsClient = true;
     } catch (ClassNotFoundException e) {
-      handleLogAction(e);
+      LOG.debug("No such class", e);
     } catch (NoSuchMethodException e) {
-      handleLogAction(e);
+      LOG.debug("No such method", e);
     }
   }
 
@@ -206,7 +215,7 @@ public class YarnUtils {
                                           CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT)).getScheme();
 
     // Loop through all name services. Each name service could have multiple name node associated with it.
-    for (Map.Entry<String, Map<String, InetSocketAddress>> entry : getEntries(config)) {
+    for (Map.Entry<String, Map<String, InetSocketAddress>> entry : getHaNnRpcAddresses(config).entrySet()) {
       String nsId = entry.getKey();
       Map<String, InetSocketAddress> addressesInNN = entry.getValue();
       if (!HAUtil.isHAEnabled(config, nsId) || addressesInNN == null || addressesInNN.isEmpty()) {
@@ -219,30 +228,48 @@ public class YarnUtils {
       URI uri = URI.create(scheme + "://" + nsId);
 
       LOG.info("Cloning delegation token for uri {}", uri);
-      HAUtil.cloneDelegationTokenForLogicalUri(UserGroupInformation.getCurrentUser(), uri, addressesInNN.values());
+      cloneDelegationTokenForLogicalUri(UserGroupInformation.getCurrentUser(), uri, addressesInNN.values());
     }
   }
 
-  /***
+  /**
+   * When hadoop_version > 2.8.0, class HAUtil has no method cloneDelegationTokenForLogicalUri(Configuration config)
+   *
+   */
+  private static void cloneDelegationTokenForLogicalUri(UserGroupInformation ugi, URI haUri,
+                                                        Collection<InetSocketAddress> nnAddrs) {
+    if (hasHAUtilsClient) {
+      invokeStaticMethodWithExceptionHandled(cloneDelegationTokenForLogicalUriMethod, ugi, haUri, nnAddrs);
+    } else {
+      HAUtil.cloneDelegationTokenForLogicalUri(ugi, haUri, nnAddrs);
+    }
+  }
+
+
+  /**
    * When hadoop_version > 2.8.0, class DFSUtils has no method getHaNnRpcAddresses(Configuration config)
    * @param config
    * @return
    */
-  private static Set<Map.Entry<String, Map<String, InetSocketAddress>>> getEntries(Configuration config) {
-    return iDFSUtilClientExists ? invoke(config) :
-        DFSUtil.getHaNnRpcAddresses(config).entrySet();
+  private static Map<String, Map<String, InetSocketAddress>> getHaNnRpcAddresses(Configuration config) {
+    return hasDFSUtilClient ? getHaNnRpcAddressesUseDFSUtilClient(config) :
+        DFSUtil.getHaNnRpcAddresses(config);
   }
 
-  private static Set<Map.Entry<String, Map<String, InetSocketAddress>>> invoke(Configuration config) {
+  private static Map<String, Map<String, InetSocketAddress>> getHaNnRpcAddressesUseDFSUtilClient(Configuration config) {
+    return (Map) invokeStaticMethodWithExceptionHandled(getHaNnRpcAddressesMethod, config);
+  }
+
+  private static Object invokeStaticMethodWithExceptionHandled(Method method, Object ... args) {
+    Preconditions.checkNotNull(method);
     try {
-      return ((Map) getHaNnRpcAddressesMethod.invoke(null, config)).entrySet();
+      return method.invoke(null, args);
     } catch (Exception e) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(e.getMessage(), e);
       }
       throw Throwables.propagate(e);
     }
-
   }
 
   /**
@@ -388,27 +415,6 @@ public class YarnUtils {
     return null;
   }
 
-  private static void handleLogAction(Exception e) {
-
-    if (e == null) {
-      LOG.warn("exception is null.");
-      return;
-    }
-
-    String message = e.getClass().getSimpleName();
-
-    int exceptionPos = message.indexOf("Exception");
-
-    message = exceptionPos == 0 ? EMPTY : message.substring(0, exceptionPos - 1);
-
-    if (LOG.isWarnEnabled()) {
-      LOG.warn("{} {}", message, e.getMessage());
-    }
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("%s %s", message, e.getMessage()), e);
-    }
-  }
 
   private YarnUtils() {
   }
