@@ -18,11 +18,7 @@
 
 language: java
 
-# Run it on precise, until figure out how to make jdk7 works (or no longer needs to support jdk7).
-dist: precise
-
 jdk:
-  - oraclejdk7
   - oraclejdk8
 
 branches:
@@ -45,28 +41,6 @@ env:
   - PROFILE='cdh-4.4.0'
   - PROFILE='mapr-hadoop-2.4'
   - PROFILE='hadoop-2.6,java8-test'
-
-# Only runs JDK8 on hadoop-2.5 profile
-matrix:
-  exclude:
-    - jdk: oraclejdk8
-      env: PROFILE='hadoop-2.0'
-    - jdk: oraclejdk8
-      env: PROFILE='hadoop-2.1'
-    - jdk: oraclejdk8
-      env: PROFILE='hadoop-2.2'
-    - jdk: oraclejdk8
-      env: PROFILE='hadoop-2.4'
-    - jdk: oraclejdk8
-      env: PROFILE='hadoop-2.5'
-    - jdk: oraclejdk8
-      env: PROFILE='hadoop-2.6'
-    - jdk: oraclejdk8
-      env: PROFILE='cdh-4.4.0'
-    - jdk: oraclejdk8
-      env: PROFILE='mapr-hadoop-2.4'
-    - jdk: oraclejdk7
-      env: PROFILE='hadoop-2.6,java8-test'
 
 sudo: false
 
