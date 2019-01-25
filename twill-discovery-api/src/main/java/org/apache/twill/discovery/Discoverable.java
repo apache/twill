@@ -63,7 +63,7 @@ public class Discoverable {
 
   @Override
   public String toString() {
-    return "{name=" + name + ", address=" + address + ", payload=" + payload + "}";
+    return "{name=" + name + ", address=" + address + ", payload=" + Arrays.toString(payload) + "}";
   }
 
   @Override
@@ -77,12 +77,15 @@ public class Discoverable {
 
     Discoverable other = (Discoverable) o;
 
-    return name.equals(other.getName()) && address.equals(other.getSocketAddress()) &&
-      Arrays.equals(payload, other.getPayload());
+    return Objects.equals(name, other.name) &&
+      Objects.equals(address, other.address) &&
+      Arrays.equals(payload, other.payload);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, address, payload);
+    int result = Objects.hash(name, address);
+    result = 31 * result + Arrays.hashCode(payload);
+    return result;
   }
 }
