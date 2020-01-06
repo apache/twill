@@ -144,7 +144,7 @@ public abstract class AbstractYarnAMClient<T> extends AbstractIdleService implem
         if (!launcher.isLaunched()) {
           YarnContainerInfo containerInfo = launcher.getContainerInfo();
           // Casting is needed in Java 8, otherwise it complains about ambiguous method over the info(String, Throwable)
-          LOG.info("Nothing to run in container, releasing it: {}", containerInfo.getContainer());
+          LOG.info("Nothing to run in container, releasing it: {}", containerInfo.<Object>getContainer());
           releaseAssignedContainer(containerInfo);
         }
       }
