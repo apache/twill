@@ -32,13 +32,11 @@ script: mvn --batch-mode test -P $PROFILE -Dsurefire.redirectTestOutputToFile=fa
 install: mvn --batch-mode install -P $PROFILE -DskipTests=true
 
 env:
-  - PROFILE='hadoop-2.0'
   - PROFILE='hadoop-2.1'
   - PROFILE='hadoop-2.2'
   - PROFILE='hadoop-2.4'
   - PROFILE='hadoop-2.5'
   - PROFILE='hadoop-2.6'
-  - PROFILE='cdh-4.4.0'
   - PROFILE='mapr-hadoop-2.4'
   - PROFILE='hadoop-2.6,java8-test'
 
