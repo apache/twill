@@ -753,7 +753,7 @@ public final class ApplicationMasterService extends AbstractYarnTwillService imp
   private void launchRunnable(List<? extends ProcessLauncher<YarnContainerInfo>> launchers,
                               Queue<ProvisionRequest> provisioning) {
     for (ProcessLauncher<YarnContainerInfo> processLauncher : launchers) {
-      LOG.info("Container allocated: {}", processLauncher.getContainerInfo().getContainer());
+      LOG.info("Container allocated: {}", processLauncher.getContainerInfo().<Object>getContainer());
       ProvisionRequest provisionRequest = provisioning.peek();
       if (provisionRequest == null) {
         continue;

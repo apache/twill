@@ -96,6 +96,7 @@ page at http://checkstyle.sourceforge.net/config.html -->
       <!-- This ensures that static imports go to the end. -->
       <property name="option" value="bottom"/>
       <property name="tokens" value="STATIC_IMPORT, IMPORT"/>
+      <property name="separated" value="true"/>
     </module>
 
     <!--
