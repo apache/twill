@@ -329,7 +329,7 @@ public abstract class LocationTestBase {
         Assert.assertFalse(textfile.isDirectory());
         Assert.assertEquals(permissions, child.getPermissions());
         Assert.assertEquals(permissions, grandchild.getPermissions());
-        Assert.assertEquals(correctFilePermissions(permissions), textfile.getPermissions());
+        Assert.assertEquals(permissions, textfile.getPermissions());
 
         // mkdirs of existing file
         Location file = factory.create("existingfile");
@@ -379,14 +379,6 @@ public abstract class LocationTestBase {
    * Create a location factory rooted at a given path.
    */
   protected abstract LocationFactory createLocationFactory(String pathBase) throws Exception;
-
-  /**
-   * Some older versions of Hadoop always strip the execute permission from files (but keep it for directories).
-   * This allows subclasses to correct the expected file permissions, based on the Hadoop version (if any).
-   */
-  protected String correctFilePermissions(String expectedFilePermissions) {
-    return expectedFilePermissions; // unchanged by default
-  }
 
   protected UserGroupInformation createTestUGI() throws IOException {
     String userName = System.getProperty("user.name").equals("tester") ? "twiller" : "tester";

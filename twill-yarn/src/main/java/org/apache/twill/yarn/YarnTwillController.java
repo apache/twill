@@ -37,7 +37,6 @@ import org.apache.twill.internal.appmaster.TrackerService;
 import org.apache.twill.internal.state.SystemMessages;
 import org.apache.twill.internal.yarn.YarnAppClient;
 import org.apache.twill.internal.yarn.YarnApplicationReport;
-import org.apache.twill.internal.yarn.YarnUtils;
 import org.apache.twill.zookeeper.NodeData;
 import org.apache.twill.zookeeper.ZKClient;
 import org.apache.zookeeper.data.Stat;
@@ -83,13 +82,9 @@ final class YarnTwillController extends AbstractTwillController implements Twill
     super(appName, runId, zkClient, amLiveNodeData.getKafkaZKConnect() != null, Collections.<LogHandler>emptyList());
     this.appName = appName;
     this.amLiveNodeData = amLiveNodeData;
-    this.startUp = new Callable<ProcessController<YarnApplicationReport>>() {
-      @Override
-      public ProcessController<YarnApplicationReport> call() throws Exception {
-        return yarnAppClient.createProcessController(
-          YarnUtils.createApplicationId(amLiveNodeData.getAppIdClusterTime(), amLiveNodeData.getAppId()));
-      }
-    };
+    this.startUp = () -> yarnAppClient.createProcessController(
+      ApplicationId.newInstance(amLiveNodeData.getAppIdClusterTime(),
+                                amLiveNodeData.getAppId()));
     this.startTimeout = Constants.APPLICATION_MAX_START_SECONDS;
     this.startTimeoutUnit = TimeUnit.SECONDS;
   }

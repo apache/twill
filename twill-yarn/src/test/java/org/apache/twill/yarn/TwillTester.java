@@ -42,7 +42,6 @@ import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.LocationFactory;
 import org.apache.twill.internal.yarn.VersionDetectYarnAppClientFactory;
 import org.apache.twill.internal.yarn.YarnAppClient;
-import org.apache.twill.internal.yarn.YarnUtils;
 import org.apache.twill.internal.zookeeper.InMemoryZKServer;
 import org.junit.rules.ExternalResource;
 import org.junit.rules.TemporaryFolder;
@@ -128,16 +127,11 @@ public class TwillTester extends ExternalResource {
 
     Configuration conf = new YarnConfiguration(dfsCluster.getFileSystem().getConf());
 
-    if (YarnUtils.getHadoopVersion().equals(YarnUtils.HadoopVersions.HADOOP_20)) {
-      conf.set("yarn.resourcemanager.scheduler.class",
-               "org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler");
-    } else {
-      conf.set("yarn.resourcemanager.scheduler.class",
-               "org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler");
-      conf.set("yarn.scheduler.capacity.resource-calculator",
-               "org.apache.hadoop.yarn.util.resource.DominantResourceCalculator");
-      conf.setBoolean("yarn.scheduler.include-port-in-node-name", true);
-    }
+    conf.set("yarn.resourcemanager.scheduler.class",
+             "org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler");
+    conf.set("yarn.scheduler.capacity.resource-calculator",
+             "org.apache.hadoop.yarn.util.resource.DominantResourceCalculator");
+    conf.setBoolean("yarn.scheduler.include-port-in-node-name", true);
     conf.set("yarn.nodemanager.vmem-pmem-ratio", "100.1");
     conf.set("yarn.nodemanager.vmem-check-enabled", "false");
     conf.set("yarn.scheduler.minimum-allocation-mb", "128");
@@ -235,8 +229,8 @@ public class TwillTester extends ExternalResource {
   public ApplicationResourceUsageReport getApplicationResourceReport(String appId) throws Exception {
     List<String> splits = Lists.newArrayList(Splitter.on('_').split(appId));
     Preconditions.checkArgument(splits.size() == 3, "Invalid application id - " + appId);
-    ApplicationId applicationId =
-      YarnUtils.createApplicationId(Long.parseLong(splits.get(1)), Integer.parseInt(splits.get(2)));
+    ApplicationId applicationId = ApplicationId.newInstance(Long.parseLong(splits.get(1)),
+                                                            Integer.parseInt(splits.get(2)));
 
     ClientRMService clientRMService = cluster.getResourceManager().getClientRMService();
     GetApplicationReportRequest request = Records.newRecord(GetApplicationReportRequest.class);

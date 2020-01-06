@@ -37,7 +37,6 @@ import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.hadoop.yarn.util.Records;
 import org.apache.twill.api.LocalFile;
 import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.ForwardingLocationFactory;
@@ -70,7 +69,6 @@ public class YarnUtils {
    * Defines different versions of Hadoop.
    */
   public enum HadoopVersions {
-    HADOOP_20,
     HADOOP_21,
     HADOOP_22,
     HADOOP_23,
@@ -109,7 +107,7 @@ public class YarnUtils {
     Preconditions.checkArgument(localFile.getLastModified() >= 0, "Last modified time should be >= 0.");
     Preconditions.checkArgument(localFile.getSize() >= 0, "File size should be >= 0.");
 
-    YarnLocalResource resource = createAdapter(YarnLocalResource.class);
+    YarnLocalResource resource = new Hadoop21YarnLocalResource();
     resource.setVisibility(LocalResourceVisibility.APPLICATION);
     resource.setResource(ConverterUtils.getYarnUrlFromURI(localFile.getURI()));
     resource.setTimestamp(localFile.getLastModified());
@@ -118,7 +116,7 @@ public class YarnUtils {
   }
 
   public static YarnLaunchContext createLaunchContext() {
-    return createAdapter(YarnLaunchContext.class);
+    return new Hadoop21YarnLaunchContext();
   }
 
   // temporary workaround since older versions of hadoop don't have the getVirtualCores method.
@@ -147,32 +145,6 @@ public class YarnUtils {
       return false;
     }
     return true;
-  }
-
-  /**
-   * Creates {@link ApplicationId} from the given cluster timestamp and id.
-   */
-  public static ApplicationId createApplicationId(long timestamp, int id) {
-    try {
-      try {
-        // For Hadoop-2.1
-        Method method = ApplicationId.class.getMethod("newInstance", long.class, int.class);
-        return (ApplicationId) method.invoke(null, timestamp, id);
-      } catch (NoSuchMethodException e) {
-        // Try with Hadoop-2.0 way
-        ApplicationId appId = Records.newRecord(ApplicationId.class);
-
-        Method setClusterTimestamp = ApplicationId.class.getMethod("setClusterTimestamp", long.class);
-        Method setId = ApplicationId.class.getMethod("setId", int.class);
-
-        setClusterTimestamp.invoke(appId, timestamp);
-        setId.invoke(appId, id);
-
-        return appId;
-      }
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
-    }
   }
 
   /**
@@ -329,50 +301,25 @@ public class YarnUtils {
       return hadoopVersion;
     }
     try {
-      Class.forName("org.apache.hadoop.yarn.client.api.NMClient");
+      Class.forName("org.apache.hadoop.yarn.client.cli.LogsCLI");
       try {
-        Class.forName("org.apache.hadoop.yarn.client.cli.LogsCLI");
+        Class.forName("org.apache.hadoop.yarn.conf.HAUtil");
         try {
-          Class.forName("org.apache.hadoop.yarn.conf.HAUtil");
-          try {
-            Class[] args = new Class[1];
-            args[0] = String.class;
-            // see if we have a org.apache.hadoop.yarn.api.records.ContainerId.fromString() method
-            Class.forName("org.apache.hadoop.yarn.api.records.ContainerId").getMethod("fromString", args);
-            HADOOP_VERSION.set(HadoopVersions.HADOOP_26);
-          } catch (NoSuchMethodException e) {
-            HADOOP_VERSION.set(HadoopVersions.HADOOP_23);
-          }
-        } catch (ClassNotFoundException e) {
-          HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
+          Class[] args = new Class[1];
+          args[0] = String.class;
+          // see if we have a org.apache.hadoop.yarn.api.records.ContainerId.fromString() method
+          Class.forName("org.apache.hadoop.yarn.api.records.ContainerId").getMethod("fromString", args);
+          HADOOP_VERSION.set(HadoopVersions.HADOOP_26);
+        } catch (NoSuchMethodException e) {
+          HADOOP_VERSION.set(HadoopVersions.HADOOP_23);
         }
       } catch (ClassNotFoundException e) {
-        HADOOP_VERSION.set(HadoopVersions.HADOOP_21);
+        HADOOP_VERSION.set(HadoopVersions.HADOOP_22);
       }
     } catch (ClassNotFoundException e) {
-      HADOOP_VERSION.set(HadoopVersions.HADOOP_20);
+      HADOOP_VERSION.set(HadoopVersions.HADOOP_21);
     }
     return HADOOP_VERSION.get();
-  }
-
-  /**
-   * Helper method to create adapter class for bridging between Hadoop 2.0 and 2.1.
-   */
-  private static <T> T createAdapter(Class<T> clz) {
-    String className = clz.getPackage().getName();
-
-    if (getHadoopVersion().equals(HadoopVersions.HADOOP_20)) {
-      className += ".Hadoop20" + clz.getSimpleName();
-    } else {
-      className += ".Hadoop21" + clz.getSimpleName();
-    }
-
-    try {
-      //noinspection unchecked
-      return (T) Class.forName(className).newInstance();
-    } catch (Exception e) {
-      throw Throwables.propagate(e);
-    }
   }
 
   private static YarnLocalResource setLocalResourceType(YarnLocalResource localResource, LocalFile localFile) {

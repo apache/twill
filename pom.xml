@@ -179,7 +179,6 @@
         <junit.version>4.11</junit.version>
         <jopt-simple.version>3.2</jopt-simple.version>
         <commons-compress.version>1.5</commons-compress.version>
-        <hadoop20.output.dir>target/hadoop20-classes</hadoop20.output.dir>
         <force.mac.tests>false</force.mac.tests>
     </properties>
 
@@ -225,11 +224,13 @@
                     <configuration>
                         <excludePackageNames>*.internal.*:echo:*.example.*</excludePackageNames>
                         <links>
-                            <link>http://docs.oracle.com/javase/7/docs/api/</link>
+                            <link>http://docs.oracle.com/javase/8/docs/api/</link>
                         </links>
                         <bottom>
-                            <![CDATA[Copyright &#169; 2013-2016 <a href="http://www.apache.org">The Apache Software Foundation</a>. All rights reserved.]]>
+                            <![CDATA[Copyright &#169; 2013-2020 <a href="http://www.apache.org">The Apache Software Foundation</a>. All rights reserved.]]>
                         </bottom>
+                        <doclint>none</doclint>
+                        <failOnError>false</failOnError>
                     </configuration>
                     <executions>
                         <execution>
@@ -375,12 +376,13 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-assembly-plugin</artifactId>
-                        <version>2.4</version>
+                        <version>3.2.0</version>
                         <configuration>
                             <finalName>apache-twill-${project.version}</finalName>
                             <formats>
                                 <format>tar.gz</format>
                             </formats>
+                            <tarLongFileMode>posix</tarLongFileMode>
                         </configuration>
                     </plugin>
                     <plugin>
@@ -390,76 +392,6 @@
                             <!-- Disable this plugin so that it won't generate a DEPENDENCIES file in the source tar -->
                             <skip>true</skip>
                         </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>hadoop-2.0</id>
-            <properties>
-                <hadoop.version>2.0.2-alpha</hadoop.version>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>1.8</version>
-                        <executions>
-                            <execution>
-                                <id>add-source</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>cdh-4.4.0</id>
-            <properties>
-                <hadoop.version>2.0.0-cdh4.4.0</hadoop.version>
-            </properties>
-            <repositories>
-                <repository>
-                    <id>cloudera-releases</id>
-                    <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
-                    <releases>
-                        <enabled>true</enabled>
-                    </releases>
-                    <snapshots>
-                        <enabled>false</enabled>
-                    </snapshots>
-                </repository>
-            </repositories>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>1.8</version>
-                        <executions>
-                            <execution>
-                                <id>add-source</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
                     </plugin>
                 </plugins>
             </build>
@@ -485,18 +417,6 @@
                                 <configuration>
                                     <sources>
                                         <source>src/main/hadoop21</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-source-2.0</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
                                     </sources>
                                 </configuration>
                             </execution>
@@ -527,18 +447,6 @@
                                     <sources>
                                         <source>src/main/hadoop21</source>
                                         <source>src/main/hadoop22</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-source-2.0</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
                                     </sources>
                                 </configuration>
                             </execution>
@@ -573,18 +481,6 @@
                                     </sources>
                                 </configuration>
                             </execution>
-                            <execution>
-                                <id>add-source-2.0</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
                         </executions>
                     </plugin>
                 </plugins>
@@ -613,18 +509,6 @@
                                         <source>src/main/hadoop21</source>
                                         <source>src/main/hadoop22</source>
                                         <source>src/main/hadoop23</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-source-2.0</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
                                     </sources>
                                 </configuration>
                             </execution>
@@ -673,18 +557,6 @@
                                     </sources>
                                 </configuration>
                             </execution>
-                            <execution>
-                                <id>add-source-2.0</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
                         </executions>
                     </plugin>
                 </plugins>
@@ -713,18 +585,6 @@
                                         <source>src/main/hadoop21</source>
                                         <source>src/main/hadoop22</source>
                                         <source>src/main/hadoop23</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-source-2.0</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
                                     </sources>
                                 </configuration>
                             </execution>
@@ -760,18 +620,6 @@
                                         <source>src/main/hadoop22</source>
                                         <source>src/main/hadoop23</source>
                                         <source>src/main/hadoop26</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-source-2.0</id>
-                                <phase>prepare-package</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/hadoop20</source>
                                     </sources>
                                 </configuration>
                             </execution>
