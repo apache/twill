@@ -277,7 +277,7 @@ public class LogLevelChangeTestRun extends BaseYarnTest {
       if (matchCount == expectedInstances) {
         return;
       }
-      TimeUnit.MILLISECONDS.sleep(100);
+      TimeUnit.SECONDS.sleep(1);
     }
 
     Assert.fail("Timeout waiting for expected log levels");
