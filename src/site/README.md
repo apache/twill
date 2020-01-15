@@ -23,9 +23,7 @@ Apache Twill Site Update Instructions
 
         git checkout master
 
-        mvn clean prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.0 &&
-        mvn prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 &&
-        mvn deploy -DskipTests -Dremoteresources.skip=true -P hadoop-2.3 -P apache-release
+        mvn clean deploy -DskipTests -Dremoteresources.skip=true -P hadoop-2.6 -P apache-release
 1. Build javadocs for the newly released version
 
         git checkout branch-${RELEASE_VERSION}

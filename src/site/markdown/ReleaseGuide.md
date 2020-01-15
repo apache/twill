@@ -81,9 +81,7 @@ git push origin v${RELEASE_VERSION}
   
 #### Build the source tarball and publish artifacts to the staging repo
 ```
-mvn clean prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.0 &&
-mvn prepare-package -DskipTests -Dremoteresources.skip=true -P hadoop-2.6 &&
-mvn deploy -DskipTests -Dremoteresources.skip=true -P hadoop-2.6 -P apache-release
+mvn clean deploy -DskipTests -Dremoteresources.skip=true -P hadoop-2.6 -P apache-release
 ```
 The source tarball can be found in `target/apache-twill-${RELEASE_VERSION}-source-release.tar.gz`
 after the above command has successfully completed.
