@@ -113,6 +113,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 /**
@@ -121,12 +122,6 @@ import javax.annotation.Nullable;
 final class YarnTwillPreparer implements TwillPreparer {
 
   private static final Logger LOG = LoggerFactory.getLogger(YarnTwillPreparer.class);
-  private static final Function<Class<?>, String> CLASS_TO_NAME = new Function<Class<?>, String>() {
-    @Override
-    public String apply(Class<?> cls) {
-      return cls.getName();
-    }
-  };
 
   private final Configuration config;
   private final TwillSpecification twillSpec;
@@ -575,13 +570,17 @@ final class YarnTwillPreparer implements TwillPreparer {
 
       // Add the TwillRunnableEventHandler class
       if (twillSpec.getEventHandler() != null) {
-        classes.add(getClassLoader().loadClass(twillSpec.getEventHandler().getClassName()));
+        classes.add(classLoader.loadClass(twillSpec.getEventHandler().getClassName()));
+      }
+
+      // Optionally add the custom classloader class
+      if (classLoaderClassName != null) {
+        classes.add(classLoader.loadClass(classLoaderClassName));
       }
 
       // The location name is computed from the MD5 of all the classes names
       // The localized name is always APPLICATION_JAR
-      List<String> classList = Lists.newArrayList(Iterables.transform(classes, CLASS_TO_NAME));
-      Collections.sort(classList);
+      List<String> classList = classes.stream().map(Class::getName).sorted().collect(Collectors.toList());
       Hasher hasher = Hashing.md5().newHasher();
       for (String name : classList) {
         hasher.putString(name);
