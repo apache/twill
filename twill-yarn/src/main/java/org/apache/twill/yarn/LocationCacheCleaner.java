@@ -18,7 +18,6 @@
 package org.apache.twill.yarn;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Predicate;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
 import org.apache.hadoop.conf.Configuration;
@@ -32,11 +31,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /**
  * Responsible for cleanup of {@link LocationCache}.
@@ -66,7 +67,7 @@ final class LocationCacheCleaner extends AbstractIdleService {
   }
 
   @Override
-  protected void startUp() throws Exception {
+  protected void startUp() {
     scheduler = Executors.newSingleThreadScheduledExecutor(Threads.createDaemonThreadFactory("location-cache-cleanup"));
     scheduler.execute(new Runnable() {
       @Override
@@ -88,31 +89,27 @@ final class LocationCacheCleaner extends AbstractIdleService {
   }
 
   @Override
-  protected void shutDown() throws Exception {
+  protected void shutDown() {
     scheduler.shutdownNow();
   }
 
   @VisibleForTesting
   void forceCleanup(final long currentTime) {
-    Futures.getUnchecked(scheduler.submit(new Runnable() {
-      @Override
-      public void run() {
-        cleanup(currentTime);
-      }
-    }));
+    Futures.getUnchecked(scheduler.submit(() -> cleanup(currentTime)));
   }
 
   /**
    * Performs cleanup based on the given time.
    */
-  private void cleanup(long currentTime) {
+  @VisibleForTesting
+  void cleanup(long currentTime) {
     // First go through the pending cleanup list and remove those that can be removed
     Iterator<PendingCleanup> iterator = pendingCleanups.iterator();
     while (iterator.hasNext()) {
       PendingCleanup pendingCleanup = iterator.next();
 
       // If rejected by the predicate, it means it is being used, hence remove it from the pending cleanup list.
-      if (!cleanupPredicate.apply(pendingCleanup.getLocation())) {
+      if (!cleanupPredicate.test(pendingCleanup.getLocation())) {
         iterator.remove();
       } else {
         try {
@@ -133,15 +130,18 @@ final class LocationCacheCleaner extends AbstractIdleService {
     try {
       for (Location cacheDir : cacheBaseLocation.list()) {
         try {
-          for (Location location : cacheDir.list()) {
-            if (cleanupPredicate.apply(location)) {
-              long expireTime = currentTime;
-              if (cacheDir.getName().equals(sessionId)) {
-                expireTime += expiry;
-              } else {
-                // If the cache entry is from different YarnTwillRunnerService session, use the anti expiry time.
-                expireTime += antiqueExpiry;
-              }
+          boolean currentSession = cacheDir.getName().equals(sessionId);
+          List<Location> entries = cacheDir.list();
+          if (!currentSession && entries.isEmpty()) {
+            // Delete empty directory of old session
+            cacheDir.delete();
+            continue;
+          }
+
+          // If the cache entry is from different YarnTwillRunnerService session, use the anti expiry time.
+          long expireTime = computeExpiry(currentTime, currentSession ? expiry : antiqueExpiry);
+          for (Location location : entries) {
+            if (cleanupPredicate.test(location)) {
               // If the location is already pending for cleanup, this won't update the expire time as
               // the comparison of PendingCleanup is only by location.
               if (pendingCleanups.add(new PendingCleanup(location, expireTime))) {
@@ -156,6 +156,13 @@ final class LocationCacheCleaner extends AbstractIdleService {
     } catch (IOException e) {
       LOG.warn("Failed to list cache directories from {}", cacheBaseLocation, e);
     }
+  }
+
+  private long computeExpiry(long currentTime, long increment) {
+    if (Long.MAX_VALUE - increment < currentTime) {
+      return Long.MAX_VALUE;
+    }
+    return currentTime + increment;
   }
 
   /**

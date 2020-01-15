@@ -405,34 +405,31 @@ public final class YarnTwillRunnerService implements TwillRunnerService {
 
   private LocationCacheCleaner startLocationCacheCleaner(final Location cacheBase, final String sessionId) {
     LocationCacheCleaner cleaner = new LocationCacheCleaner(
-      yarnConfig, cacheBase, sessionId, new Predicate<Location>() {
-        @Override
-        public boolean apply(Location location) {
-          // Collects all the locations that is being used by any live applications
-          Set<Location> activeLocations = new HashSet<>();
-          synchronized (YarnTwillRunnerService.this) {
-            for (YarnTwillController controller : controllers.values()) {
-              ApplicationMasterLiveNodeData amLiveNodeData = controller.getApplicationMasterLiveNodeData();
-              if (amLiveNodeData != null) {
-                for (LocalFile localFile : amLiveNodeData.getLocalFiles()) {
-                  activeLocations.add(locationFactory.create(localFile.getURI()));
-                }
+      yarnConfig, cacheBase, sessionId, location -> {
+        // Collects all the locations that is being used by any live applications
+        Set<Location> activeLocations = new HashSet<>();
+        synchronized (YarnTwillRunnerService.this) {
+          for (YarnTwillController controller : controllers.values()) {
+            ApplicationMasterLiveNodeData amLiveNodeData = controller.getApplicationMasterLiveNodeData();
+            if (amLiveNodeData != null) {
+              for (LocalFile localFile : amLiveNodeData.getLocalFiles()) {
+                activeLocations.add(locationFactory.create(localFile.getURI()));
               }
             }
           }
-
-          try {
-            // Always keep the launcher.jar and twill.jar from the current session as they should never change,
-            // hence never expires
-            activeLocations.add(cacheBase.append(sessionId).append(Constants.Files.LAUNCHER_JAR));
-            activeLocations.add(cacheBase.append(sessionId).append(Constants.Files.TWILL_JAR));
-          } catch (IOException e) {
-            // This should not happen
-            LOG.warn("Failed to construct cache location", e);
-          }
-
-          return !activeLocations.contains(location);
         }
+
+        try {
+          // Always keep the launcher.jar and twill.jar from the current session as they should never change,
+          // hence never expires
+          activeLocations.add(cacheBase.append(sessionId).append(Constants.Files.LAUNCHER_JAR));
+          activeLocations.add(cacheBase.append(sessionId).append(Constants.Files.TWILL_JAR));
+        } catch (IOException e) {
+          // This should not happen
+          LOG.warn("Failed to construct cache location", e);
+        }
+
+        return !activeLocations.contains(location);
       });
     cleaner.startAndWait();
     return cleaner;
