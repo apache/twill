@@ -144,7 +144,7 @@ public final class Dependencies {
     private final DependencyAcceptor acceptor;
 
     public DependencyClassVisitor(DependencyAcceptor acceptor) {
-      super(Opcodes.ASM5);
+      super(Opcodes.ASM7);
       this.acceptor = acceptor;
       this.signatureVisitor = createSignatureVisitor();
       this.annotationVisitor = createAnnotationVisitor();
@@ -189,7 +189,7 @@ public final class Dependencies {
         addType(Type.getType(desc));
       }
 
-      return new FieldVisitor(Opcodes.ASM5) {
+      return new FieldVisitor(Opcodes.ASM7) {
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
           if (!visible) {
@@ -210,7 +210,7 @@ public final class Dependencies {
       }
       addClasses(exceptions);
 
-      return new MethodVisitor(Opcodes.ASM5) {
+      return new MethodVisitor(Opcodes.ASM7) {
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
@@ -315,7 +315,7 @@ public final class Dependencies {
      * Creates a {@link SignatureVisitor} for gathering dependency information from class signature.
      */
     private SignatureVisitor createSignatureVisitor() {
-      return new SignatureVisitor(Opcodes.ASM5) {
+      return new SignatureVisitor(Opcodes.ASM7) {
         private String currentClass;
 
         @Override
@@ -335,7 +335,7 @@ public final class Dependencies {
      * Creates an {@link AnnotationVisitor} for gathering dependency information from annotations.
      */
     private AnnotationVisitor createAnnotationVisitor() {
-      return new AnnotationVisitor(Opcodes.ASM5) {
+      return new AnnotationVisitor(Opcodes.ASM7) {
         @Override
         public void visit(String name, Object value) {
           if (value instanceof Type) {

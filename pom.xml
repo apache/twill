@@ -173,7 +173,7 @@
         <netty.version>4.1.16.Final</netty.version>
         <snappy-java.version>1.0.5</snappy-java.version>
         <jcl-over-slf4j.version>1.7.2</jcl-over-slf4j.version>
-        <asm.version>5.0.2</asm.version>
+        <asm.version>7.1</asm.version>
         <kafka.version>0.8.0</kafka.version>
         <zkclient.version>0.10</zkclient.version>
         <zookeeper.version>3.4.5</zookeeper.version>
@@ -729,7 +729,12 @@
             </dependency>
             <dependency>
                 <groupId>org.ow2.asm</groupId>
-                <artifactId>asm-all</artifactId>
+                <artifactId>asm</artifactId>
+                <version>${asm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-commons</artifactId>
                 <version>${asm.version}</version>
             </dependency>
             <dependency>
