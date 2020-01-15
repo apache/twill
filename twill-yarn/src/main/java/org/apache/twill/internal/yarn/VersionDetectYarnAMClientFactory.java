@@ -38,11 +38,6 @@ public final class VersionDetectYarnAMClientFactory implements YarnAMClientFacto
       Class<YarnAMClient> clz;
       String clzName;
       switch (YarnUtils.getHadoopVersion()) {
-        case HADOOP_20:
-          // Uses hadoop-2.0 class
-          clzName = getClass().getPackage().getName() + ".Hadoop20YarnAMClient";
-          clz = (Class<YarnAMClient>) Class.forName(clzName);
-          break;
         case HADOOP_21:
           // Uses hadoop-2.1 class
           clzName = getClass().getPackage().getName() + ".Hadoop21YarnAMClient";

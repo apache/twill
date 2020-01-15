@@ -22,7 +22,7 @@
     <parent>
         <artifactId>twill-parent</artifactId>
         <groupId>org.apache.twill</groupId>
-        <version>0.13.0-SNAPSHOT</version>
+        <version>0.14.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -106,90 +106,6 @@
     </build>
 
     <profiles>
-        <profile>
-            <id>hadoop-2.0</id>
-            <properties>
-                <output.dir>${hadoop20.output.dir}</output.dir>
-            </properties>
-        </profile>
-        <profile>
-            <id>hadoop-2.1</id>
-            <build>
-                <resources>
-                    <resource>
-                        <directory>${hadoop20.output.dir}</directory>
-                    </resource>
-                    <resource>
-                        <directory>src/main/resources</directory>
-                    </resource>
-                </resources>
-            </build>
-        </profile>
-        <profile>
-            <id>hadoop-2.2</id>
-            <build>
-                <resources>
-                    <resource>
-                        <directory>${hadoop20.output.dir}</directory>
-                    </resource>
-                    <resource>
-                        <directory>src/main/resources</directory>
-                    </resource>
-                </resources>
-            </build>
-        </profile>
-        <profile>
-            <id>hadoop-2.3</id>
-            <build>
-                <resources>
-                    <resource>
-                        <directory>${hadoop20.output.dir}</directory>
-                    </resource>
-                    <resource>
-                        <directory>src/main/resources</directory>
-                    </resource>
-                </resources>
-            </build>
-        </profile>
-        <profile>
-            <id>hadoop-2.4</id>
-            <build>
-                <resources>
-                    <resource>
-                        <directory>${hadoop20.output.dir}</directory>
-                    </resource>
-                    <resource>
-                        <directory>src/main/resources</directory>
-                    </resource>
-                </resources>
-            </build>
-        </profile>
-        <profile>
-            <id>hadoop-2.5</id>
-            <build>
-                <resources>
-                    <resource>
-                        <directory>${hadoop20.output.dir}</directory>
-                    </resource>
-                    <resource>
-                        <directory>src/main/resources</directory>
-                    </resource>
-                </resources>
-            </build>
-        </profile>
-        <profile>
-            <id>hadoop-2.6</id>
-            <build>
-                <resources>
-                    <resource>
-                        <directory>${hadoop20.output.dir}</directory>
-                    </resource>
-                    <resource>
-                        <directory>src/main/resources</directory>
-                    </resource>
-                </resources>
-            </build>
-        </profile>
         <profile>
             <id>mapr-hadoop-2.4</id>
             <dependencies>
