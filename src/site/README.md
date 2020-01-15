@@ -40,7 +40,7 @@ Apache Twill Site Update Instructions
 1. Update the `src/site/site.xml` file to add new release information.
 1. Build the site
 
-        mvn clean site -DskipTests -P site
+        mvn clean site -DskipTests -P site,hadoop-2.6
    All Twill website files will be generated at the `target/site` directory
 1. Update and check-in changes in SVN `https://svn.apache.org/repos/asf/twill/site`.
         
