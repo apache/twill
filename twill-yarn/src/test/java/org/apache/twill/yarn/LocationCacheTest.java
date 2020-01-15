@@ -117,9 +117,8 @@ public class LocationCacheTest {
       .forceLocationCacheCleanup(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(30) +
                                    Configs.Defaults.LOCATION_CACHE_ANTIQUE_EXPIRY_MS);
 
-    // Now there shouldn't be any file under the current session cache directory
-    List<Location> locations = currentSessionCache.list();
-    Assert.assertTrue("Location is not empty " + locations, locations.isEmpty());
+    // The previous session cache directory should be deleted after a new session was running
+    Assert.assertFalse(currentSessionCache.exists());
   }
 
   /**
