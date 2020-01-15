@@ -84,6 +84,11 @@
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-commons</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
