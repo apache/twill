@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
 final class SimpleKafkaPublisher implements KafkaPublisher {
 
   private static final Logger LOG = LoggerFactory.getLogger(SimpleKafkaPublisher.class);
+  private static final int MAX_MESSAGE_BYTES = 1024 * 1024 * 10;
 
   private final BrokerService brokerService;
   private final Ack ack;
@@ -171,9 +172,9 @@ final class SimpleKafkaPublisher implements KafkaPublisher {
         props.put("metadata.broker.list", newBrokerList);
         props.put("serializer.class", ByteBufferEncoder.class.getName());
         props.put("key.serializer.class", IntegerEncoder.class.getName());
-        props.put("partitioner.class", IntegerPartitioner.class.getName());
         props.put("request.required.acks", Integer.toString(ack.getAck()));
         props.put("compression.codec", compression.getCodec());
+        props.put("message.max.bytes", Integer.toString(MAX_MESSAGE_BYTES));
 
         ProducerConfig config = new ProducerConfig(props);
         newProducer = new Producer<>(config);

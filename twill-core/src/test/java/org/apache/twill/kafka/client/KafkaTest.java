@@ -135,6 +135,9 @@ public class KafkaTest {
           server = new EmbeddedKafkaServer(kafkaServerConfig);
           server.startAndWait();
 
+          // Wait a little while to make sure changes is reflected in broker service
+          TimeUnit.SECONDS.sleep(3);
+
           // Publish another message
           createPublishThread(kafkaClient, topic, Compression.NONE, "Second message", 1).start();
 
@@ -308,16 +311,14 @@ public class KafkaTest {
 
   private Thread createPublishThread(final KafkaClient kafkaClient, final String topic, final Compression compression,
                                      final String message, final int count, final int base) {
-    return new Thread() {
-      public void run() {
-        KafkaPublisher publisher = kafkaClient.getPublisher(KafkaPublisher.Ack.ALL_RECEIVED, compression);
-        KafkaPublisher.Preparer preparer = publisher.prepare(topic);
-        for (int i = 0; i < count; i++) {
-          preparer.add(Charsets.UTF_8.encode((base + i) + " " + message), 0);
-        }
-        Futures.getUnchecked(preparer.send());
+    return new Thread(() -> {
+      KafkaPublisher publisher = kafkaClient.getPublisher(KafkaPublisher.Ack.ALL_RECEIVED, compression);
+      KafkaPublisher.Preparer preparer = publisher.prepare(topic);
+      for (int i = 0; i < count; i++) {
+        preparer.add(Charsets.UTF_8.encode((base + i) + " " + message), 0);
       }
-    };
+      Futures.getUnchecked(preparer.send());
+    });
   }
 
 

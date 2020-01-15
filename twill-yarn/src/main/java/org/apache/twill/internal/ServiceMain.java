@@ -18,8 +18,11 @@
 package org.apache.twill.internal;
 
 import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.util.ContextInitializer;
+import ch.qos.logback.core.filter.Filter;
 import ch.qos.logback.core.joran.spi.JoranException;
+import ch.qos.logback.core.spi.FilterReply;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.Futures;
@@ -211,7 +214,14 @@ public abstract class ServiceMain {
       }
     }
 
+    KafkaAppender kafkaAppender = getKafkaAppender(context);
+    kafkaAppender.start();
+
     // Attach the KafkaAppender to the root logger
+    context.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME).addAppender(kafkaAppender);
+  }
+
+  private KafkaAppender getKafkaAppender(LoggerContext context) {
     KafkaAppender kafkaAppender = new KafkaAppender();
     kafkaAppender.setName("KAFKA");
     kafkaAppender.setTopic(Constants.LOG_TOPIC);
@@ -223,10 +233,15 @@ public abstract class ServiceMain {
       kafkaAppender.setRunnableName(runnableName);
     }
 
+    kafkaAppender.addFilter(new Filter<ILoggingEvent>() {
+      @Override
+      public FilterReply decide(ILoggingEvent event) {
+        return event.getLoggerName().startsWith("kafka.") ? FilterReply.DENY : FilterReply.ACCEPT;
+      }
+    });
     kafkaAppender.setContext(context);
-    kafkaAppender.start();
 
-    context.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME).addAppender(kafkaAppender);
+    return kafkaAppender;
   }
 
   /**
