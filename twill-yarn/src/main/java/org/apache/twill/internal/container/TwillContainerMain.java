@@ -132,7 +132,7 @@ public final class TwillContainerMain extends ServiceMain {
       service,
       zkClientService,
       new LogFlushService(),
-      new TwillZKPathService(containerZKClient, runId),
+      new TwillZKPathService(containerZKClient, runId, conf),
       new CloseableServiceWrapper(discoveryService)
     );
   }

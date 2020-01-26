@@ -100,6 +100,11 @@ public final class Configs {
      */
     public static final String FILE_CONTEXT_CACHE_MAX_SIZE = "twill.file.context.cache.max.size";
 
+    /**
+     * The timeout seconds for zookeeper path service.
+     */
+    public static final String ZOOKEEPER_PATH_SERVICE_TIMEOUT = "twill.zookeeper.path.service.timeout.secs";
+
     private Keys() {
     }
   }
@@ -148,6 +153,11 @@ public final class Configs {
      * Default size of the file context cache.
      */
     public static final int FILE_CONTEXT_CACHE_MAX_SIZE = 100;
+
+    /**
+     * Default timeout value in seconds for zookeeper path service.
+     */
+    public static final long ZOOKEEPER_PATH_SERVICE_TIMEOUT = 5L;
 
 
     private Defaults() {

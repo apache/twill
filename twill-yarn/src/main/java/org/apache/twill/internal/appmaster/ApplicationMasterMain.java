@@ -92,7 +92,7 @@ public final class ApplicationMasterMain extends ServiceMain {
     List<Service> prerequisites = Lists.newArrayList(
       new YarnAMClientService(amClient, trackerService),
       zkClientService,
-      new AppMasterTwillZKPathService(zkClientService, runId)
+      new AppMasterTwillZKPathService(zkClientService, runId, conf)
     );
 
     if (twillRuntimeSpec.isLogCollectionEnabled()) {
@@ -256,8 +256,8 @@ public final class ApplicationMasterMain extends ServiceMain {
     private static final Logger LOG = LoggerFactory.getLogger(AppMasterTwillZKPathService.class);
     private final ZKClient zkClient;
 
-    AppMasterTwillZKPathService(ZKClient zkClient, RunId runId) {
-      super(zkClient, runId);
+    AppMasterTwillZKPathService(ZKClient zkClient, RunId runId, Configuration conf) {
+      super(zkClient, runId, conf);
       this.zkClient = zkClient;
     }
 
@@ -285,7 +285,7 @@ public final class ApplicationMasterMain extends ServiceMain {
         LOG.info("Removing ZK path: {}{}", zkClient.getConnectString(), path);
         deleteFutures.add(zkClient.delete(path));
       }
-      Futures.successfulAsList(deleteFutures).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      Futures.successfulAsList(deleteFutures).get(timeoutSecs, TimeUnit.SECONDS);
       for (OperationFuture<?> future : deleteFutures) {
         try {
           future.get();
@@ -324,7 +324,7 @@ public final class ApplicationMasterMain extends ServiceMain {
     private boolean delete(String path) throws Exception {
       try {
         LOG.info("Removing ZK path: {}{}", zkClient.getConnectString(), path);
-        zkClient.delete(path).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        zkClient.delete(path).get(timeoutSecs, TimeUnit.SECONDS);
         return true;
       } catch (ExecutionException e) {
         if (e.getCause() instanceof KeeperException.NotEmptyException) {
@@ -347,7 +347,7 @@ public final class ApplicationMasterMain extends ServiceMain {
      */
     private List<String> getChildren(String path) throws Exception {
       try {
-        return zkClient.getChildren(path).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).getChildren();
+        return zkClient.getChildren(path).get(timeoutSecs, TimeUnit.SECONDS).getChildren();
       } catch (ExecutionException e) {
         if (e.getCause() instanceof KeeperException.NoNodeException) {
           // If the node doesn't exists, return an empty list
