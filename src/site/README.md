@@ -35,7 +35,7 @@ Apache Twill Site Update Instructions
         
         cp -r target/site/apidocs src/site/resources/apidocs-${RELEASE_VERSION}
 1. Update release version and link in `src/site/markdown/index.md`
-1. Create new release page markdown file `src/site/markdown/release/${RELEASE_VERSION}.md`.
+1. Create new release page markdown file `src/site/markdown/releases/${RELEASE_VERSION}.md`.
    You can base on the previous release page and update accordingly.
 1. Update the `src/site/site.xml` file to add new release information.
 1. Build the site
