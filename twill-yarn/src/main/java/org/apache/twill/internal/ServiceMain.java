@@ -31,6 +31,7 @@ import com.google.common.util.concurrent.Service;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.twill.api.Configs;
 import org.apache.twill.api.RunId;
 import org.apache.twill.filesystem.FileContextLocationFactory;
 import org.apache.twill.filesystem.LocalLocationFactory;
@@ -248,30 +249,30 @@ public abstract class ServiceMain {
    * A simple service for creating/remove ZK paths needed for {@link AbstractTwillService}.
    */
   protected static class TwillZKPathService extends AbstractIdleService {
-
-    protected static final long TIMEOUT_SECONDS = 5L;
-
     private static final Logger LOG = LoggerFactory.getLogger(TwillZKPathService.class);
 
     private final ZKClient zkClient;
     private final String path;
+    protected final long timeoutSecs;
 
-    public TwillZKPathService(ZKClient zkClient, RunId runId) {
+    public TwillZKPathService(ZKClient zkClient, RunId runId, Configuration conf) {
       this.zkClient = zkClient;
       this.path = "/" + runId.getId();
+      this.timeoutSecs = conf.getLong(Configs.Keys.ZOOKEEPER_PATH_SERVICE_TIMEOUT,
+                                      Configs.Defaults.ZOOKEEPER_PATH_SERVICE_TIMEOUT);
     }
 
     @Override
     protected void startUp() throws Exception {
       LOG.info("Creating container ZK path: {}{}", zkClient.getConnectString(), path);
       ZKOperations.ignoreError(zkClient.create(path, null, CreateMode.PERSISTENT),
-                               KeeperException.NodeExistsException.class, null).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                               KeeperException.NodeExistsException.class, null).get(timeoutSecs, TimeUnit.SECONDS);
     }
 
     @Override
     protected void shutDown() throws Exception {
       LOG.info("Removing container ZK path: {}{}", zkClient.getConnectString(), path);
-      ZKOperations.recursiveDelete(zkClient, path).get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      ZKOperations.recursiveDelete(zkClient, path).get(timeoutSecs, TimeUnit.SECONDS);
     }
   }
 }
